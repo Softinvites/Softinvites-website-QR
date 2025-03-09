@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       setIsAuthenticated(true);
       navigate("/home"); // Redirect after login
     } catch (error) {
-      console.error("Login failed", error);
+      console.error("Login faied", error);
     }
   }, [navigate]);
 
