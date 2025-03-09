@@ -15,8 +15,6 @@ interface AuthContextType {
   isAuthenticated: boolean;
   user: User | null;
   login: (email: string, password: string) => Promise<void>;
-  register: (username: string, email: string, password: string, confirmPassword: string, name: string) => Promise<void>;
-  logout: () => void;
 }
 
 // Create the AuthContext
@@ -37,9 +35,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
           setUser(response.data);
           setIsAuthenticated(true);
         })
-        .catch(() => {
-          logout(); // Logout if token is invalid
-        });
+      
     }
   }, []);
 
@@ -61,31 +57,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     }
   };
 
-  // Register function
-  const register = async (username: string, email: string, password: string, confirmPassword: string, name: string) => {
-    try {
-      const response = await axios.post("https://softinvite-api.onrender.com/admin/register", {
-        username,
-        email,
-        password,
-        confirm_password: confirmPassword,
-        name,
-      });
-
-      console.log("Registration successful:", response.data);
-      navigate("/sign-in"); // Redirect to sign-in after successful registration
-    } catch (error) {
-      console.error("Registration failed", error);
-    }
-  };
-
-  // Logout function
-  const logout = () => {
-    localStorage.removeItem("token");
-    setUser(null);
-    setIsAuthenticated(false);
-    navigate("/sign-in");
-  };
+  
 
   // Memoize the context value to avoid re-renders
   const authContextValue = useMemo(
@@ -93,8 +65,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
       isAuthenticated,
       user,
       login,
-      register,
-      logout,
+      
     }),
     [isAuthenticated, user]
   );
