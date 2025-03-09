@@ -7,6 +7,8 @@ import LinearProgress, { linearProgressClasses } from '@mui/material/LinearProgr
 import { varAlpha } from 'src/theme/styles';
 import { AuthLayout } from 'src/layouts/auth';
 import { DashboardLayout } from 'src/layouts/dashboard';
+import { useAuth } from 'src/context/AuthContext'; // ✅ Import useAuth
+import ProtectedRoute from 'src/components/ProtectedRoute';
 
 // ----------------------------------------------------------------------
 
@@ -33,7 +35,13 @@ const renderFallback = (
 );
 
 export function Router() {
+  const { isAuthenticated } = useAuth(); // ✅ Get authentication state
+
   return useRoutes([
+    {
+      path: '/',
+      element: isAuthenticated ? <Navigate to="/home" replace /> : <Navigate to="/sign-in" replace />, // ✅ Redirect to sign-in if not authenticated
+    },
     {
       element: (
         <DashboardLayout>
@@ -43,10 +51,15 @@ export function Router() {
         </DashboardLayout>
       ),
       children: [
-        { element: <HomePage />, index: true },
-        { path: 'user', element: <UserPage /> },
-        { path: 'products', element: <ProductsPage /> },
-        { path: 'blog', element: <BlogPage /> },
+        {
+          element: <ProtectedRoute />, // ✅ Protect all dashboard routes
+          children: [
+            { path: 'home', element: <HomePage /> },
+            { path: 'user', element: <UserPage /> },
+            { path: 'products', element: <ProductsPage /> },
+            { path: 'blog', element: <BlogPage /> },
+          ],
+        },
       ],
     },
     {
