@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, ReactNode, useMemo, useEffect } from "react";
+import { createContext, useContext, useState, ReactNode, useMemo, useEffect, useCallback } from "react";
 import axios from "axios";
 import { useNavigate } from "react-router-dom";
 
@@ -34,40 +34,37 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         .then((response) => {
           setUser(response.data);
           setIsAuthenticated(true);
-        })
-      
+        });
     }
   }, []);
 
-  // Login function
-  const login = async (email: string, password: string) => {
+  // Memoized login function using useCallback
+  const login = useCallback(async (email: string, password: string) => {
     try {
-      const response = await axios.post<{ token: string; user: User }>("https://softinvite-api.onrender.com/admin/login", { 
-        email, 
-        password 
-      });
+      const response = await axios.post<{ token: string; user: User }>(
+        "https://softinvite-api.onrender.com/admin/login",
+        { email, password }
+      );
 
-      const { token, user } = response.data;
+      // Rename destructured 'user' to 'userData' to avoid shadowing
+      const { token, user: userData } = response.data;
       localStorage.setItem("token", token);
-      setUser(user);
+      setUser(userData);
       setIsAuthenticated(true);
       navigate("/home"); // Redirect after login
     } catch (error) {
       console.error("Login failed", error);
     }
-  };
+  }, [navigate]);
 
-  
-
-  // Memoize the context value to avoid re-renders
+  // Memoize the context value to avoid unnecessary re-renders
   const authContextValue = useMemo(
     () => ({
       isAuthenticated,
       user,
       login,
-      
     }),
-    [isAuthenticated, user]
+    [isAuthenticated, user, login]
   );
 
   return <AuthContext.Provider value={authContextValue}>{children}</AuthContext.Provider>;
