@@ -28,6 +28,8 @@ export function SignInView() {
       const response = await axios.post('https://softinvite-api.onrender.com/admin/login', {
         email,
         password,
+
+   withCredentials: true  // Important for cookies-based auth
       });
       localStorage.setItem('token', response.data.token);
       navigate('/home');
