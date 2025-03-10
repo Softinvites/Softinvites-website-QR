@@ -25,12 +25,12 @@ export function SignInView() {
     setLoading(true);
     setError('');
     try {
-      const response = await axios.post('https://softinvite-api.onrender.com/admin/login', {
-        email,
-        password,
-
-   withCredentials: true  // Important for cookies-based auth
-      });
+      const response = await axios.post('https://softinvite-api.onrender.com/admin/login',
+        
+        { email, password },  // Request body should only contain email & password
+        { withCredentials: true } // This should be the third argument
+      );
+  
       localStorage.setItem('token', response.data.token);
       navigate('/home');
     } catch (err) {
