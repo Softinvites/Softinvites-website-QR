@@ -91,7 +91,7 @@ export function UserView() {
     const timer = setTimeout(() => {
       localStorage.removeItem("token");
       navigate("/sign-in"); // Redirect to sign-in page
-    }, 80000); // 30 minutes (1,800,000 ms)
+    }, 1800000); // 30 minutes (1,800,000 ms)
     
 
     return () => clearTimeout(timer); // Cleanup timeout if component unmounts
