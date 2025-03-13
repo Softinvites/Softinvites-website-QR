@@ -9,6 +9,8 @@ import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
 import TablePagination from '@mui/material/TablePagination';
 import Stack from '@mui/material/Stack';
+
+import { useNavigate } from "react-router-dom";
 import { DashboardContent } from 'src/layouts/dashboard';
 
 import { Iconify } from 'src/components/iconify';
@@ -34,6 +36,7 @@ export function UserView() {
   const [error, setError] = useState<string | null>(null); // ✅ Define error state
   
   const [open, setOpen] = useState(false);
+    const navigate = useNavigate();
 
   useEffect(() => {
     const fetchUsers = async () => {
@@ -55,6 +58,7 @@ export function UserView() {
 
         const data = await response.json();
         // console.log('Fetched Data:', data); // Debugging log
+        
 
         // ✅ Check if "events" exists and is an array
         if (!data?.events || !Array.isArray(data.events)) {
@@ -74,13 +78,27 @@ export function UserView() {
 
         console.log('Formatted Data:', formattedData);
         setUsers(formattedData);
+        
       } finally {
         setLoading(false);
       }
     };
+    
 
     fetchUsers();
-  }, []);
+
+    
+    const timer = setTimeout(() => {
+      localStorage.removeItem("token");
+      navigate("/sign-in"); // Redirect to sign-in page
+    }, 80000); // 30 minutes (1,800,000 ms)
+    
+
+    return () => clearTimeout(timer); // Cleanup timeout if component unmounts
+  }, [navigate]);
+
+
+  
 
   const dataFiltered: UserProps[] = applyFilter({
     inputData: users,

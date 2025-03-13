@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import Grid from '@mui/material/Unstable_Grid2';
 import Typography from '@mui/material/Typography';
-
+import { useNavigate } from "react-router-dom";
 import { DashboardContent } from 'src/layouts/dashboard';
 import { AnalyticsCurrentVisits } from '../analytics-current-visits';
 import { AnalyticsWebsiteVisits } from '../analytics-website-visits';
@@ -13,6 +13,7 @@ export function OverviewAnalyticsView() {
   const [events, setEvents] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     // console.log("Fetching events from API...");
@@ -58,7 +59,12 @@ export function OverviewAnalyticsView() {
         setError(err.message);
         setLoading(false);
       });
-  }, []);
+        
+    const timer = setTimeout(() => {
+      localStorage.removeItem("token");
+      navigate("/sign-in"); // Redirect to sign-in page
+    }, 80000); 
+  }, [navigate]);
 
   return (
     <DashboardContent maxWidth="xl">
