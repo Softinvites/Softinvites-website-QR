@@ -93,32 +93,43 @@ export function UserView() {
   return (
     <DashboardContent>
       <Box display="flex" alignItems="center" mb={5}>
-        <Typography variant="h4" flexGrow={1}>
-          Events
-        </Typography>
-        <Stack direction="row" spacing={2}>
+      <Typography variant="h4" flexGrow={1} padding={1}>
+        Events
+      </Typography>
+      <Stack direction="row" spacing={2}>
         <Button
-        variant="contained"
-        color="inherit"
-        startIcon={<Iconify icon="mingcute:add-line" />}
-        onClick={() => setOpen(true)}
-      >
-        Create new Event
-      </Button>
+          variant="contained"
+          color="inherit"
+          startIcon={<Iconify icon="mingcute:add-line" />}
+          onClick={() => setOpen(true)}
+          sx={{
+            fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
+            padding: { xs: "4px 8px", sm: "6px 12px", md: "8px 16px" },
+            minWidth: { xs: "auto", sm: "auto" },
+          }}
+        >
+          Create new Event
+        </Button>
 
-      {/* Import and use the reusable modal */}
-      <EventModal open={open} handleClose={() => setOpen(false)}>
-        {/* You can pass form elements inside here if needed */}
-      </EventModal>
-          <Button
-            variant="contained"
-         color="error"
-            startIcon={<Iconify icon="mingcute:add-line" />}
-          >
-            Delete all Events
-          </Button>
-        </Stack>
-      </Box>
+        {/* Reusable Event Modal */}
+        <EventModal open={open} handleClose={() => setOpen(false)}>
+          {/* Add form elements inside if needed */}
+        </EventModal>
+
+        <Button
+          variant="contained"
+          color="error"
+          startIcon={<Iconify icon="mingcute:add-line" />}
+          sx={{
+            fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
+            padding: { xs: "4px 8px", sm: "6px 12px", md: "8px 16px" },
+            minWidth: { xs: "auto", sm: "auto" },
+          }}
+        >
+          Delete all Events
+        </Button>
+      </Stack>
+    </Box>
 
       <Card>
         <UserTableToolbar
