@@ -63,7 +63,7 @@ export function OverviewAnalyticsView() {
     const timer = setTimeout(() => {
       localStorage.removeItem("token");
       navigate("/sign-in"); // Redirect to sign-in page
-    }, 80000); 
+    }, 3600000); 
   }, [navigate]);
 
   return (
