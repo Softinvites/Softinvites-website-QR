@@ -34,7 +34,7 @@ export function SignInView() {
       localStorage.setItem('token', response.data.token);
       navigate('/home');
     } catch (err) {
-      setError('Invalid credentials. Please try aain.');
+      setError('Invalid credentials. Please try again.');
     }
     setLoading(false);
   };

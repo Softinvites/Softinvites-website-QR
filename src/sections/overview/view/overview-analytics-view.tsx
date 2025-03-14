@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import Grid from '@mui/material/Unstable_Grid2';
 import Typography from '@mui/material/Typography';
 import { useNavigate } from "react-router-dom";
+import Button from '@mui/material/Button';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { AnalyticsCurrentVisits } from '../analytics-current-visits';
 import { AnalyticsWebsiteVisits } from '../analytics-website-visits';
@@ -35,11 +36,13 @@ export function OverviewAnalyticsView() {
       },
     })
       .then((res) => {
-        // console.log("Received response:", res);
+       console.log("Received response:", res);
 
         if (!res.ok) {
           throw new Error(`HTTP error! Status: ${res.status}`);
+        
         }
+        console.log(res.status)
 
         return res.json();
       })
@@ -63,7 +66,7 @@ export function OverviewAnalyticsView() {
     const timer = setTimeout(() => {
       localStorage.removeItem("token");
       navigate("/sign-in"); // Redirect to sign-in page
-    }, 2900000); 
+    }, 2900000);  
   }, [navigate]);
 
   return (
@@ -72,11 +75,30 @@ export function OverviewAnalyticsView() {
         Hi, Welcome back 👋
       </Typography>
 
+
       {error && (
-        <Typography color="error">
-          Failed to load events data: {error}
-        </Typography>
-      )}
+  <Button
+    onClick={() => navigate("/sign-in")}
+    sx={{
+      mt: 2,
+      animation: "beepEffect 2s infinite",
+      "@keyframes beepEffect": {
+        "0%": { transform: "scale(1)", color: "black" },
+        "50%": { transform: "scale(1.05)", color: "red" },
+        "100%": { transform: "scale(1)", color: "black" },
+      },
+    }}
+  >
+    Click here to sign in again to view details
+  </Button>
+)}
+
+
+
+
+
+
+
 
       {loading ? (
         <Typography>Loading events...</Typography>
