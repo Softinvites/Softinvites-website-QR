@@ -9,6 +9,12 @@ import MenuList from '@mui/material/MenuList';
 import TableCell from '@mui/material/TableCell';
 import IconButton from '@mui/material/IconButton';
 import MenuItem, { menuItemClasses } from '@mui/material/MenuItem';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import TextField from '@mui/material/TextField';
+import Button from '@mui/material/Button';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
@@ -19,9 +25,7 @@ export type UserProps = {
   id: string;
   name: string;
   status: string;
-  
   date: string;
-  
   createdAt: string;
   location: string;
   avatarUrl: string;
@@ -35,21 +39,110 @@ type UserTableRowProps = {
 };
 
 export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) {
+  console.log("Rendering UserTableRow with data:", row);
+
+  // Replace with your actual token or use a context/provider
+  const token = localStorage.getItem('token');
+
   const [openPopover, setOpenPopover] = useState<HTMLButtonElement | null>(null);
+  const [openDialog, setOpenDialog] = useState(false);
+
+  // These states hold the editable values.
+  // If you want to pre-populate with your specific details, you could also initialize here:
+  // useState("Stalo x Vera Wedding") etc.
+  const [editName, setEditName] = useState(row.name);
+  const [editDate, setEditDate] = useState(row.date);
+  const [editLocation, setEditLocation] = useState(row.location);
 
   const handleOpenPopover = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    console.log("Opening popover for:", row.name);
     setOpenPopover(event.currentTarget);
-  }, []);
+  }, [row.name]);
 
   const handleClosePopover = useCallback(() => {
+    console.log("Closing popover");
     setOpenPopover(null);
   }, []);
+
+  // Open the edit dialog and initialize form values (or set defaults as needed)
+  const handleOpenEditDialog = useCallback(() => {
+    console.log("Opening edit dialog for:", row.name);
+    // If you want to use the specific details provided in your example, uncomment these:
+    // setEditName("Stalo x Vera Wedding");
+    // setEditDate("16th September, 2026");
+    // setEditLocation("Victoria Island Lagos");
+    // Otherwise, initialize with the current row values:
+    setEditName(row.name);
+    setEditDate(row.date);
+    setEditLocation(row.location);
+    setOpenDialog(true);
+    handleClosePopover();
+  }, [row, handleClosePopover]);
+
+  const handleCloseDialog = useCallback(() => {
+    console.log("Closing edit dialog");
+    setOpenDialog(false);
+  }, []);
+
+  const handleSubmitEdit = useCallback(async () => {
+    console.log("Submitting edit for:", row.name, "with values:", { editName, editDate, editLocation });
+    try {
+      const response = await fetch(`https://softinvite-api.onrender.com/events/update/${row.id}`, {
+        method: 'PUT', // or 'PATCH' if that's what your API expects
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          name: editName,
+          date: editDate,
+          location: editLocation
+        })
+      });
+      const data = await response.json();
+      console.log("Edit response:", data);
+    } catch (error) {
+      console.error("Error editing event:", error);
+    } finally {
+      handleCloseDialog();
+      
+      window.location.reload(); // Refresh the page
+    }
+  }, [row.id, token, editName, editDate, editLocation, row.name, handleCloseDialog]);
+
+  // DELETE function remains unchanged
+  const handleDelete = useCallback(async () => {
+    console.log("Delete clicked for:", row.name);
+    try {
+      const response = await fetch(`https://softinvite-api.onrender.com/events/events/${row.id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      const data = await response.json();
+      console.log("Delete response:", data);
+    } catch (error) {
+      console.error("Error deleting event:", error);
+    } finally {
+      handleClosePopover();
+      
+      window.location.reload(); // Refresh the page
+    }
+  }, [row, token, handleClosePopover]);
 
   return (
     <>
       <TableRow hover tabIndex={-1} role="checkbox" selected={selected}>
         <TableCell padding="checkbox">
-          <Checkbox disableRipple checked={selected} onChange={onSelectRow} />
+          <Checkbox
+            disableRipple
+            checked={selected}
+            onChange={() => {
+              console.log("Checkbox clicked for:", row.name, "Selected:", !selected);
+              onSelectRow();
+            }}
+          />
         </TableCell>
 
         <TableCell component="th" scope="row">
@@ -60,17 +153,12 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         </TableCell>
 
         <TableCell>{row.location}</TableCell>
-        
-
-
         <TableCell>{row.date}</TableCell>
-
-        
         <TableCell>{row.createdAt}</TableCell>
-
-      
         <TableCell>
-          <Label color={(row.status === 'banned' && 'error') || 'success'}>{row.status}</Label>
+          <Label color={(row.status === 'banned' && 'error') || 'success'}>
+            {row.status}
+          </Label>
         </TableCell>
 
         <TableCell align="right">
@@ -103,17 +191,53 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
             },
           }}
         >
-          <MenuItem onClick={handleClosePopover}>
+          <MenuItem onClick={handleOpenEditDialog}>
             <Iconify icon="solar:pen-bold" />
             Edit
           </MenuItem>
 
-          <MenuItem onClick={handleClosePopover} sx={{ color: 'error.main' }}>
+          <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
             <Iconify icon="solar:trash-bin-trash-bold" />
             Delete
           </MenuItem>
         </MenuList>
       </Popover>
+
+      <Dialog open={openDialog} onClose={handleCloseDialog}>
+        <DialogTitle>Edit Event</DialogTitle>
+        <DialogContent>
+          <TextField
+            margin="dense"
+            label="Name"
+            fullWidth
+            variant="outlined"
+            value={editName}
+            onChange={(e) => setEditName(e.target.value)}
+          />
+          <TextField
+            margin="dense"
+            label="Date"
+            fullWidth
+            variant="outlined"
+            value={editDate}
+            onChange={(e) => setEditDate(e.target.value)}
+          />
+          <TextField
+            margin="dense"
+            label="Location"
+            fullWidth
+            variant="outlined"
+            value={editLocation}
+            onChange={(e) => setEditLocation(e.target.value)}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDialog}>Cancel</Button>
+          <Button onClick={handleSubmitEdit} variant="contained">
+            Save
+          </Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }
