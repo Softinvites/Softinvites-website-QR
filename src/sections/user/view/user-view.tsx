@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-
+import axios from 'axios';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
@@ -10,11 +10,13 @@ import TableContainer from '@mui/material/TableContainer';
 import TablePagination from '@mui/material/TablePagination';
 import Stack from '@mui/material/Stack';
 
+
 import { useNavigate } from "react-router-dom";
 import { DashboardContent } from 'src/layouts/dashboard';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+
 
 import { TableNoData } from '../table-no-data';
 import { UserTableRow } from '../user-table-row';
@@ -26,6 +28,9 @@ import { emptyRows, applyFilter, getComparator } from '../utils';
 import type { UserProps } from '../user-table-row';
 import EventModal from './EventModal';
 
+import DeleteConfirmModal from "./DeleteConfirmModal"; // Import the new modal
+
+
 // ----------------------------------------------------------------------
 
 export function UserView() {
@@ -36,6 +41,26 @@ export function UserView() {
   const [error, setError] = useState<string | null>(null); // ✅ Define error state
   
   const [open, setOpen] = useState(false);
+  const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  const handleDelete = async () => {
+    setLoading(true);
+    try {
+      await axios.delete("https://softinvite-api.onrender.com/events/events/", {
+        headers: {
+          Authorization: `Bearer ${localStorage.getItem("token")}`, // Ensure you have authentication
+        },
+      });
+
+      alert("All events deleted successfully!");
+      setOpen(false);
+      window.location.reload(); // Refresh the page
+  
+    } finally {
+      setLoading(false);
+    }
+  };
+
     const navigate = useNavigate();
 
   useEffect(() => {
@@ -108,6 +133,11 @@ export function UserView() {
 
   const notFound = !dataFiltered.length && !!filterName;
 
+  function handleDeleteConfirm(): void {
+    throw new Error('Function not implemented.');
+  }
+
+
   return (
     <DashboardContent>
       <Box display="flex" alignItems="center" mb={5}>
@@ -139,17 +169,21 @@ export function UserView() {
         
 
         <Button
-          variant="contained"
-          color="error"
-          startIcon={<Iconify icon="mingcute:add-line" />}
-          sx={{
-            fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
-            padding: { xs: "4px 8px", sm: "6px 12px", md: "8px 16px" },
-            minWidth: { xs: "auto", sm: "auto" },
-          }}
-        >
-          Delete all Events
-        </Button>
+            variant="contained"
+            color="error"
+            startIcon={<Iconify icon="mingcute:delete-line" />}
+            onClick={() => setDeleteModalOpen(true)} // Open delete confirmation modal
+          >
+            Delete all Events
+          </Button>
+
+          {/* Delete Confirmation Modal */}
+          <DeleteConfirmModal
+            open={deleteModalOpen}
+            handleClose={() => setDeleteModalOpen(false)}
+            handleConfirm={handleDelete}
+          />
+
       </Stack>
     </Box>
 
