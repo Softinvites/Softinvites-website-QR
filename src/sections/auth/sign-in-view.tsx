@@ -37,7 +37,7 @@ export function SignInView() {
        // Show success toast before navigation
     toast.success('Sign in successful!', {
       position: 'top-right',
-      autoClose: 2000, // Close after 2 seconds
+      autoClose: 3500, // Close after 2 seconds
       onClose: () => navigate('/home'), // Navigate after the toast disappears
     });
       navigate('/home');
