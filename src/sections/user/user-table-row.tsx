@@ -16,6 +16,8 @@ import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 
+import {  toast } from 'react-toastify';
+
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 
@@ -86,9 +88,10 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
 
   const handleSubmitEdit = useCallback(async () => {
     console.log("Submitting edit for:", row.name, "with values:", { editName, editDate, editLocation });
+  
     try {
       const response = await fetch(`https://softinvite-api.onrender.com/events/update/${row.id}`, {
-        method: 'PUT', // or 'PATCH' if that's what your API expects
+        method: 'PUT', // Ensure your API expects 'PUT' or 'PATCH'
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
@@ -99,17 +102,35 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           location: editLocation
         })
       });
+  
+      if (!response.ok) {
+        throw new Error(`Failed to update event: ${response.statusText}`);
+      }
+  
       const data = await response.json();
-      console.log("Edit response:", data);
+      console.log("Event updated:", data);
+  
+      toast.success('Edited successfully!', {
+        position: 'top-right',
+        autoClose: 3000, // Closes after 2 seconds
+        onClose: () => window.location.reload(), // Reload only after the toast disappears
+      });
+      
+      // Option 1: Update state instead of reloading (if using state management)
+      // updateEventState(row.id, { name: editName, date: editDate, location: editLocation });
+  
     } catch (error) {
       console.error("Error editing event:", error);
+      toast.error("Failed to edit event. Please try again.", {
+        position: 'top-right',
+        autoClose: 3000,
+      });
     } finally {
-      handleCloseDialog();
-      
-      window.location.reload(); // Refresh the page
+      handleCloseDialog(); // Close dialog after the toast appears
     }
+    
   }, [row.id, token, editName, editDate, editLocation, row.name, handleCloseDialog]);
-
+  
   // DELETE function remains unchanged
   const handleDelete = useCallback(async () => {
     console.log("Delete clicked for:", row.name);
@@ -126,6 +147,11 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       console.error("Error deleting event:", error);
     } finally {
       handleClosePopover();
+      toast.success('successful!', {
+        position: 'top-right',
+        autoClose: 2000, // Close after 2 seconds
+      });
+  
       
       window.location.reload(); // Refresh the page
     }

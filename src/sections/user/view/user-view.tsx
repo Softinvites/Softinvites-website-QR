@@ -10,6 +10,7 @@ import TableContainer from '@mui/material/TableContainer';
 import TablePagination from '@mui/material/TablePagination';
 import Stack from '@mui/material/Stack';
 
+import {  toast } from 'react-toastify';
 
 import { useNavigate } from "react-router-dom";
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -52,9 +53,13 @@ export function UserView() {
         },
       });
 
-      alert("All events deleted successfully!");
+      toast.success('Events deleted succesfully', {
+        position: 'top-right',
+        autoClose: 2000, // Close after 2 seconds
+        
+        onClose: () => window.location.reload(), // Reload only after the toast disappears
+      });
       setOpen(false);
-      window.location.reload(); // Refresh the page
   
     } finally {
       setLoading(false);

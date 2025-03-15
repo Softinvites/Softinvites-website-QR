@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import axios from 'axios';
+
+import {  toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 
 import Box from '@mui/material/Box';
@@ -32,6 +34,12 @@ export function SignInView() {
       );
   
       localStorage.setItem('token', response.data.token);
+       // Show success toast before navigation
+    toast.success('Sign in successful!', {
+      position: 'top-right',
+      autoClose: 2000, // Close after 2 seconds
+      onClose: () => navigate('/home'), // Navigate after the toast disappears
+    });
       navigate('/home');
     } catch (err) {
       setError('Invalid credentials. Please try again.');

@@ -1,5 +1,16 @@
 import * as React from 'react';
-import { Dialog, DialogActions, DialogContent, DialogTitle, Button, TextField } from '@mui/material';
+import {
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogTitle,
+  Button,
+  TextField,
+  
+  CircularProgress, // Import CircularProgress for the spinner
+} from '@mui/material';
+
+import {  toast } from 'react-toastify';
 
 interface EventModalProps {
   open: boolean;
@@ -10,9 +21,11 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
   const [eventData, setEventData] = React.useState({
     name: '',
     date: '',
-    location: ''
+    location: '',
   });
 
+  
+  const [loading, setLoading] = React.useState(false); // Loading state
   // Handle input change
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEventData({ ...eventData, [e.target.name]: e.target.value });
@@ -25,31 +38,31 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
         alert('You must be logged in to create an event.');
         return;
       }
-  
+
       const response = await fetch('https://softinvite-api.onrender.com/events/create', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`
+          Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(eventData)
+        body: JSON.stringify(eventData),
       });
-  
+
       if (!response.ok) {
         throw new Error('Failed to create event');
       }
-  
-      alert('Event created successfully!');
+      toast.success('Events created succesfully', {
+        position: 'top-right',
+        autoClose: 3000, // Close after 2 seconds
+        
+        onClose: () => window.location.reload(), // Reload only after the toast disappears
+      });
       handleClose(); // Close the modal
-      window.location.reload(); // Refresh the page
     } catch (error) {
       console.error('Error creating event:', error);
       alert('Error creating event');
     }
   };
-  
-  
-
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
@@ -81,8 +94,17 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
         />
       </DialogContent>
       <DialogActions>
-        <Button onClick={handleClose} color="error">Cancel</Button>
-        <Button variant="contained" color="primary" onClick={handleSubmit}>Create</Button>
+        <Button onClick={handleClose} color="error">
+          Cancel
+        </Button>
+        <Button
+          variant="contained"
+          color="primary"
+          onClick={handleSubmit}
+          disabled={loading} // Disable button when loading
+        >
+          {loading ? <CircularProgress size={24} color="inherit" /> : 'Create'}
+        </Button>
       </DialogActions>
     </Dialog>
   );
