@@ -8,18 +8,19 @@ import { AnalyticsCurrentVisits } from '../analytics-current-visits';
 import { AnalyticsWebsiteVisits } from '../analytics-website-visits';
 import { AnalyticsWidgetSummary } from '../analytics-widget-summary';
 
-// ----------------------------------------------------------------------
-
 export function OverviewAnalyticsView() {
   const [events, setEvents] = useState([]);
+  const [analytics, setAnalytics] = useState({
+    totalEvents: 0,
+    totalGuests: 0,
+    checkedInGuests: 0,
+    unusedCodes: 0,
+  });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const navigate = useNavigate();
 
   useEffect(() => {
-    // console.log("Fetching events from API...");
-
-    // Retrieve token from local storage
     const token = localStorage.getItem("token");
 
     if (!token) {
@@ -28,45 +29,42 @@ export function OverviewAnalyticsView() {
       return;
     }
 
-    fetch("https://softinvite-api.onrender.com/events/events", {
-      method: "GET",
-      headers: {
-        "Authorization": `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-    })
-      .then((res) => {
-       console.log("Received response:", res);
-
-        if (!res.ok) {
-          throw new Error(`HTTP error! Status: ${res.status}`);
-        
+    Promise.all([
+      fetch("https://softinvite-api.onrender.com/events/events", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }).then((res) => res.json()),
+      fetch("https://softinvite-api.onrender.com/guest/get-analytics/67da15fbf7a98bfd3bf1d2a8", {
+        method: "GET",
+        headers: {
+          "Authorization": `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+      }).then((res) => res.json()),
+    ])
+      .then(([eventsData, analyticsData]) => {
+        if (eventsData && Array.isArray(eventsData.events)) {
+          setEvents(eventsData.events);
         }
-        console.log(res.status)
-
-        return res.json();
-      })
-      .then((data) => {
-        // console.log("Fetched data:", data);
-
-        if (data && Array.isArray(data.events)) {
-          setEvents(data.events);
-        } else {
-          throw new Error("Invalid data format: events key missing or not an array");
+        if (analyticsData) {
+          setAnalytics(analyticsData);
         }
-
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Error fetching events:", err);
+        console.error("Error fetching data:", err);
         setError(err.message);
         setLoading(false);
       });
-        
+
     const timer = setTimeout(() => {
       localStorage.removeItem("token");
-      navigate("/sign-in"); // Redirect to sign-in page
-    }, 2900000);  
+      navigate("/sign-in");
+    }, 2900000);
+
   }, [navigate]);
 
   return (
@@ -75,30 +73,14 @@ export function OverviewAnalyticsView() {
         Hi, Welcome back 👋
       </Typography>
 
-
       {error && (
-  <Button
-    onClick={() => navigate("/sign-in")}
-    sx={{
-      mt: 2,
-      animation: "beepEffect 2s infinite",
-      "@keyframes beepEffect": {
-        "0%": { transform: "scale(1)", color: "black" },
-        "50%": { transform: "scale(1.05)", color: "red" },
-        "100%": { transform: "scale(1)", color: "black" },
-      },
-    }}
-  >
-    Click here to sign in again to view details
-  </Button>
-)}
-
-
-
-
-
-
-
+        <Button
+          onClick={() => navigate("/sign-in")}
+          sx={{ mt: 2, color: "red" }}
+        >
+          Click here to sign in again to view details
+        </Button>
+      )}
 
       {loading ? (
         <Typography>Loading events...</Typography>
@@ -106,48 +88,45 @@ export function OverviewAnalyticsView() {
         <Grid container spacing={3}>
           <Grid xs={12} sm={6} md={3}>
             <AnalyticsWidgetSummary
-              title="Number of events"
-              percent={events.length}
-              total={events.length}  
+              title="Number of Events"
+              percent={analytics.totalEvents}
+              total={analytics.totalEvents}
               icon={<img alt="icon" src="/assets/icons/glass/ic-glass-bag.svg" />}
-       
             />
           </Grid>
 
           <Grid xs={12} sm={6} md={3}>
             <AnalyticsWidgetSummary
-              title="New users"
-              percent={-0.1}
-              total={1352831}
+              title="Total Guests"
+              percent={analytics.totalGuests}
+              total={analytics.totalGuests}
               color="secondary"
               icon={<img alt="icon" src="/assets/icons/glass/ic-glass-users.svg" />}
-             
             />
           </Grid>
 
           <Grid xs={12} sm={6} md={3}>
             <AnalyticsWidgetSummary
-              title="Purchase orders"
-              percent={2.8}
-              total={1723315}
+              title="Checked-in Guests"
+              percent={analytics.checkedInGuests}
+              total={analytics.checkedInGuests}
               color="warning"
               icon={<img alt="icon" src="/assets/icons/glass/ic-glass-buy.svg" />}
-             
             />
           </Grid>
 
           <Grid xs={12} sm={6} md={3}>
             <AnalyticsWidgetSummary
-              title="Messages"
-              percent={3.6}
-              total={234}
+              title="Unused Codes"
+              percent={analytics.unusedCodes}
+              total={analytics.unusedCodes}
               color="error"
               icon={<img alt="icon" src="/assets/icons/glass/ic-glass-message.svg" />}
-            
             />
           </Grid>
 
-          <Grid xs={12} md={6} lg={4}>
+          
+<Grid xs={12} md={6} lg={4}>
             <AnalyticsCurrentVisits
               title="Current visits"
               chart={{
@@ -179,3 +158,8 @@ export function OverviewAnalyticsView() {
     </DashboardContent>
   );
 }
+
+
+
+
+

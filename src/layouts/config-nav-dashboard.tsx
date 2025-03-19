@@ -14,22 +14,14 @@ export const navData = [
     icon: icon('ic-analytics'),
   },
   {
-    title: 'User',
+    title: 'Event',
     path: '/user',
     icon: icon('ic-user'),
   },
+ 
+  
   {
-    title: 'Product',
-    path: '/products',
-    icon: icon('ic-cart'),
-    info: (
-      <Label color="error" variant="inverted">
-        +3
-      </Label>
-    ),
-  },
-  {
-    title: 'Blog',
+    title: 'Guests',
     path: '/blog',
     icon: icon('ic-blog'),
   },
