@@ -68,74 +68,67 @@ export function BlogView() {
 
     const navigate = useNavigate();
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setLoading(true);
-      setError(null); // ✅ Reset error before fetching
-
-      try {
-        const token = localStorage.getItem('token');
-        //    console.log('Token:', token); // Debugging
-
-        const response = await fetch('https://softinvite-api.onrender.com/guest/events-guest/67dbe103a821b139210cb988', {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-
-        if (!response.ok) {
-          console.error('Fetch error:', response.status, response.statusText);
-          throw new Error(`Failed to fetch data (Status: ${response.status})`);
+    useEffect(() => {
+      const fetchUsers = async () => {
+        setLoading(true);
+        setError(null); // Reset error before fetching
+    
+        try {
+          const token = localStorage.getItem('token');
+          const eventId = localStorage.getItem('selectedEventId'); // Get eventId from localStorage
+    
+          if (!eventId) {
+            setError('No event ID found in local storage.');
+            setLoading(false);
+            return;
+          }
+    
+          const response = await fetch(`https://softinvite-api.onrender.com/guest/events-guest/${eventId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+    
+          if (!response.ok) {
+            console.error('Fetch error:', response.status, response.statusText);
+            throw new Error(`Failed to fetch data (Status: ${response.status})`);
+          }
+    
+          const data = await response.json();
+          console.log('Fetched Data:', data); // Debugging log
+    
+          if (!data?.guests || !Array.isArray(data.guests)) {
+            console.error('Expected an array under "guests" but got:', data);
+            setError('Invalid API response format');
+            return;
+          }
+    
+          const formattedData: UserProps[] = data.guests.map((guest: any) => ({
+            id: guest.eventId, // Make sure this is the correct ID you need
+            name: `${guest.firstName} ${guest.lastName}`,
+            email: guest.email,
+            location: '',
+            createdAt: new Date(guest.createdAt).toLocaleDateString(),
+            status: guest.status,
+          }));
+    
+          console.log('Formatted Data:', formattedData);
+          setUsers(formattedData);
+        } catch (err: any) {
+          setError(err.message);
+        } finally {
+          setLoading(false);
         }
-
-        const data = await response.json();
-         console.log('Fetched Data:', data); // Debugging log
-        
-
-    // Check if "guests" exists and is an array
-    if (!data?.guests || !Array.isArray(data.guests)) {
-      console.error('Expected an array under "guests" but got:', data);
-      setError('Invalid API response format');
-      return;
-    }
-
-    // Map the guest data to your UserProps structure.
-    // Adjust the properties as needed based on your requirements.
-    const formattedData: UserProps[] = data.guests.map((guest: any) => ({
-      id: guest.eventId, // or guest._id if that's what you need
-      name: `${guest.firstName} ${guest.lastName}`,
-      email: `${guest.email}`, // Provide appropriate value if available
-      phone: `${guest.phone}`, // Provide appropriate value if available
-      createdAt: new Date(guest.createdAt).toLocaleDateString(),
-      status: guest.status, // For example, "pending"
-    }));
-
-    console.log('Formatted Data:', formattedData);
-    setUsers(formattedData);
-
-    // Example: Save the eventId of the first guest to local storage when the page loads
-    if (formattedData.length > 0) {
-      localStorage.setItem('selectedEventId', formattedData[0].id);
-    }
+      };
     
-  } catch (err: any) {
-    setError(err.message);
-  } finally {
-    setLoading(false);
-  }
-};
-
-    fetchUsers();
-
+      fetchUsers();
     
-    const timer = setTimeout(() => {
-      localStorage.removeItem("token");
-      navigate("/sign-in"); // Redirect to sign-in page
-    }, 1800000); // 30 minutes (1,800,000 ms)
+      const timer = setTimeout(() => {
+        localStorage.removeItem("token");
+        navigate("/sign-in"); // Redirect to sign-in page
+      }, 1800000); // 30 minutes (1,800,000 ms)
     
-
-    return () => clearTimeout(timer); // Cleanup timeout if component unmounts
-  }, [navigate]);
-
-
+      return () => clearTimeout(timer); // Cleanup timeout if component unmounts
+    }, [navigate]);
+    
   
 
   const dataFiltered: UserProps[] = applyFilter({
@@ -155,7 +148,7 @@ export function BlogView() {
     <DashboardContent>
       <Box display="flex" alignItems="center" mb={5}>
       <Typography variant="h4" flexGrow={1} padding={1}>
-        Events
+        Guests
       </Typography>
       <Stack direction="row" spacing={2}>
         <Button
@@ -169,7 +162,7 @@ export function BlogView() {
             minWidth: { xs: "auto", sm: "auto" },
           }}
         >
-          Create new Event
+          Create new Guest
         </Button>
 
         {/* Reusable Event Modal */}
