@@ -74,11 +74,24 @@ export function BlogView() {
         setError(null); // Reset error before fetching
     
         try {
-          const token = localStorage.getItem('token');
-          const eventId = localStorage.getItem('selectedEventId'); // Get eventId from localStorage
-    
+          const token = localStorage.getItem('token');const eventIdArray = localStorage.getItem('allRowIds'); // Retrieve from local storage
+
+          let eventId = null;
+          if (eventIdArray) {
+            try {
+              const parsedIds = JSON.parse(eventIdArray); // Parse JSON string to an array
+              if (Array.isArray(parsedIds) && parsedIds.length > 0) {
+                eventId = parsedIds[0]; // Get the first ID from the array
+              } else {
+                console.error("Parsed data is not a valid array:", parsedIds);
+              }
+            } catch {
+              console.error("Error parsing event IDs:", error);
+            }
+          }
+          
           if (!eventId) {
-            setError('No event ID found in local storage.');
+            setError('No valid event ID found in local storage.');
             setLoading(false);
             return;
           }
@@ -127,7 +140,7 @@ export function BlogView() {
       }, 1800000); // 30 minutes (1,800,000 ms)
     
       return () => clearTimeout(timer); // Cleanup timeout if component unmounts
-    }, [navigate]);
+    }, [navigate,error]);
     
   
 
