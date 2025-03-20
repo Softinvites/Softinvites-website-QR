@@ -118,7 +118,7 @@ export function BlogView() {
             id: guest.eventId, // Make sure this is the correct ID you need
             name: `${guest.firstName} ${guest.lastName}`,
             email: guest.email,
-            location: '',
+            phone: guest.phone,
             createdAt: new Date(guest.createdAt).toLocaleDateString(),
             status: guest.status,
           }));
