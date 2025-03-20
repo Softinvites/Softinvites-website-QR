@@ -10,7 +10,7 @@ export default function Page() {
   return (
     <>
       <Helmet>
-        <title> {`Softinvite`}</title>
+        <title> Softinvite</title>
         <meta
           name="description"
           content="Entrepreneur, Guest Management, QR Code Generation, RSVP Management, E-Invitation Distribution, Event Management @shoriaevents"
