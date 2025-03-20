@@ -6,89 +6,128 @@ import {
   DialogTitle,
   Button,
   TextField,
-  
-  CircularProgress, // Import CircularProgress for the spinner
+  CircularProgress,
 } from '@mui/material';
+import { toast } from 'react-toastify';
 
-import {  toast } from 'react-toastify';
-
-interface EventModalProps {
+interface GuestModalProps {
   open: boolean;
   handleClose: () => void;
 }
 
-const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
-  const [eventData, setEventData] = React.useState({
-    name: '',
-    date: '',
-    location: '',
+const EventModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
+  const [guestData, setGuestData] = React.useState({
+    firstName: '',
+    lastName: '',
+    email: '',
+    phone: '',
+    eventId: '',
+    qrCodeColor: '',
   });
 
-  
-  const [loading, setLoading] = React.useState(false); // Loading state
-  // Handle input change
+  const [loading, setLoading] = React.useState(false);
+
+  // Retrieve eventId from local storage when the component mounts
+  React.useEffect(() => {
+    const eventIdArray = localStorage.getItem('allRowIds');
+    if (eventIdArray) {
+      try {
+        const parsedIds = JSON.parse(eventIdArray);
+        if (Array.isArray(parsedIds) && parsedIds.length > 0) {
+          setGuestData((prev) => ({ ...prev, eventId: parsedIds[0] }));
+        } else {
+          console.error("Parsed data is not a valid array:", parsedIds);
+        }
+      } catch (error) {
+        console.error("Error parsing event IDs:", error);
+      }
+    }
+  }, []);
+
+  // Handle input change for all fields except eventId
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    setEventData({ ...eventData, [e.target.name]: e.target.value });
+    setGuestData({ ...guestData, [e.target.name]: e.target.value });
   };
 
   const handleSubmit = async () => {
+    setLoading(true);
     try {
       const token = localStorage.getItem('token');
       if (!token) {
-        alert('You must be logged in to create an event.');
+        alert('You must be logged in to add a guest.');
+        setLoading(false);
         return;
       }
 
-      const response = await fetch('https://softinvite-api.onrender.com/events/create', {
+      const response = await fetch('https://softinvite-api.onrender.com/guest/add-guest', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(eventData),
+        body: JSON.stringify(guestData),
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create event');
+        throw new Error('Failed to add guest');
       }
-      toast.success('Events created succesfully', {
+      
+      toast.success('Guest added successfully', {
         position: 'top-right',
-        autoClose: 3000, // Close after 2 seconds
-        
-        onClose: () => window.location.reload(), // Reload only after the toast disappears
+        autoClose: 3000,
+        onClose: () => window.location.reload(),
       });
-      handleClose(); // Close the modal
+      handleClose();
     } catch (error) {
-      console.error('Error creating event:', error);
-      alert('Error creating event');
+      console.error('Error adding guest:', error);
+      alert('Error adding guest');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Create New Event</DialogTitle>
+      <DialogTitle>Add New Guest</DialogTitle>
       <DialogContent>
         <TextField
           fullWidth
-          label="Event Name"
-          name="name"
-          value={eventData.name}
+          label="First Name"
+          name="firstName"
+          value={guestData.firstName}
           onChange={handleChange}
           margin="dense"
         />
         <TextField
           fullWidth
-          label="Date"
-          name="date"
-          value={eventData.date}
+          label="Last Name"
+          name="lastName"
+          value={guestData.lastName}
           onChange={handleChange}
           margin="dense"
         />
         <TextField
           fullWidth
-          label="Location"
-          name="location"
-          value={eventData.location}
+          label="Email"
+          name="email"
+          type="email"
+          value={guestData.email}
+          onChange={handleChange}
+          margin="dense"
+        />
+        <TextField
+          fullWidth
+          label="Phone"
+          name="phone"
+          value={guestData.phone}
+          onChange={handleChange}
+          margin="dense"
+        />
+        <TextField
+          fullWidth
+          label="QR Code Color"
+          name="qrCodeColor"
+          value={guestData.qrCodeColor}
           onChange={handleChange}
           margin="dense"
         />
@@ -101,9 +140,9 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
           variant="contained"
           color="primary"
           onClick={handleSubmit}
-          disabled={loading} // Disable button when loading
+          disabled={loading}
         >
-          {loading ? <CircularProgress size={24} color="inherit" /> : 'Create'}
+          {loading ? <CircularProgress size={24} color="inherit" /> : 'Add Guest'}
         </Button>
       </DialogActions>
     </Dialog>

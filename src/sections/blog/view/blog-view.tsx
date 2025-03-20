@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState,useRef, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -46,8 +46,31 @@ export function BlogView() {
 
   const handleDelete = async () => {
     setLoading(true);
+
+    const eventIdArray = localStorage.getItem('allRowIds'); // Retrieve from local storage
+
+    let eventId = null;
+    if (eventIdArray) {
+      try {
+        const parsedIds = JSON.parse(eventIdArray); // Parse JSON string to an array
+        if (Array.isArray(parsedIds) && parsedIds.length > 0) {
+          eventId = parsedIds[0]; // Get the first ID from the array
+        } else {
+          console.error("Parsed data is not a valid array:", parsedIds);
+        }
+      } catch {
+        console.error("Error parsing event IDs:", error);
+      }
+    }
+    
+    if (!eventId) {
+      setError('No valid event ID found in local storage.');
+      setLoading(false);
+      return;
+    }
+    
     try {
-      await axios.delete("https://softinvite-api.onrender.com/events/events/", {
+      await axios.delete(`https://softinvite-api.onrender.com/guest/event-guest/${eventId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`, // Ensure you have authentication
         },
@@ -71,10 +94,13 @@ export function BlogView() {
     useEffect(() => {
       const fetchUsers = async () => {
         setLoading(true);
-        setError(null); // Reset error before fetching
+        errorRef.current = null; // Reset error
+        
     
         try {
-          const token = localStorage.getItem('token');const eventIdArray = localStorage.getItem('allRowIds'); // Retrieve from local storage
+          const token = localStorage.getItem('token');
+          
+          const eventIdArray = localStorage.getItem('allRowIds'); // Retrieve from local storage
 
           let eventId = null;
           if (eventIdArray) {
@@ -140,8 +166,10 @@ export function BlogView() {
       }, 1800000); // 30 minutes (1,800,000 ms)
     
       return () => clearTimeout(timer); // Cleanup timeout if component unmounts
+      
     }, [navigate,error]);
     
+const errorRef = useRef<string | null>(null);
   
 
   const dataFiltered: UserProps[] = applyFilter({
