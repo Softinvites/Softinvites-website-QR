@@ -89,6 +89,7 @@ export function UserView() {
         const data = await response.json();
         // console.log('Fetched Data:', data); // Debugging log
         
+        
 
         // ✅ Check if "events" exists and is an array
         if (!data?.events || !Array.isArray(data.events)) {
@@ -105,6 +106,7 @@ export function UserView() {
           createdAt: new Date(event.createdAt).toLocaleDateString(),
           status: event.isActive ? 'Active' : 'Inactive',
         }));
+        
 
         console.log('Formatted Data:', formattedData);
         setUsers(formattedData);

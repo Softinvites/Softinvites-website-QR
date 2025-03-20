@@ -1,7 +1,3 @@
-
-
-
-
 import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import Box from '@mui/material/Box';
@@ -81,7 +77,7 @@ export function BlogView() {
         const token = localStorage.getItem('token');
         //    console.log('Token:', token); // Debugging
 
-        const response = await fetch('https://softinvite-api.onrender.com/events/events', {
+        const response = await fetch('https://softinvite-api.onrender.com/guest/events-guest/67dbe103a821b139210cb988', {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -91,33 +87,41 @@ export function BlogView() {
         }
 
         const data = await response.json();
-        // console.log('Fetched Data:', data); // Debugging log
+         console.log('Fetched Data:', data); // Debugging log
         
 
-        // ✅ Check if "events" exists and is an array
-        if (!data?.events || !Array.isArray(data.events)) {
-          console.error('Expected an array under "events" but got:', data);
-          setError('Invalid API response format');
-          return;
-        }
+    // Check if "guests" exists and is an array
+    if (!data?.guests || !Array.isArray(data.guests)) {
+      console.error('Expected an array under "guests" but got:', data);
+      setError('Invalid API response format');
+      return;
+    }
 
-        const formattedData: UserProps[] = data.events.map((event: any) => ({
-          id: event._id,
-          name: event.name,
-          date: event.date,
-          location: event.location,
-          createdAt: new Date(event.createdAt).toLocaleDateString(),
-          status: event.isActive ? 'Active' : 'Inactive',
-        }));
+    // Map the guest data to your UserProps structure.
+    // Adjust the properties as needed based on your requirements.
+    const formattedData: UserProps[] = data.guests.map((guest: any) => ({
+      id: guest.eventId, // or guest._id if that's what you need
+      name: `${guest.firstName} ${guest.lastName}`,
+      email: `${guest.email}`, // Provide appropriate value if available
+      phone: `${guest.phone}`, // Provide appropriate value if available
+      createdAt: new Date(guest.createdAt).toLocaleDateString(),
+      status: guest.status, // For example, "pending"
+    }));
 
-        console.log('Formatted Data:', formattedData);
-        setUsers(formattedData);
-        
-      } finally {
-        setLoading(false);
-      }
-    };
+    console.log('Formatted Data:', formattedData);
+    setUsers(formattedData);
+
+    // Example: Save the eventId of the first guest to local storage when the page loads
+    if (formattedData.length > 0) {
+      localStorage.setItem('selectedEventId', formattedData[0].id);
+    }
     
+  } catch (err: any) {
+    setError(err.message);
+  } finally {
+    setLoading(false);
+  }
+};
 
     fetchUsers();
 
@@ -223,9 +227,9 @@ export function BlogView() {
                 }
                 headLabel={[
                   { id: 'name', label: 'Name' },
-                  { id: 'location', label: 'Location' },
+                  { id: 'email', label: 'Email' },
 
-                  { id: 'date', label: 'Date' },
+                  { id: 'phone', label: 'Number' },
                   { id: 'createdAt', label: 'CreatedAt' },
 
                   { id: 'status', label: 'Status' },

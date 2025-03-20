@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
@@ -55,6 +55,19 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   const [editName, setEditName] = useState(row.name);
   const [editDate, setEditDate] = useState(row.date);
   const [editLocation, setEditLocation] = useState(row.location);
+
+   // Save the row's ID to local storage when the component mounts
+   useEffect(() => {
+    // Get the existing array of saved IDs, or initialize an empty array
+    const storedIds = JSON.parse(localStorage.getItem('allRowIds') || '[]');
+    
+    // Add the current row's ID if it doesn't already exist
+    if (!storedIds.includes(row.id)) {
+      storedIds.push(row.id);
+      localStorage.setItem('allRowIds', JSON.stringify(storedIds));
+    }
+  }, [row.id]);
+
 
   const handleOpenPopover = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     console.log("Opening popover for:", row.name);

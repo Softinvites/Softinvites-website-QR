@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
@@ -27,9 +27,9 @@ export type UserProps = {
   id: string;
   name: string;
   status: string;
-  date: string;
+  phone: string;
   createdAt: string;
-  location: string;
+  email: string;
   avatarUrl: string;
   isVerified: boolean;
 };
@@ -53,8 +53,22 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   // If you want to pre-populate with your specific details, you could also initialize here:
   // useState("Stalo x Vera Wedding") etc.
   const [editName, setEditName] = useState(row.name);
-  const [editDate, setEditDate] = useState(row.date);
-  const [editLocation, setEditLocation] = useState(row.location);
+  const [editDate, setEditDate] = useState(row.phone);
+  const [editLocation, setEditLocation] = useState(row.email);
+
+
+   // Save the row's ID to local storage when the component mounts
+   useEffect(() => {
+    // Get the existing array of saved IDs, or initialize an empty array
+    const storedIds = JSON.parse(localStorage.getItem('allRowIds') || '[]');
+    
+    // Add the current row's ID if it doesn't already exist
+    if (!storedIds.includes(row.id)) {
+      storedIds.push(row.id);
+      localStorage.setItem('allRowIds', JSON.stringify(storedIds));
+    }
+  }, [row.id]);
+
 
   const handleOpenPopover = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     console.log("Opening popover for:", row.name);
@@ -75,8 +89,8 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     // setEditLocation("Victoria Island Lagos");
     // Otherwise, initialize with the current row values:
     setEditName(row.name);
-    setEditDate(row.date);
-    setEditLocation(row.location);
+    setEditDate(row.phone);
+    setEditLocation(row.email);
     setOpenDialog(true);
     handleClosePopover();
   }, [row, handleClosePopover]);
@@ -178,8 +192,8 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           </Box>
         </TableCell>
 
-        <TableCell>{row.location}</TableCell>
-        <TableCell>{row.date}</TableCell>
+        <TableCell>{row.email}</TableCell>
+        <TableCell>{row.phone}</TableCell>
         <TableCell>{row.createdAt}</TableCell>
         <TableCell>
           <Label color={(row.status === 'banned' && 'error') || 'success'}>
