@@ -155,6 +155,11 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         }
       });
       const data = await response.json();
+
+      
+
+    // Remove allRowIds from localStorage
+    localStorage.removeItem("allRowIds");
       console.log("Delete response:", data);
     } catch (error) {
       console.error("Error deleting event:", error);

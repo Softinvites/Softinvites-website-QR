@@ -53,6 +53,11 @@ export function UserView() {
         },
       });
 
+      
+
+    // Remove allRowIds from localStorage
+    localStorage.removeItem("allRowIds");
+
       toast.success('Events deleted succesfully', {
         position: 'top-right',
         autoClose: 2000, // Close after 2 seconds
