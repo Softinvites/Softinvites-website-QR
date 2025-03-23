@@ -16,7 +16,7 @@ import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 
-import {  toast } from 'react-toastify';
+import { toast } from 'react-toastify';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
@@ -27,6 +27,7 @@ export type UserProps = {
   id: string;
   name: string;
   status: string;
+  _id:string;
   phone: string;
   createdAt: string;
   email: string;
@@ -43,32 +44,40 @@ type UserTableRowProps = {
 export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) {
   console.log("Rendering UserTableRow with data:", row);
 
-  // Replace with your actual token or use a context/provider
+  // Retrieve the token from local storage (or via context)
   const token = localStorage.getItem('token');
 
   const [openPopover, setOpenPopover] = useState<HTMLButtonElement | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
 
-  // These states hold the editable values.
-  // If you want to pre-populate with your specific details, you could also initialize here:
-  // useState("Stalo x Vera Wedding") etc.
-  const [editName, setEditName] = useState(row.name);
-  const [editDate, setEditDate] = useState(row.phone);
-  const [editLocation, setEditLocation] = useState(row.email);
+  // Split the full name into firstName and lastName (if possible)
+  const nameParts = row.name.split(' ');
+  const initialFirstName = nameParts[0];
+  const initialLastName = nameParts.slice(1).join(' ') || '';
 
+  // Editable state values
+  const [firstName, setFirstName] = useState(initialFirstName);
+  const [lastName, setLastName] = useState(initialLastName);
+  const [email, setEmail] = useState(row.email);
+  const [phone, setPhone] = useState(row.phone);
 
-   // Save the row's ID to local storage when the component mounts
-   useEffect(() => {
-    // Get the existing array of saved IDs, or initialize an empty array
-    const storedIds = JSON.parse(localStorage.getItem('allRowIds') || '[]');
-    
-    // Add the current row's ID if it doesn't already exist
+  // Save the row's ID to local storage when the component mounts
+  useEffect(() => {
+    const storedIds = JSON.parse(localStorage.getItem('alls') || '[]');
     if (!storedIds.includes(row.id)) {
       storedIds.push(row.id);
       localStorage.setItem('allRowIds', JSON.stringify(storedIds));
     }
   }, [row.id]);
 
+  // Save the row's ID to local storage when the component mounts
+  useEffect(() => {
+    const storedIds = JSON.parse(localStorage.getItem('alls') || '[]');
+    if (!storedIds.includes(row._id)) {
+      storedIds.push(row._id);
+      localStorage.setItem('allRwIds', JSON.stringify(storedIds));
+    }
+  }, [row._id]);
 
   const handleOpenPopover = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     console.log("Opening popover for:", row.name);
@@ -80,76 +89,104 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     setOpenPopover(null);
   }, []);
 
-  // Open the edit dialog and initialize form values (or set defaults as needed)
+  // Open the edit dialog and initialize form values
   const handleOpenEditDialog = useCallback(() => {
     console.log("Opening edit dialog for:", row.name);
-    // If you want to use the specific details provided in your example, uncomment these:
-    // setEditName("Stalo x Vera Wedding");
-    // setEditDate("16th September, 2026");
-    // setEditLocation("Victoria Island Lagos");
-    // Otherwise, initialize with the current row values:
-    setEditName(row.name);
-    setEditDate(row.phone);
-    setEditLocation(row.email);
+    // Initialize with current values from the row
+    setFirstName(initialFirstName);
+    setLastName(initialLastName);
+    setEmail(row.email);
+    setPhone(row.phone);
     setOpenDialog(true);
     handleClosePopover();
-  }, [row, handleClosePopover]);
+  }, [row, initialFirstName, initialLastName, handleClosePopover]);
 
   const handleCloseDialog = useCallback(() => {
     console.log("Closing edit dialog");
     setOpenDialog(false);
   }, []);
 
+  // Submit the edit using the new endpoint and payload structure
   const handleSubmitEdit = useCallback(async () => {
-    console.log("Submitting edit for:", row.name, "with values:", { editName, editDate, editLocation });
+
+
+
+  
+    const eventIdArray = localStorage.getItem('allRowIds'); // Retrieve from local storage
+    let eventId = null;
+  console.log(eventId)
+    if (eventIdArray) {
+      try {
+        const parsedIds = JSON.parse(eventIdArray); // Parse JSON string to an array
+        if (Array.isArray(parsedIds) && parsedIds.length > 0) {
+          eventId = parsedIds[0]; // Get the first ID from the array
+        } else {
+          console.error("Parsed data is not a valid array:", parsedIds);
+        }
+      } catch (error) {
+        console.error("Error parsing event IDs:", error);
+      }
+    }
+  
+    if (!eventId) {
+      toast.error("No valid event ID found in local storage.", {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+      return;
+    }
+
+    
+  console.log(eventId)
   
     try {
-      const response = await fetch(`https://softinvite-api.onrender.com/events/update/${row.id}`, {
-        method: 'PUT', // Ensure your API expects 'PUT' or 'PATCH'
+      const response = await fetch(`https://softinvite-api.onrender.com/guest/update-guest/${row._id}`, {
+        method: 'PUT', // Using PUT as expected by the server
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
-          name: editName,
-          date: editDate,
-          location: editLocation
+          firstName,
+          lastName,
+          email,
+          phone,
+          eventId, // Use eventId from local storage
         })
       });
+      console.log(row.id)
   
       if (!response.ok) {
-        throw new Error(`Failed to update event: ${response.statusText}`);
+        throw new Error(`Failed to update guest: ${response.statusText}`);
       }
   
       const data = await response.json();
-      console.log("Event updated:", data);
+      console.log("Guest updated:", data);
   
       toast.success('Edited successfully!', {
         position: 'top-right',
-        autoClose: 3000, // Closes after 2 seconds
-        onClose: () => window.location.reload(), // Reload only after the toast disappears
+        autoClose: 3000, // Closes after 3 seconds
+        onClose: () => window.location.reload(), // Reload after toast disappears
       });
       
-      // Option 1: Update state instead of reloading (if using state management)
-      // updateEventState(row.id, { name: editName, date: editDate, location: editLocation });
-  
     } catch (error) {
-      console.error("Error editing event:", error);
-      toast.error("Failed to edit event. Please try again.", {
+      console.error("Error editing guest:", error);
+      toast.error("Failed to edit guest. Please try again.", {
         position: 'top-right',
         autoClose: 3000,
       });
     } finally {
-      handleCloseDialog(); // Close dialog after the toast appears
+      handleCloseDialog();
     }
+    console.log(row.id)
     
-  }, [row.id, token, editName, editDate, editLocation, row.name, handleCloseDialog]);
+  }, [ row.id,row._id,token, firstName, lastName, email, phone, handleCloseDialog]);
   
   // DELETE function remains unchanged
   const handleDelete = useCallback(async () => {
     console.log("Delete clicked for:", row.name);
     try {
-      const response = await fetch(`https://softinvite-api.onrender.com/events/events/${row.id}`, {
+      const response = await fetch(`https://softinvite-api.onrender.com/guest/single-guest/${row._id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -161,12 +198,10 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       console.error("Error deleting event:", error);
     } finally {
       handleClosePopover();
-      toast.success('successful!', {
+      toast.success('Deletion successful!', {
         position: 'top-right',
-        autoClose: 2000, // Close after 2 seconds
+        autoClose: 2000, // Closes after 2 seconds
       });
-  
-      
       window.location.reload(); // Refresh the page
     }
   }, [row, token, handleClosePopover]);
@@ -244,31 +279,39 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       </Popover>
 
       <Dialog open={openDialog} onClose={handleCloseDialog}>
-        <DialogTitle>Edit Event</DialogTitle>
+        <DialogTitle>Edit Guest</DialogTitle>
         <DialogContent>
           <TextField
             margin="dense"
-            label="Name"
+            label="First Name"
             fullWidth
             variant="outlined"
-            value={editName}
-            onChange={(e) => setEditName(e.target.value)}
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
           />
           <TextField
             margin="dense"
-            label="Date"
+            label="Last Name"
             fullWidth
             variant="outlined"
-            value={editDate}
-            onChange={(e) => setEditDate(e.target.value)}
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
           />
           <TextField
             margin="dense"
-            label="Location"
+            label="Email"
             fullWidth
             variant="outlined"
-            value={editLocation}
-            onChange={(e) => setEditLocation(e.target.value)}
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+          <TextField
+            margin="dense"
+            label="Phone"
+            fullWidth
+            variant="outlined"
+            value={phone}
+            onChange={(e) => setPhone(e.target.value)}
           />
         </DialogContent>
         <DialogActions>

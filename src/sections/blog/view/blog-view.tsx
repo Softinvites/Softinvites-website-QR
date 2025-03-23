@@ -142,6 +142,7 @@ export function BlogView() {
     
           const formattedData: UserProps[] = data.guests.map((guest: any) => ({
             id: guest.eventId, // Make sure this is the correct ID you need
+            _id: guest._id,
             name: `${guest.firstName} ${guest.lastName}`,
             email: guest.email,
             phone: guest.phone,
