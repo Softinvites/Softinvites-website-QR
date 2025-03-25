@@ -20,6 +20,7 @@ import {  toast } from 'react-toastify';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
+import { useNavigate } from 'react-router-dom';
 
 // ----------------------------------------------------------------------
 
@@ -55,6 +56,12 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   const [editName, setEditName] = useState(row.name);
   const [editDate, setEditDate] = useState(row.date);
   const [editLocation, setEditLocation] = useState(row.location);
+
+
+  
+const navigate = useNavigate();
+
+
 
    // Save the row's ID to local storage when the component mounts
    useEffect(() => {
@@ -175,6 +182,17 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     }
   }, [row, token, handleClosePopover]);
 
+  
+  // This function saves the current row's id into localStorage as an array,
+  // then navigates to the guest page.
+  const handleOpenEditDialo = useCallback(() => {
+    console.log("Navigating to guest page for row:", row.id);
+    const allRowIds = [row.id];
+    localStorage.setItem("allRowIds", JSON.stringify(allRowIds));
+    navigate('/blog');
+  }, [row.id, navigate]);
+
+
   return (
     <>
       <TableRow hover tabIndex={-1} role="checkbox" selected={selected}>
@@ -239,6 +257,11 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
             <Iconify icon="solar:pen-bold" />
             Edit
           </MenuItem>
+          <MenuItem onClick={handleOpenEditDialo}>
+            <Iconify icon="uil:briefcase" />
+            Go to Guest
+          </MenuItem>
+
 
           <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
             <Iconify icon="solar:trash-bin-trash-bold" />

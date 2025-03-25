@@ -20,11 +20,7 @@ export const navData = [
   },
  
   
-  {
-    title: 'Guests',
-    path: '/blog',
-    icon: icon('ic-blog'),
-  },
+
   {
     title: 'Sign in',
     path: '/sign-in',
