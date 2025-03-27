@@ -275,6 +275,10 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
             <Iconify icon="solar:trash-bin-trash-bold" />
             Delete
           </MenuItem>
+          <MenuItem onClick={handleDelete} sx={{ color: 'success.main'}}>
+            <Iconify icon="uil:cloud-download" />
+            get qr-code
+          </MenuItem>
         </MenuList>
       </Popover>
 
