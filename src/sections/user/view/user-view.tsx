@@ -206,7 +206,7 @@ export function UserView() {
       height: { xs: "52px", sm: "40px", md: "48px" },
             }}
           >
-            Create new Event
+          New Event
           </Button>
           {/* Hidden file input */}
           <input
