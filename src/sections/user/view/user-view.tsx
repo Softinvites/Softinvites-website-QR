@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -40,9 +40,45 @@ export function UserView() {
   const [users, setUsers] = useState<UserProps[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null); // ✅ Define error state
-  
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+  
+
+
+  // Handler for CSV file selection and upload
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      const formData = new FormData();
+      formData.append('file', file);
+      try {
+        const token = localStorage.getItem("token");
+        const response = await axios.post(
+          "https://softinvite-api.onrender.com/guest/import-guest-csv",
+          formData,
+          {
+            headers: {
+              "Content-Type": "multipart/form-data",
+              Authorization: `Bearer ${token}`,
+            },
+          }
+        );
+        console.log("CSV imported successfully:", response.data);
+        toast.success("CSV imported successfully");
+        // Optionally, update your state or perform additional actions here
+      } catch {
+        console.error("Error importing CSV:", error);
+        toast.error("CSV import failed");
+      }
+    }
+  };
+
+  // Trigger file input click
+  const handleButtonClick = () => {
+    fileInputRef.current?.click();
+  };
 
   const handleDelete = async () => {
     setLoading(true);
@@ -52,8 +88,6 @@ export function UserView() {
           Authorization: `Bearer ${localStorage.getItem("token")}`, // Ensure you have authentication
         },
       });
-
-      
 
     // Remove allRowIds from localStorage
     localStorage.removeItem("allRowIds");
@@ -157,20 +191,59 @@ export function UserView() {
         Events
       </Typography>
       <Stack direction="row" spacing={2}>
+      <Button
+            variant="contained"
+            color="success"
+            startIcon={<Iconify icon="mingcute:add-line" />}
+            onClick={() => setOpen(true)}
+            sx={{
+              fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
+              padding: { xs: "4px 8px", sm: "6px 12px", md: "8px 16px" },
+              minWidth: { xs: "auto", sm: "auto" },
+            }}
+          >
+            Create new Event
+          </Button>
+          {/* Hidden file input */}
+          <input
+            type="file"
+            accept=".csv"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
+
+          <EventModal open={open} handleClose={() => setOpen(false)}>
+            {/* Add form elements inside if needed */}
+          </EventModal>
+
+
         <Button
           variant="contained"
-          color="inherit"
-          startIcon={<Iconify icon="mingcute:add-line" />}
-          onClick={() => setOpen(true)}
+          color="warning"
+          startIcon={<Iconify icon="uil:envelope-download" />}
+         
+          onClick={handleButtonClick}
           sx={{
             fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
+            color: "#ffff", // Black text for contrast
+            "&:hover": {
+              backgroundColor: "#FFC107", // Darker yellow on hover
+            },
             padding: { xs: "4px 8px", sm: "6px 12px", md: "8px 16px" },
             minWidth: { xs: "auto", sm: "auto" },
           }}
         >
-          Create new Event
+          Import as csv
         </Button>
 
+        <input
+        type="file"
+        accept=".csv"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
         {/* Reusable Event Modal */}
         <EventModal open={open} handleClose={() => setOpen(false)}>
           {/* Add form elements inside if needed */}
