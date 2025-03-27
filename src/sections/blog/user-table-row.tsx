@@ -230,13 +230,14 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         <TableCell>{row.email}</TableCell>
         <TableCell>{row.phone}</TableCell>
         <TableCell>{row.createdAt}</TableCell>
+        <TableCell>
         <Label color={
-  (row.status === 'banned' && 'error') ||
   (row.status === 'pending' && 'warning') ||
   'success'
 }>
   {row.status}
 </Label>
+</TableCell>
 
 
 
