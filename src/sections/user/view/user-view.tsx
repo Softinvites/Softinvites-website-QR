@@ -190,73 +190,104 @@ export function UserView() {
       <Typography variant="h4" flexGrow={1} padding={1}>
         Events
       </Typography>
-      <Stack direction="row" spacing={1} alignItems="stretch">
-  <Button
-    variant="contained"
-    color="success"
-    startIcon={<Iconify icon="mingcute:add-line" />}
-    onClick={() => setOpen(true)}
-    sx={{
-      fontSize: { xs: "0.7rem", sm: "0.875rem", md: "1rem" },
-      padding: { xs: "4px 6px", sm: "6px 10px", md: "8px 16px" },
-      minWidth: "auto",
-      height: { xs: "32px", sm: "40px", md: "48px" },
-    }}
-  >
-    Create new Event
-  </Button>
+      <Stack direction="row" spacing={1}>
+      <Button
+            variant="contained"
+            color="success"
+            startIcon={<Iconify icon="mingcute:add-line" />}
+            onClick={() => setOpen(true)}
+            sx={{
+              fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
+              padding: { xs: "2px 6px", sm: "6px 8px", md: "8px 10px" }, // Reduced horizontal padding
+              letterSpacing: "0.2px", // Reduced letter spacing
+              textTransform: "none", // Keep text as is, without auto-uppercase
+              minWidth: { xs: "auto", sm: "auto" },
+              
+      height: { xs: "52px", sm: "40px", md: "48px" },
+            }}
+          >
+            Create new Event
+          </Button>
+          {/* Hidden file input */}
+          <input
+            type="file"
+            accept=".csv"
+            ref={fileInputRef}
+            onChange={handleFileChange}
+            style={{ display: 'none' }}
+          />
 
-  <input
-    type="file"
-    accept=".csv"
-    ref={fileInputRef}
-    onChange={handleFileChange}
-    style={{ display: "none" }}
-  />
-
-  <Button
-    variant="contained"
-    color="warning"
-    startIcon={<Iconify icon="uil:envelope-download" />}
-    onClick={handleButtonClick}
-    sx={{
-      fontSize: { xs: "0.7rem", sm: "0.875rem", md: "1rem" },
-      color: "#fff",
-      "&:hover": {
-        backgroundColor: "#FFC107",
-      },
-      padding: { xs: "4px 6px", sm: "6px 10px", md: "8px 16px" },
-      minWidth: "auto",
-      height: { xs: "32px", sm: "40px", md: "48px" },
-    }}
-  >
-    Import as CSV
-  </Button>
-
-  <Button
-    variant="contained"
-    color="error"
-    startIcon={<Iconify icon="mingcute:delete-line" />}
-    onClick={() => setDeleteModalOpen(true)}
-    sx={{
-      fontSize: { xs: "0.7rem", sm: "0.875rem", md: "1rem" },
-      padding: { xs: "4px 6px", sm: "6px 10px", md: "8px 16px" },
-      minWidth: "auto",
-      height: { xs: "32px", sm: "40px", md: "48px" },
-    }}
-  >
-    Delete all Events
-  </Button>
-
-  {/* Delete Confirmation Modal */}
-  <DeleteConfirmModal
-    open={deleteModalOpen}
-    handleClose={() => setDeleteModalOpen(false)}
-    handleConfirm={handleDelete}
-  />
-</Stack>
+          <EventModal open={open} handleClose={() => setOpen(false)}>
+            {/* Add form elements inside if needed */}
+          </EventModal>
 
 
+        <Button
+          variant="contained"
+          color="warning"
+          startIcon={<Iconify icon="uil:envelope-download" />}
+         
+          onClick={handleButtonClick}
+          sx={{
+            color: "#ffff", // Black text for contrast
+            "&:hover": {
+              backgroundColor: "#FFC107", // Darker yellow on hover
+            },
+            fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
+              padding: { xs: "2px 6px", sm: "6px 8px", md: "8px 10px" }, // Reduced horizontal padding
+              letterSpacing: "0.2px", // Reduced letter spacing
+              textTransform: "none", // Keep text as is, without auto-uppercase
+            minWidth: { xs: "auto", sm: "auto" },
+            
+      height: { xs: "52px", sm: "40px", md: "48px" },
+          }}
+        >
+          Import as csv
+        </Button>
+
+        <input
+        type="file"
+        accept=".csv"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
+        {/* Reusable Event Modal */}
+        <EventModal open={open} handleClose={() => setOpen(false)}>
+          {/* Add form elements inside if needed */}
+
+          
+          
+        </EventModal>
+        
+
+        <Button
+            variant="contained"
+            color="error"
+            startIcon={<Iconify icon="mingcute:delete-line" />}
+            onClick={() => setDeleteModalOpen(true)} // Open delete confirmation modal
+            
+          
+             sx={{
+              fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
+              padding: { xs: "2px 6px", sm: "6px 8px", md: "8px 10px" }, // Reduced horizontal padding
+              letterSpacing: "0.2px", // Reduced letter spacing
+              textTransform: "none", // Keep text as is, without auto-uppercase
+            
+      height: { xs: "52px", sm: "40px", md: "48px" },
+          }}
+        >
+            Delete all Events
+          </Button>
+
+          {/* Delete Confirmation Modal */}
+          <DeleteConfirmModal
+            open={deleteModalOpen}
+            handleClose={() => setDeleteModalOpen(false)}
+            handleConfirm={handleDelete}
+          />
+
+      </Stack>
     </Box>
 
       <Card>
