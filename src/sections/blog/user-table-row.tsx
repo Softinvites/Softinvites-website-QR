@@ -230,11 +230,15 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         <TableCell>{row.email}</TableCell>
         <TableCell>{row.phone}</TableCell>
         <TableCell>{row.createdAt}</TableCell>
-        <TableCell>
-          <Label color={(row.status === 'banned' && 'error') || 'success'}>
-            {row.status}
-          </Label>
-        </TableCell>
+        <Label color={
+  (row.status === 'banned' && 'error') ||
+  (row.status === 'pending' && 'warning') ||
+  'success'
+}>
+  {row.status}
+</Label>
+
+
 
         <TableCell align="right">
           <IconButton onClick={handleOpenPopover}>
