@@ -181,6 +181,8 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     console.log(row.id)
     
   }, [ row.id,row._id,token, firstName, lastName, email, phone, handleCloseDialog]);
+
+
   
   // DELETE function remains unchanged
   const handleDelete = useCallback(async () => {
@@ -205,6 +207,42 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       window.location.reload(); // Refresh the page
     }
   }, [row, token, handleClosePopover]);
+
+   // NEW: Handler to get the QR code URL and open it in a new tab
+   const handleDownloadQRCode = useCallback(async () => {
+    console.log("Downloading QR code for:", row.name);
+    try {
+      const response = await fetch(`https://softinvite-api.onrender.com/guest/download-qrcode/${row._id}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+      if (!response.ok) {
+        throw new Error(`Failed to get QR Code: ${response.statusText}`);
+      }
+      const data = await response.json();
+      console.log("QR Code data:", data);
+      if (data.downloadUrl) {
+        // Open the QR code URL in a new browser tab
+        window.open(data.downloadUrl, '_blank');
+      } else {
+        toast.error('Failed to retrieve QR Code', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+      }
+    } catch (error) {
+      console.error("Error downloading QR Code:", error);
+      toast.error('Error downloading QR Code', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } finally {
+      handleClosePopover();
+    }
+  }, [row._id, row.name, token, handleClosePopover]);
+
 
   return (
     <>
@@ -280,7 +318,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
             <Iconify icon="solar:trash-bin-trash-bold" />
             Delete
           </MenuItem>
-          <MenuItem onClick={handleDelete} sx={{ color: 'success.main'}}>
+          <MenuItem onClick={handleDownloadQRCode} sx={{ color: 'success.main' }}>
             <Iconify icon="uil:cloud-download" />
             get qr-code
           </MenuItem>
