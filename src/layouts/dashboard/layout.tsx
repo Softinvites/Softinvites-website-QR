@@ -20,6 +20,8 @@ import { MenuButton } from '../components/menu-button';
 import { LayoutSection } from '../core/layout-section';
 import { HeaderSection } from '../core/header-section';
 import { AccountPopover } from '../components/account-popover';
+import { LanguagePopover } from '../components/language-popover';
+import { NotificationsPopover } from '../components/notifications-popover';
 
 // ----------------------------------------------------------------------
 
@@ -78,7 +80,9 @@ export function DashboardLayout({ sx, children, header }: DashboardLayoutProps) 
             ),
             rightArea: (
               <Box gap={1} display="flex" alignItems="center">
-               
+                <Searchbar />
+                <LanguagePopover data={_langs} />
+                <NotificationsPopover data={_notifications} />
                 <AccountPopover
                   data={[
                     {
@@ -92,8 +96,8 @@ export function DashboardLayout({ sx, children, header }: DashboardLayoutProps) 
                       icon: <Iconify width={22} icon="solar:shield-keyhole-bold-duotone" />,
                     },
                     {
-                      label: 'sign-in',
-                      href: '/sign-in',
+                      label: 'Settings',
+                      href: '#',
                       icon: <Iconify width={22} icon="solar:settings-bold-duotone" />,
                     },
                   ]}
