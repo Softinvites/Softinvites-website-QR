@@ -27,7 +27,7 @@ export function SignInView() {
     setLoading(true);
     setError('');
     try {
-      const response = await axios.post('https://softinvite-api.onrender.com/admin/login',
+      const response = await axios.post('https://software-invite-api-self.vercel.app/admin/login',
         
         { email, password },  // Request body should only contain email & password
         { withCredentials: true } // This should be the third argument

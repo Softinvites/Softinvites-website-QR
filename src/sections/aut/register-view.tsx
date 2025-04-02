@@ -36,7 +36,7 @@ export function RegisterPage() {
 
     try {
       await axios.post(
-        'https://softinvite-api.onrender.com/admin/register',
+        'https://software-invite-api-self.vercel.app/admin/register',
         {
           username: formData.username,
           email: formData.email,

@@ -40,50 +40,19 @@ export function UserView() {
   const [users, setUsers] = useState<UserProps[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null); // ✅ Define error state
-  const fileInputRef = useRef<HTMLInputElement>(null);
+ 
   const [open, setOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
   
 
 
-  // Handler for CSV file selection and upload
-  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file) {
-      const formData = new FormData();
-      formData.append('file', file);
-      try {
-        const token = localStorage.getItem("token");
-        const response = await axios.post(
-          "https://softinvite-api.onrender.com/guest/import-guest-csv",
-          formData,
-          {
-            headers: {
-              "Content-Type": "multipart/form-data",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
-        console.log("CSV imported successfully:", response.data);
-        toast.success("CSV imported successfully");
-        // Optionally, update your state or perform additional actions here
-      } catch {
-        console.error("Error importing CSV:", error);
-        toast.error("CSV import failed");
-      }
-    }
-  };
 
-  // Trigger file input click
-  const handleButtonClick = () => {
-    fileInputRef.current?.click();
-  };
-
+  
   const handleDelete = async () => {
     setLoading(true);
     try {
-      await axios.delete("https://softinvite-api.onrender.com/events/events/", {
+      await axios.delete("https://software-invite-api-self.vercel.app/events/events/", {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`, // Ensure you have authentication
         },
@@ -116,12 +85,13 @@ export function UserView() {
         const token = localStorage.getItem('token');
         //    console.log('Token:', token); // Debugging
 
-        const response = await fetch('https://softinvite-api.onrender.com/events/events', {
+        const response = await fetch('https://software-invite-api-self.vercel.app/events/events', {
           headers: { Authorization: `Bearer ${token}` },
         });
 
         if (!response.ok) {
           console.error('Fetch error:', response.status, response.statusText);
+            navigate('/sign-in'); // Redirect to login page
           throw new Error(`Failed to fetch data (Status: ${response.status})`);
         }
 
@@ -208,59 +178,14 @@ export function UserView() {
           >
           New Event
           </Button>
-          {/* Hidden file input */}
-          <input
-            type="file"
-            accept=".csv"
-            ref={fileInputRef}
-            onChange={handleFileChange}
-            style={{ display: 'none' }}
-          />
+         
 
           <EventModal open={open} handleClose={() => setOpen(false)}>
             {/* Add form elements inside if needed */}
           </EventModal>
 
 
-        <Button
-          variant="contained"
-          color="warning"
-          startIcon={<Iconify icon="uil:envelope-download" />}
-         
-          onClick={handleButtonClick}
-          sx={{
-            color: "#ffff", // Black text for contrast
-            "&:hover": {
-              backgroundColor: "#FFC107", // Darker yellow on hover
-            },
-            fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
-              padding: { xs: "2px 6px", sm: "6px 8px", md: "8px 10px" }, // Reduced horizontal padding
-              letterSpacing: "0.2px", // Reduced letter spacing
-              textTransform: "none", // Keep text as is, without auto-uppercase
-            minWidth: { xs: "auto", sm: "auto" },
-            
-      height: { xs: "52px", sm: "40px", md: "48px" },
-          }}
-        >
-          Import as csv
-        </Button>
-
-        <input
-        type="file"
-        accept=".csv"
-        ref={fileInputRef}
-        onChange={handleFileChange}
-        style={{ display: 'none' }}
-      />
-        {/* Reusable Event Modal */}
-        <EventModal open={open} handleClose={() => setOpen(false)}>
-          {/* Add form elements inside if needed */}
-
-          
-          
-        </EventModal>
-        
-
+      
         <Button
             variant="contained"
             color="error"

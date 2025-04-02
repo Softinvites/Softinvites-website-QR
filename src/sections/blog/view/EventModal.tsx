@@ -59,7 +59,7 @@ const EventModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
         return;
       }
 
-      const response = await fetch('https://softinvite-api.onrender.com/guest/add-guest', {
+      const response = await fetch('https://software-invite-api-self.vercel.app/guest/add-guest', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

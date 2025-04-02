@@ -39,10 +39,44 @@ export function BlogView() {
   const [filterName, setFilterName] = useState('');
   const [users, setUsers] = useState<UserProps[]>([]);
   const [loading, setLoading] = useState(false);
+    const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null); // ✅ Define error state
   
   const [open, setOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+
+   // Handler for CSV file selection and upload
+    const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
+      const file = event.target.files?.[0];
+      if (file) {
+        const formData = new FormData();
+        formData.append('file', file);
+        try {
+          const token = localStorage.getItem("token");
+          const response = await axios.post(
+            "https://software-invite-api-self.vercel.app/guest/import-guest-csv",
+            formData,
+            {
+              headers: {
+                "Content-Type": "multipart/form-data",
+                Authorization: `Bearer ${token}`,
+              },
+            }
+          );
+          console.log("CSV imported successfully:", response.data);
+          toast.success("CSV imported successfully");
+          // Optionally, update your state or perform additional actions here
+        } catch {
+          console.error("Error importing CSV:", error);
+          toast.error("CSV import failed");
+        }
+      }
+    };
+
+     // Trigger file input click
+  const handleButtonClick = () => {
+    fileInputRef.current?.click();
+  };
 
   const handleDelete = async () => {
     setLoading(true);
@@ -70,7 +104,7 @@ export function BlogView() {
     }
     
     try {
-      await axios.delete(`https://softinvite-api.onrender.com/guest/event-guest/${eventId}`, {
+      await axios.delete(`https://software-invite-api-self.vercel.app/guest/event-guest/${eventId}`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`, // Ensure you have authentication
         },
@@ -122,12 +156,13 @@ export function BlogView() {
             return;
           }
     
-          const response = await fetch(`https://softinvite-api.onrender.com/guest/events-guest/${eventId}`, {
+          const response = await fetch(`https://software-invite-api-self.vercel.app/guest/events-guest/${eventId}`, {
             headers: { Authorization: `Bearer ${token}` },
           });
     
           if (!response.ok) {
             console.error('Fetch error:', response.status, response.statusText);
+            navigate('/sign-in'); // Redirect to login page
             throw new Error(`Failed to fetch data (Status: ${response.status})`);
           }
     
@@ -192,21 +227,66 @@ const errorRef = useRef<string | null>(null);
       <Typography variant="h4" flexGrow={1} padding={1}>
         Guests
       </Typography>
-      <Stack direction="row" spacing={2}>
+
+      <Stack direction="row" spacing={1}>
+      
         <Button
-          variant="contained"
-          color="inherit"
+         variant="contained"
+            color="success"
           startIcon={<Iconify icon="mingcute:add-line" />}
           onClick={() => setOpen(true)}
           sx={{
             fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
-            padding: { xs: "4px 8px", sm: "6px 12px", md: "8px 16px" },
+            padding: { xs: "2px 6px", sm: "6px 8px", md: "8px 10px" }, // Reduced horizontal padding
+            letterSpacing: "0.2px", // Reduced letter spacing
+            textTransform: "none", // Keep text as is, without auto-uppercase
             minWidth: { xs: "auto", sm: "auto" },
+            
+    height: { xs: "52px", sm: "40px", md: "48px" },
           }}
         >
           Create new Guest
         </Button>
 
+        {/* Reusable Event Modal */}
+        <EventModal open={open} handleClose={() => setOpen(false)}>
+          {/* Add form elements inside if needed */}
+
+          
+          
+        </EventModal>
+
+        
+      <Button
+          variant="contained"
+          color="warning"
+          startIcon={<Iconify icon="uil:envelope-download" />}
+         
+          onClick={handleButtonClick}
+          sx={{
+            color: "#ffff", // Black text for contrast
+            "&:hover": {
+              backgroundColor: "#FFC107", // Darker yellow on hover
+            },
+            fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
+              padding: { xs: "2px 6px", sm: "6px 8px", md: "8px 10px" }, // Reduced horizontal padding
+              letterSpacing: "0.2px", // Reduced letter spacing
+              textTransform: "none", // Keep text as is, without auto-uppercase
+            minWidth: { xs: "auto", sm: "auto" },
+            
+      height: { xs: "52px", sm: "40px", md: "48px" },
+          }}
+        >
+          Import as csv
+        </Button>
+
+        <input
+        type="file"
+        accept=".csv"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        style={{ display: 'none' }}
+      />
         {/* Reusable Event Modal */}
         <EventModal open={open} handleClose={() => setOpen(false)}>
           {/* Add form elements inside if needed */}
@@ -221,7 +301,17 @@ const errorRef = useRef<string | null>(null);
             color="error"
             startIcon={<Iconify icon="mingcute:delete-line" />}
             onClick={() => setDeleteModalOpen(true)} // Open delete confirmation modal
+            sx={{
+              fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
+              padding: { xs: "2px 6px", sm: "6px 8px", md: "8px 10px" }, // Reduced horizontal padding
+              letterSpacing: "0.2px", // Reduced letter spacing
+              textTransform: "none", // Keep text as is, without auto-uppercase
+            
+      height: { xs: "52px", sm: "40px", md: "48px" },
+          }}
+        
           >
+            
             Delete all Events
           </Button>
 
@@ -233,6 +323,7 @@ const errorRef = useRef<string | null>(null);
           />
 
       </Stack>
+      
     </Box>
 
       <Card>

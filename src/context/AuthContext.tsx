@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback(async (email: string, password: string) => {
     try {
       const response = await axios.post<{ token: string; user: User }>(
-        "https://softinvite-api.onrender.com/admin/login",
+        "https://software-invite-api-self.vercel.app/login",
         { email, password }
       );
 

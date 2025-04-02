@@ -110,7 +110,7 @@ const navigate = useNavigate();
     console.log("Submitting edit for:", row.name, "with values:", { editName, editDate, editLocation });
   
     try {
-      const response = await fetch(`https://softinvite-api.onrender.com/events/update/${row.id}`, {
+      const response = await fetch(`https://software-invite-api-self.vercel.app/events/update/${row.id}`, {
         method: 'PUT', // Ensure your API expects 'PUT' or 'PATCH'
         headers: {
           'Content-Type': 'application/json',
@@ -155,7 +155,7 @@ const navigate = useNavigate();
   const handleDelete = useCallback(async () => {
     console.log("Delete clicked for:", row.name);
     try {
-      const response = await fetch(`https://softinvite-api.onrender.com/events/events/${row.id}`, {
+      const response = await fetch(`https://software-invite-api-self.vercel.app/events/events/${row.id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`

@@ -41,6 +41,12 @@ export function AccountPopover({ data = [], sx, ...other }: AccountPopoverProps)
   const handleClosePopover = useCallback(() => {
     setOpenPopover(null);
   }, []);
+  
+const handleLogout = () => {
+  localStorage.removeItem("token"); // Remove the authentication token
+  router.push("/sign-in"); // Redirect to the sign-in page
+};
+
 
   const handleClickItem = useCallback(
     (path: string) => {
@@ -129,9 +135,11 @@ export function AccountPopover({ data = [], sx, ...other }: AccountPopoverProps)
         <Divider sx={{ borderStyle: 'dashed' }} />
 
         <Box sx={{ p: 1 }}>
-          <Button fullWidth color="error" size="medium" variant="text">
-            Logout
-          </Button>
+         
+<Button fullWidth color="error" size="medium" variant="text" onClick={handleLogout}>
+  Logout
+</Button>
+
         </Box>
       </Popover>
     </>

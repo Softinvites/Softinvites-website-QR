@@ -25,19 +25,20 @@ export function OverviewAnalyticsView() {
 
     if (!token) {
       console.error("No token found in local storage.");
+      navigate('/sign-in'); // Redirect to login page
       setLoading(false);
       return;
     }
 
     Promise.all([
-      fetch("https://softinvite-api.onrender.com/events/events", {
+      fetch("https://software-invite-api-self.vercel.app/events/events", {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       }).then((res) => res.json()),
-      fetch("https://softinvite-api.onrender.com/guest/get-analytics/67da15fbf7a98bfd3bf1d2a8", {
+      fetch("https://software-invite-api-self.vercel.app/guest/get-analytics/", {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
@@ -49,6 +50,7 @@ export function OverviewAnalyticsView() {
         if (eventsData && Array.isArray(eventsData.events)) {
           setEvents(eventsData.events);
         }
+        
         if (analyticsData) {
           setAnalytics(analyticsData);
         }
@@ -56,15 +58,12 @@ export function OverviewAnalyticsView() {
       })
       .catch((err) => {
         console.error("Error fetching data:", err);
+        navigate('/sign-in'); // Redirect to login page
         setError(err.message);
         setLoading(false);
       });
 
-    const timer = setTimeout(() => {
-      localStorage.removeItem("token");
-      navigate("/sign-in");
-    }, 2900000);
-
+   
   }, [navigate]);
 
   return (

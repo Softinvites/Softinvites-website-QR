@@ -140,7 +140,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   console.log(eventId)
   
     try {
-      const response = await fetch(`https://softinvite-api.onrender.com/guest/update-guest/${row._id}`, {
+      const response = await fetch(`https://software-invite-api-self.vercel.app/guest/update-guest/${row._id}`, {
         method: 'PUT', // Using PUT as expected by the server
         headers: {
           'Content-Type': 'application/json',
@@ -188,7 +188,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   const handleDelete = useCallback(async () => {
     console.log("Delete clicked for:", row.name);
     try {
-      const response = await fetch(`https://softinvite-api.onrender.com/guest/single-guest/${row._id}`, {
+      const response = await fetch(`https://software-invite-api-self.vercel.app/guest/single-guest/${row._id}`, {
         method: 'DELETE',
         headers: {
           'Authorization': `Bearer ${token}`
@@ -212,7 +212,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
    const handleDownloadQRCode = useCallback(async () => {
     console.log("Downloading QR code for:", row.name);
     try {
-      const response = await fetch(`https://softinvite-api.onrender.com/guest/download-qrcode/${row._id}`, {
+      const response = await fetch(`https://software-invite-api-self.vercel.app/guest/download-qrcode/${row._id}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`

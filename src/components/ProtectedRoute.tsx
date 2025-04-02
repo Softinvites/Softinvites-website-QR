@@ -14,12 +14,7 @@ const ProtectedLayout = () => {
       setHasRefreshed(true);
     }
 
-    // Remove "refreshed" after 30 seconds
-    const timer = setTimeout(() => {
-      sessionStorage.removeItem("refreshed");
-    }, 300);
-
-    return () => clearTimeout(timer); // Cleanup timeout if component unmounts
+   
   }, []);
 
   if (!hasRefreshed) return null; // Prevents UI from showing before refresh
