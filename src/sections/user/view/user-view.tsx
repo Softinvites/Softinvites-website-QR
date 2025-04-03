@@ -111,6 +111,7 @@ export function UserView() {
           id: event._id,
           name: event.name,
           date: event.date,
+          description: event.description,
           location: event.location,
           createdAt: new Date(event.createdAt).toLocaleDateString(),
           status: event.isActive ? 'Active' : 'Inactive',
@@ -247,10 +248,10 @@ export function UserView() {
                   { id: 'date', label: 'Date' },
                   { id: 'createdAt', label: 'CreatedAt' },
 
-                  { id: 'status', label: 'Status' },
+                  { id: 'description', label: 'Description' },
 
                   { id: '' },
-                  { id: '' },
+                  { id: 'aaa' },
                 ]}
               />
               <TableBody>

@@ -22,6 +22,7 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
     name: '',
     date: '',
     location: '',
+    description: '',
   });
 
   
@@ -92,6 +93,16 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
           onChange={handleChange}
           margin="dense"
         />
+
+<TextField
+          fullWidth
+          label="Description"
+          name="description"
+          value={eventData.description}
+          onChange={handleChange}
+          margin="dense"
+        />
+        
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose} color="error">

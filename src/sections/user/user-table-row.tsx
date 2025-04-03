@@ -33,6 +33,7 @@ export type UserProps = {
   location: string;
   avatarUrl: string;
   isVerified: boolean;
+  description: string;
 };
 
 type UserTableRowProps = {
@@ -56,6 +57,8 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   const [editName, setEditName] = useState(row.name);
   const [editDate, setEditDate] = useState(row.date);
   const [editLocation, setEditLocation] = useState(row.location);
+  
+  const [editDescription, setEditDescription] = useState(row.description);
 
 
   
@@ -97,6 +100,8 @@ const navigate = useNavigate();
     setEditName(row.name);
     setEditDate(row.date);
     setEditLocation(row.location);
+    
+    setEditDescription(row.description);
     setOpenDialog(true);
     handleClosePopover();
   }, [row, handleClosePopover]);
@@ -107,7 +112,7 @@ const navigate = useNavigate();
   }, []);
 
   const handleSubmitEdit = useCallback(async () => {
-    console.log("Submitting edit for:", row.name, "with values:", { editName, editDate, editLocation });
+    console.log("Submitting edit for:", row.name, "with values:", { editName, editDate, editLocation,editDescription });
   
     try {
       const response = await fetch(`https://software-invite-api-self.vercel.app/events/update/${row.id}`, {
@@ -119,7 +124,8 @@ const navigate = useNavigate();
         body: JSON.stringify({
           name: editName,
           date: editDate,
-          location: editLocation
+          location: editLocation,
+          description: editDescription
         })
       });
   
@@ -149,7 +155,7 @@ const navigate = useNavigate();
       handleCloseDialog(); // Close dialog after the toast appears
     }
     
-  }, [row.id, token, editName, editDate, editLocation, row.name, handleCloseDialog]);
+  }, [row.id, token, editName, editDate, editLocation, row.name,editDescription, handleCloseDialog]);
   
   // DELETE function remains unchanged
   const handleDelete = useCallback(async () => {
@@ -217,6 +223,8 @@ const navigate = useNavigate();
         <TableCell>{row.location}</TableCell>
         <TableCell>{row.date}</TableCell>
         <TableCell>{row.createdAt}</TableCell>
+        
+        <TableCell>{row.description}</TableCell>
         <TableCell>
           <Label color={(row.status === 'banned' && 'error') || 'success'}>
             {row.status}
@@ -296,6 +304,14 @@ const navigate = useNavigate();
             variant="outlined"
             value={editLocation}
             onChange={(e) => setEditLocation(e.target.value)}
+          />
+           <TextField
+            margin="dense"
+            label="Description"
+            fullWidth
+            variant="outlined"
+            value={editDescription}
+            onChange={(e) => setEditDescription(e.target.value)}
           />
         </DialogContent>
         <DialogActions>
