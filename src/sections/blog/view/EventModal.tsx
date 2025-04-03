@@ -9,6 +9,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { toast } from 'react-toastify';
+import { SketchPicker } from 'react-color';
 
 interface GuestModalProps {
   open: boolean;
@@ -22,7 +23,9 @@ const EventModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
     email: '',
     phone: '',
     eventId: '',
-    qrCodeColor: '',
+    qrCodeBgColor: '#ffffff',
+    qrCodeCenterColor: '#020202',
+    qrCodeEdgeColor: '#020202',
   });
 
   const [loading, setLoading] = React.useState(false);
@@ -44,9 +47,14 @@ const EventModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
     }
   }, []);
 
-  // Handle input change for all fields except eventId
+  // Handle input change for text fields
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setGuestData({ ...guestData, [e.target.name]: e.target.value });
+  };
+
+  // Handle color changes from the SketchPicker
+  const handleColorChange = (color: any, field: string) => {
+    setGuestData((prev) => ({ ...prev, [field]: color.hex }));
   };
 
   const handleSubmit = async () => {
@@ -123,14 +131,33 @@ const EventModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
           onChange={handleChange}
           margin="dense"
         />
-        <TextField
-          fullWidth
-          label="QR Code Color"
-          name="qrCodeColor"
-          value={guestData.qrCodeColor}
-          onChange={handleChange}
-          margin="dense"
-        />
+        <div style={{ margin: '20px 0' }}>
+          <div>
+            <strong>QR Code Background Color</strong>
+          </div>
+          <SketchPicker
+            color={guestData.qrCodeBgColor}
+            onChangeComplete={(color) => handleColorChange(color, 'qrCodeBgColor')}
+          />
+        </div>
+        <div style={{ margin: '20px 0' }}>
+          <div>
+            <strong>QR Code Center Color</strong>
+          </div>
+          <SketchPicker
+            color={guestData.qrCodeCenterColor}
+            onChangeComplete={(color) => handleColorChange(color, 'qrCodeCenterColor')}
+          />
+        </div>
+        <div style={{ margin: '20px 0' }}>
+          <div>
+            <strong>QR Code Edge Color</strong>
+          </div>
+          <SketchPicker
+            color={guestData.qrCodeEdgeColor}
+            onChangeComplete={(color) => handleColorChange(color, 'qrCodeEdgeColor')}
+          />
+        </div>
       </DialogContent>
       <DialogActions>
         <Button onClick={handleClose} color="error">

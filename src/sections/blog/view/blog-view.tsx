@@ -161,10 +161,11 @@ export function BlogView() {
           });
     
           if (!response.ok) {
-            console.error('Fetch error:', response.status, response.statusText);
-            navigate('/sign-in'); // Redirect to login page
-            throw new Error(`Failed to fetch data (Status: ${response.status})`);
-          }
+            console.log('Fetch error:', response.status, response.statusText);
+            
+            throw new Error('Please create guest details.');
+        }
+        
     
           const data = await response.json();
           console.log('Fetched Data:', data); // Debugging log
