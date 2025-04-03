@@ -163,7 +163,7 @@ export function BlogView() {
           if (!response.ok) {
             console.log('Fetch error:', response.status, response.statusText);
             
-            throw new Error('Please create guest details.');
+            throw new Error('No Guest Available.');
         }
         
     
