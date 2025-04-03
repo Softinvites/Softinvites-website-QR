@@ -52,9 +52,19 @@ const EventModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
     setGuestData({ ...guestData, [e.target.name]: e.target.value });
   };
 
-  // Handle color changes from the SketchPicker
+  // Handle color changes from the SketchPicker (state still stores hex)
   const handleColorChange = (color: any, field: string) => {
     setGuestData((prev) => ({ ...prev, [field]: color.hex }));
+  };
+
+  // Convert a hex color to an "r,g,b" string
+  const hexToRgb = (hex: string): string => {
+    // Remove the hash if present
+    const cleanedHex = hex.replace('#', '');
+    const r = parseInt(cleanedHex.substring(0, 2), 16);
+    const g = parseInt(cleanedHex.substring(2, 4), 16);
+    const b = parseInt(cleanedHex.substring(4, 6), 16);
+    return `${r},${g},${b}`;
   };
 
   const handleSubmit = async () => {
@@ -67,13 +77,21 @@ const EventModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
         return;
       }
 
+      // Create a payload with colors in the required rgb format
+      const payload = {
+        ...guestData,
+        qrCodeBgColor: hexToRgb(guestData.qrCodeBgColor),
+        qrCodeCenterColor: hexToRgb(guestData.qrCodeCenterColor),
+        qrCodeEdgeColor: hexToRgb(guestData.qrCodeEdgeColor),
+      };
+
       const response = await fetch('https://software-invite-api-self.vercel.app/guest/add-guest', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify(guestData),
+        body: JSON.stringify(payload),
       });
 
       if (!response.ok) {

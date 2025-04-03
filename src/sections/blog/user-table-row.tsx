@@ -225,7 +225,15 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       console.log("QR Code data:", data);
       if (data.downloadUrl) {
         // Open the QR code URL in a new browser tab
-        window.open(data.downloadUrl, '_blank');
+        window.open(data.downloadUrl, "_blank");
+      
+        // Create an anchor element to trigger the download
+        const link = document.createElement('a');
+        link.href = data.downloadUrl;
+        link.download = ''; // Optionally, you can specify a filename
+        link.click();
+      
+      
       } else {
         toast.error('Failed to retrieve QR Code', {
           position: 'top-right',

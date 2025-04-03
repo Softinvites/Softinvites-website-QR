@@ -313,7 +313,7 @@ const errorRef = useRef<string | null>(null);
         
           >
             
-            Delete all Events
+            Delete all Guest
           </Button>
 
           {/* Delete Confirmation Modal */}
