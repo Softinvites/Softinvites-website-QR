@@ -21,8 +21,7 @@ import { toast } from 'react-toastify';
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 
-// Import QrReader (using the named export from react-qr-scanner)
-// This matches the documentation sample that uses a class-based component.
+// Import QrReader from react-qr-scanner
 import QrReader from 'react-qr-scanner';
 
 export type UserProps = {
@@ -51,8 +50,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
 
   const [openPopover, setOpenPopover] = useState<HTMLButtonElement | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
-  
-  // State for QR code scan dialog
   const [openScanDialog, setOpenScanDialog] = useState(false);
 
   // Split the full name into firstName and lastName (if possible)
@@ -113,7 +110,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   const handleSubmitEdit = useCallback(async () => {
     const eventIdArray = localStorage.getItem('allRowIds'); // Retrieve from local storage
     let eventId = null;
-    console.log(eventId);
     if (eventIdArray) {
       try {
         const parsedIds = JSON.parse(eventIdArray);
@@ -126,7 +122,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         console.error("Error parsing event IDs:", error);
       }
     }
-  
+
     if (!eventId) {
       toast.error("No valid event ID found in local storage.", {
         position: 'top-right',
@@ -134,7 +130,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       });
       return;
     }
-  
+
     try {
       const response = await fetch(`https://software-invite-api-self.vercel.app/guest/update-guest/${row._id}`, {
         method: 'PUT',
@@ -150,20 +146,19 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           eventId,
         })
       });
-  
+
       if (!response.ok) {
         throw new Error(`Failed to update guest: ${response.statusText}`);
       }
-  
+
       const data = await response.json();
       console.log("Guest updated:", data);
-  
+
       toast.success('Edited successfully!', {
         position: 'top-right',
         autoClose: 3000,
         onClose: () => window.location.reload(),
       });
-      
     } catch (error) {
       console.error("Error editing guest:", error);
       toast.error("Failed to edit guest. Please try again.", {
@@ -248,11 +243,13 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     setOpenScanDialog(false);
   }, []);
 
-  // Callback for handling the QR scan result (using secure ghost camera logic)
-  const handleScan = useCallback(
-    async (result: any, error: any) => {
+  // Callback for handling the QR scan result
+  const handleScanResult = useCallback(
+    async (result: string | { text: string } | null) => {
       if (result) {
-        console.log("Scanned QR code data:", result.text);
+        // Extract the scanned text based on the result type
+        const scannedText = typeof result === 'string' ? result : result.text;
+        console.log("Scanned QR code data:", scannedText);
         try {
           const response = await fetch(`https://software-invite-api-self.vercel.app/guest/scan-qrcode`, {
             method: 'POST',
@@ -260,7 +257,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
               'Content-Type': 'application/json',
               'Authorization': `Bearer ${token}`
             },
-            body: JSON.stringify({ scannedData: result.text })
+            body: JSON.stringify({ scannedData: scannedText })
           });
           if (!response.ok) {
             throw new Error(`Failed to process scanned QR Code: ${response.statusText}`);
@@ -280,9 +277,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         } finally {
           handleCloseScanDialog();
         }
-      }
-      if (error) {
-        console.info("QR Reader error:", error);
       }
     },
     [token, handleCloseScanDialog]
@@ -426,20 +420,19 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
               width: '100%',
             }}
           >
-           <QrReader
-  delay={300}
-  style={{ height: '100%', width: '100%' }}
-  onError={(error) => console.log('QR Reader error:', error)}
-  onScan={(result: string | { text: string } | null) => {
-    if (result) {
-      // Determine the scanned text based on the result type
-      const scannedText =
-        typeof result === 'string' ? result : result.text;
-      handleScan({ text: scannedText }, null);
-    }
-  }}
-/>
-
+            <QrReader
+              delay={300} // Scan interval (ms); use false to disable continuous scanning.
+              facingMode="rear" // Use the rear camera on mobile devices.
+              style={{ height: '100%', width: '100%' }}
+              onError={(error) => console.log('QR Reader error:', error)}
+              onScan={(result: string | { text: string } | null) => {
+                if (result) {
+                  const scannedText = typeof result === 'string' ? result : result.text;
+                  // Pass the scanned text to our handler
+                  handleScanResult(scannedText);
+                }
+              }}
+            />
           </Box>
         </DialogContent>
         <DialogActions>
