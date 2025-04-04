@@ -21,10 +21,9 @@ import { toast } from 'react-toastify';
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 
-// Import QrReader (using the named export from react-qr-reader)
-import { QrReader } from 'react-qr-reader';
-
-// ----------------------------------------------------------------------
+// Import QrReader (using the named export from react-qr-scanner)
+// This matches the documentation sample that uses a class-based component.
+import QrReader from 'react-qr-scanner';
 
 export type UserProps = {
   id: string;
@@ -52,6 +51,8 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
 
   const [openPopover, setOpenPopover] = useState<HTMLButtonElement | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
+  
+  // State for QR code scan dialog
   const [openScanDialog, setOpenScanDialog] = useState(false);
 
   // Split the full name into firstName and lastName (if possible)
@@ -74,7 +75,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     }
   }, [row.id]);
 
-  // Save the row's ID (_id) to local storage when the component mounts
+  // Save the row's _id to local storage when the component mounts
   useEffect(() => {
     const storedIds = JSON.parse(localStorage.getItem('alls') || '[]');
     if (!storedIds.includes(row._id)) {
@@ -109,7 +110,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     setOpenDialog(false);
   }, []);
 
-  // Submit the edit using the new endpoint and payload structure
   const handleSubmitEdit = useCallback(async () => {
     const eventIdArray = localStorage.getItem('allRowIds'); // Retrieve from local storage
     let eventId = null;
@@ -135,8 +135,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       return;
     }
   
-    console.log(eventId);
-  
     try {
       const response = await fetch(`https://software-invite-api-self.vercel.app/guest/update-guest/${row._id}`, {
         method: 'PUT',
@@ -152,7 +150,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           eventId,
         })
       });
-      console.log(row.id);
   
       if (!response.ok) {
         throw new Error(`Failed to update guest: ${response.statusText}`);
@@ -176,11 +173,8 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     } finally {
       handleCloseDialog();
     }
-    console.log(row.id);
-    
-  }, [row.id, row._id, token, firstName, lastName, email, phone, handleCloseDialog]);
+  }, [row._id, token, firstName, lastName, email, phone, handleCloseDialog]);
 
-  // DELETE function remains unchanged
   const handleDelete = useCallback(async () => {
     console.log("Delete clicked for:", row.name);
     try {
@@ -204,7 +198,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     }
   }, [row, token, handleClosePopover]);
 
-  // Existing: Download QR Code function
   const handleDownloadQRCode = useCallback(async () => {
     console.log("Downloading QR code for:", row.name);
     try {
@@ -245,7 +238,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     }
   }, [row._id, row.name, token, handleClosePopover]);
 
-  // NEW: Open the scan dialog (which activates the camera)
+  // Open the scan dialog (activates the camera)
   const handleOpenScanDialog = useCallback(() => {
     setOpenScanDialog(true);
     handleClosePopover();
@@ -255,11 +248,10 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     setOpenScanDialog(false);
   }, []);
 
-  // Callback for handling the QR scan result
+  // Callback for handling the QR scan result (using secure ghost camera logic)
   const handleScan = useCallback(
     async (result: any, error: any) => {
       if (result) {
-        // Prevent multiple submissions for the same result if needed
         console.log("Scanned QR code data:", result.text);
         try {
           const response = await fetch(`https://software-invite-api-self.vercel.app/guest/scan-qrcode`, {
@@ -422,20 +414,36 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         </DialogActions>
       </Dialog>
 
-      {/* Scan QR Code Dialog */}
-      <Dialog open={openScanDialog} onClose={handleCloseScanDialog} fullWidth maxWidth="sm">
+      <Dialog open={openScanDialog} onClose={handleCloseScanDialog} maxWidth="sm" fullWidth>
         <DialogTitle>Scan QR Code</DialogTitle>
         <DialogContent>
-  <Box sx={{ width: '100%' }}>
-    <QrReader
-      onResult={handleScan}
-      constraints={{ facingMode: 'environment' }}
-    />
-  </Box>
-</DialogContent>
+          <Box
+            sx={{
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center',
+              height: 300,
+              width: '100%',
+            }}
+          >
+           <QrReader
+  delay={300}
+  style={{ height: '100%', width: '100%' }}
+  onError={(error) => console.log('QR Reader error:', error)}
+  onScan={(result: string | { text: string } | null) => {
+    if (result) {
+      // Determine the scanned text based on the result type
+      const scannedText =
+        typeof result === 'string' ? result : result.text;
+      handleScan({ text: scannedText }, null);
+    }
+  }}
+/>
 
+          </Box>
+        </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseScanDialog}>Cancel</Button>
+          <Button onClick={handleCloseScanDialog}>Close</Button>
         </DialogActions>
       </Dialog>
     </>
