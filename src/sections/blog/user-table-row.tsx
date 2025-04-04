@@ -423,24 +423,21 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       </Dialog>
 
       {/* Scan QR Code Dialog */}
-     <Dialog open={openScanDialog} onClose={handleCloseScanDialog} fullWidth maxWidth="sm">
-  <DialogTitle>Scan QR Code</DialogTitle>
-  <DialogContent>
-    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
-      <QrReader
-        constraints={{ facingMode: { ideal: 'environment' } }}
-        scanDelay={500}
-        onResult={handleScan}
-        videoContainerStyle={{ width: '100%' }}
-        videoStyle={{ width: '100%' }}
-      />
-    </Box>
-  </DialogContent>
-  <DialogActions>
-    <Button onClick={handleCloseScanDialog}>Cancel</Button>
-  </DialogActions>
-</Dialog>
+      <Dialog open={openScanDialog} onClose={handleCloseScanDialog} fullWidth maxWidth="sm">
+        <DialogTitle>Scan QR Code</DialogTitle>
+        <DialogContent>
+  <Box sx={{ width: '100%' }}>
+    <QrReader
+      onResult={handleScan}
+      constraints={{ facingMode: 'environment' }}
+    />
+  </Box>
+</DialogContent>
 
+        <DialogActions>
+          <Button onClick={handleCloseScanDialog}>Cancel</Button>
+        </DialogActions>
+      </Dialog>
     </>
   );
 }
