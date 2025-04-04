@@ -91,7 +91,7 @@ export function UserView() {
 
         if (!response.ok) {
           console.error('Fetch error:', response.status, response.statusText);
-            navigate('/sign-in'); // Redirect to login page
+           
           throw new Error(`Failed to fetch data (Status: ${response.status})`);
         }
 
