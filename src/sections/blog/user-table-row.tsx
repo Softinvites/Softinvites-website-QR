@@ -45,7 +45,7 @@ type UserTableRowProps = {
 };
 
 export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) {
-  console.log('Rendering UserTableRow with data:', row);
+  console.log("Rendering UserTableRow with data:", row);
 
   // Retrieve the token from local storage (or via context)
   const token = localStorage.getItem('token');
@@ -83,22 +83,19 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     }
   }, [row._id]);
 
-  const handleOpenPopover = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      console.log('Opening popover for:', row.name);
-      setOpenPopover(event.currentTarget);
-    },
-    [row.name]
-  );
+  const handleOpenPopover = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    console.log("Opening popover for:", row.name);
+    setOpenPopover(event.currentTarget);
+  }, [row.name]);
 
   const handleClosePopover = useCallback(() => {
-    console.log('Closing popover');
+    console.log("Closing popover");
     setOpenPopover(null);
   }, []);
 
   // Open the edit dialog and initialize form values
   const handleOpenEditDialog = useCallback(() => {
-    console.log('Opening edit dialog for:', row.name);
+    console.log("Opening edit dialog for:", row.name);
     setFirstName(initialFirstName);
     setLastName(initialLastName);
     setEmail(row.email);
@@ -108,7 +105,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   }, [row, initialFirstName, initialLastName, handleClosePopover]);
 
   const handleCloseDialog = useCallback(() => {
-    console.log('Closing edit dialog');
+    console.log("Closing edit dialog");
     setOpenDialog(false);
   }, []);
 
@@ -123,58 +120,56 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         if (Array.isArray(parsedIds) && parsedIds.length > 0) {
           eventId = parsedIds[0];
         } else {
-          console.error('Parsed data is not a valid array:', parsedIds);
+          console.error("Parsed data is not a valid array:", parsedIds);
         }
       } catch (error) {
-        console.error('Error parsing event IDs:', error);
+        console.error("Error parsing event IDs:", error);
       }
     }
-
+  
     if (!eventId) {
-      toast.error('No valid event ID found in local storage.', {
+      toast.error("No valid event ID found in local storage.", {
         position: 'top-right',
         autoClose: 3000,
       });
       return;
     }
-
+  
     console.log(eventId);
-
+  
     try {
-      const response = await fetch(
-        `https://software-invite-api-self.vercel.app/guest/update-guest/${row._id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            firstName,
-            lastName,
-            email,
-            phone,
-            eventId,
-          }),
-        }
-      );
+      const response = await fetch(`https://software-invite-api-self.vercel.app/guest/update-guest/${row._id}`, {
+        method: 'PUT',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify({
+          firstName,
+          lastName,
+          email,
+          phone,
+          eventId,
+        })
+      });
       console.log(row.id);
-
+  
       if (!response.ok) {
         throw new Error(`Failed to update guest: ${response.statusText}`);
       }
-
+  
       const data = await response.json();
-      console.log('Guest updated:', data);
-
+      console.log("Guest updated:", data);
+  
       toast.success('Edited successfully!', {
         position: 'top-right',
         autoClose: 3000,
         onClose: () => window.location.reload(),
       });
+      
     } catch (error) {
-      console.error('Error editing guest:', error);
-      toast.error('Failed to edit guest. Please try again.', {
+      console.error("Error editing guest:", error);
+      toast.error("Failed to edit guest. Please try again.", {
         position: 'top-right',
         autoClose: 3000,
       });
@@ -182,25 +177,23 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       handleCloseDialog();
     }
     console.log(row.id);
+    
   }, [row.id, row._id, token, firstName, lastName, email, phone, handleCloseDialog]);
 
   // DELETE function remains unchanged
   const handleDelete = useCallback(async () => {
-    console.log('Delete clicked for:', row.name);
+    console.log("Delete clicked for:", row.name);
     try {
-      const response = await fetch(
-        `https://software-invite-api-self.vercel.app/guest/single-guest/${row._id}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      const response = await fetch(`https://software-invite-api-self.vercel.app/guest/single-guest/${row._id}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-      );
+      });
       const data = await response.json();
-      console.log('Delete response:', data);
+      console.log("Delete response:", data);
     } catch (error) {
-      console.error('Error deleting event:', error);
+      console.error("Error deleting event:", error);
     } finally {
       handleClosePopover();
       toast.success('Deletion successful!', {
@@ -213,24 +206,21 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
 
   // Existing: Download QR Code function
   const handleDownloadQRCode = useCallback(async () => {
-    console.log('Downloading QR code for:', row.name);
+    console.log("Downloading QR code for:", row.name);
     try {
-      const response = await fetch(
-        `https://software-invite-api-self.vercel.app/guest/download-qrcode/${row._id}`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      const response = await fetch(`https://software-invite-api-self.vercel.app/guest/download-qrcode/${row._id}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-      );
+      });
       if (!response.ok) {
         throw new Error(`Failed to get QR Code: ${response.statusText}`);
       }
       const data = await response.json();
-      console.log('QR Code data:', data);
+      console.log("QR Code data:", data);
       if (data.downloadUrl) {
-        window.open(data.downloadUrl, '_blank');
+        window.open(data.downloadUrl, "_blank");
         const link = document.createElement('a');
         link.href = data.downloadUrl;
         link.download = '';
@@ -245,7 +235,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         });
       }
     } catch (error) {
-      console.error('Error downloading QR Code:', error);
+      console.error("Error downloading QR Code:", error);
       toast.error('Error downloading QR Code', {
         position: 'top-right',
         autoClose: 3000,
@@ -270,30 +260,27 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     async (result: any, error: any) => {
       if (result) {
         // Prevent multiple submissions for the same result if needed
-        console.log('Scanned QR code data:', result.text);
+        console.log("Scanned QR code data:", result.text);
         try {
-          const response = await fetch(
-            `https://software-invite-api-self.vercel.app/guest/scan-qrcode`,
-            {
-              method: 'POST',
-              headers: {
-                'Content-Type': 'application/json',
-                Authorization: `Bearer ${token}`,
-              },
-              body: JSON.stringify({ scannedData: result.text }),
-            }
-          );
+          const response = await fetch(`https://software-invite-api-self.vercel.app/guest/scan-qrcode`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Bearer ${token}`
+            },
+            body: JSON.stringify({ scannedData: result.text })
+          });
           if (!response.ok) {
             throw new Error(`Failed to process scanned QR Code: ${response.statusText}`);
           }
           const resultData = await response.json();
-          console.log('Processed scan result:', resultData);
+          console.log("Processed scan result:", resultData);
           toast.success('QR Code scanned and processed successfully!', {
             position: 'top-right',
             autoClose: 3000,
           });
         } catch (err) {
-          console.error('Error processing scanned QR Code:', err);
+          console.error("Error processing scanned QR Code:", err);
           toast.error('Error processing scanned QR Code', {
             position: 'top-right',
             autoClose: 3000,
@@ -303,7 +290,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         }
       }
       if (error) {
-        console.info('QR Reader error:', error);
+        console.info("QR Reader error:", error);
       }
     },
     [token, handleCloseScanDialog]
@@ -317,7 +304,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
             disableRipple
             checked={selected}
             onChange={() => {
-              console.log('Checkbox clicked for:', row.name, 'Selected:', !selected);
+              console.log("Checkbox clicked for:", row.name, "Selected:", !selected);
               onSelectRow();
             }}
           />
@@ -334,7 +321,9 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         <TableCell>{row.phone}</TableCell>
         <TableCell>{row.createdAt}</TableCell>
         <TableCell>
-          <Label color={(row.status === 'pending' && 'warning') || 'success'}>{row.status}</Label>
+          <Label color={(row.status === 'pending' && 'warning') || 'success'}>
+            {row.status}
+          </Label>
         </TableCell>
 
         <TableCell align="right">
@@ -434,18 +423,24 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       </Dialog>
 
       {/* Scan QR Code Dialog */}
-      <Dialog open={openScanDialog} onClose={handleCloseScanDialog} fullWidth maxWidth="sm">
-        <DialogTitle>Scan QR Code</DialogTitle>
-        <DialogContent>
-          <Box sx={{ width: '100%' }}>
-            <QrReader onResult={handleScan} constraints={{ facingMode: 'environment' }} />
-          </Box>
-        </DialogContent>
+     <Dialog open={openScanDialog} onClose={handleCloseScanDialog} fullWidth maxWidth="sm">
+  <DialogTitle>Scan QR Code</DialogTitle>
+  <DialogContent>
+    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
+      <QrReader
+        constraints={{ facingMode: { ideal: 'environment' } }}
+        scanDelay={500}
+        onResult={handleScan}
+        videoContainerStyle={{ width: '100%' }}
+        videoStyle={{ width: '100%' }}
+      />
+    </Box>
+  </DialogContent>
+  <DialogActions>
+    <Button onClick={handleCloseScanDialog}>Cancel</Button>
+  </DialogActions>
+</Dialog>
 
-        <DialogActions>
-          <Button onClick={handleCloseScanDialog}>Cancel</Button>
-        </DialogActions>
-      </Dialog>
     </>
   );
 }
