@@ -21,8 +21,8 @@ import { toast } from 'react-toastify';
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 
-// Import QrReader (using the named export from react-qr-reader)
-import { QrReader } from 'react-qr-reader';
+// Import Html5QrcodeScanner from the html5-qrcode library
+import { Html5QrcodeScanner } from 'html5-qrcode';
 
 // ----------------------------------------------------------------------
 
@@ -42,6 +42,40 @@ type UserTableRowProps = {
   row: UserProps;
   selected: boolean;
   onSelectRow: () => void;
+};
+
+// Create a custom scanner component using html5-qrcode
+const Html5QrCodeScannerComponent = ({
+  onScanSuccess,
+  onScanError,
+}: {
+  onScanSuccess: (decodedText: string, decodedResult: any) => void;
+  onScanError: (errorMessage: string) => void;
+}) => {
+  useEffect(() => {
+    // Configuration options for the scanner
+    const config = { fps: 10, qrbox: 250 };
+    const scanner = new Html5QrcodeScanner("html5qr-reader", config, false);
+
+    // Render the scanner and pass callbacks
+    scanner.render(
+      (decodedText, decodedResult) => {
+        onScanSuccess(decodedText, decodedResult);
+      },
+      (errorMessage) => {
+        onScanError(errorMessage);
+      }
+    );
+
+    // Clear the scanner when the component is unmounted
+    return () => {
+      scanner.clear().catch((error) => {
+        console.error("Failed to clear html5QrCodeScanner", error);
+      });
+    };
+  }, [onScanSuccess, onScanError]);
+
+  return <div id="html5qr-reader" />;
 };
 
 export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) {
@@ -255,46 +289,45 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     setOpenScanDialog(false);
   }, []);
 
-  // Callback for handling the QR scan result
-  const handleScan = useCallback(
-    async (result: any, error: any) => {
-      if (result) {
-        // Prevent multiple submissions for the same result if needed
-        console.log("Scanned QR code data:", result.text);
-        try {
-          const response = await fetch(`https://software-invite-api-self.vercel.app/guest/scan-qrcode`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Authorization': `Bearer ${token}`
-            },
-            body: JSON.stringify({ scannedData: result.text })
-          });
-          if (!response.ok) {
-            throw new Error(`Failed to process scanned QR Code: ${response.statusText}`);
-          }
-          const resultData = await response.json();
-          console.log("Processed scan result:", resultData);
-          toast.success('QR Code scanned and processed successfully!', {
-            position: 'top-right',
-            autoClose: 3000,
-          });
-        } catch (err) {
-          console.error("Error processing scanned QR Code:", err);
-          toast.error('Error processing scanned QR Code', {
-            position: 'top-right',
-            autoClose: 3000,
-          });
-        } finally {
-          handleCloseScanDialog();
+  // Callback for handling the QR scan result from the Html5QrcodeScanner
+  const handleScanSuccess = useCallback(
+    async (decodedText: string, decodedResult: any) => {
+      console.log("Scanned QR code data:", decodedText);
+      try {
+        const response = await fetch(`https://software-invite-api-self.vercel.app/guest/scan-qrcode`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ scannedData: decodedText })
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to process scanned QR Code: ${response.statusText}`);
         }
-      }
-      if (error) {
-        console.info("QR Reader error:", error);
+        const resultData = await response.json();
+        console.log("Processed scan result:", resultData);
+        toast.success('QR Code scanned and processed successfully!', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+      } catch (err) {
+        console.error("Error processing scanned QR Code:", err);
+        toast.error('Error processing scanned QR Code', {
+          position: 'top-right',
+          autoClose: 3000,
+        });
+      } finally {
+        handleCloseScanDialog();
       }
     },
     [token, handleCloseScanDialog]
   );
+
+  // Optional error callback for scanner errors
+  const handleScanError = useCallback((errorMessage: string) => {
+    console.info("QR Scanner error:", errorMessage);
+  }, []);
 
   return (
     <>
@@ -422,15 +455,11 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         </DialogActions>
       </Dialog>
 
-      {/* Scan QR Code Dialog */}
-      <Dialog open={openScanDialog} onClose={handleCloseScanDialog} fullWidth maxWidth="sm"sx={{ width: '100%' }}>
+      {/* Scan QR Code Dialog using Html5-QRCode */}
+      <Dialog open={openScanDialog} onClose={handleCloseScanDialog} fullWidth maxWidth="sm" sx={{ width: '100%' }}>
         <DialogTitle>Scan QR Code</DialogTitle>
         <DialogContent>
-          <QrReader
-            onResult={handleScan}
-            constraints={{ facingMode: 'environment' }}
-          
-          />
+          <Html5QrCodeScannerComponent onScanSuccess={handleScanSuccess} onScanError={handleScanError} />
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCloseScanDialog}>Cancel</Button>
