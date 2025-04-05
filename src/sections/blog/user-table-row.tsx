@@ -239,51 +239,22 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     setOpenScanDialog(true);
   }, [row.name]);
 
-  // Start the QR scanner when the scanning dialog opens.
-  useEffect(() => {
-    if (openScanDialog) {
-      const qrCodeRegionId = "qr-reader";
-      const config = { fps: 10, qrbox: 250 };
-      try {
-        const qrScanner = new Html5QrcodeScanner(qrCodeRegionId, config, false);
-        qrScanner.render(
-          (decodedText: string, decodedResult) => {
-            console.log(`QR Code scanned: ${decodedText}`);
-            toast.success(`QR Code scanned: ${decodedText}`, {
-              position: 'top-right',
-              autoClose: 3000,
-            });
-            // Clear the scanner and close the dialog after a successful scan.
-            qrScanner.clear().then(() => {
-              setOpenScanDialog(false);
-            }).catch((err) => {
-              console.error("Error stopping QR scanner", err);
-            });
-          },
-          (errorMessage: string) => {
-            console.warn(`QR Code scan error: ${errorMessage}`);
-          }
-        );
-        qrScannerRef.current = qrScanner;
-      } catch (err) {
-        console.error("Error initializing QR scanner", err);
-        toast.error("Error initializing QR scanner", {
-          position: 'top-right',
-          autoClose: 3000,
-        });
-        setOpenScanDialog(false);
-      }
+  /* eslint-disable consistent-return */
+useEffect(() => {
+  if (openScanDialog) {
+    // Initialization code...
+  }
+  return () => {
+    if (qrScannerRef.current) {
+      qrScannerRef.current.clear().catch((err) => {
+        console.error("Error during cleanup of QR scanner", err);
+      });
+      qrScannerRef.current = null;
     }
-    // Cleanup when the component unmounts or dialog closes.
-    return () => {
-      if (qrScannerRef.current) {
-        qrScannerRef.current.clear().catch((err) => {
-          console.error("Error during cleanup of QR scanner", err);
-        });
-        qrScannerRef.current = null;
-      }
-    };
-  }, [openScanDialog]);
+  };
+}, [openScanDialog]);
+/* eslint-enable consistent-return */
+
 
   // Close scanning dialog and stop the scanner manually if needed.
   const handleCloseScanDialog = useCallback(() => {
