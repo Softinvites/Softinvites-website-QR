@@ -24,8 +24,6 @@ import { Iconify } from 'src/components/iconify';
 // Import Html5QrcodeScanner from the html5-qrcode library
 import { Html5QrcodeScanner } from 'html5-qrcode';
 
-// ----------------------------------------------------------------------
-
 export type UserProps = {
   id: string;
   name: string;
@@ -44,39 +42,26 @@ type UserTableRowProps = {
   onSelectRow: () => void;
 };
 
-// Create a custom scanner component using html5-qrcode
-const Html5QrCodeScannerComponent = ({
-  onScanSuccess,
-  onScanError,
-}: {
-  onScanSuccess: (decodedText: string, decodedResult: any) => void;
-  onScanError: (errorMessage: string) => void;
-}) => {
+// ----------------------------------------------------------------------
+// Scanner component that handles mounting and unmounting of the QR scanner
+function Html5QrCodeScannerComponent({ onScanSuccess, onScanError }: { onScanSuccess: (decodedText: string, decodedResult: any) => void, onScanError: (errorMessage: string) => void }) {
   useEffect(() => {
-    // Configuration options for the scanner
-    const config = { fps: 10, qrbox: 250 };
-    const scanner = new Html5QrcodeScanner("html5qr-reader", config, false);
+    const config = { fps: 5, qrbox: { width: 300, height: 300 } };
 
-    // Render the scanner and pass callbacks
-    scanner.render(
-      (decodedText, decodedResult) => {
-        onScanSuccess(decodedText, decodedResult);
-      },
-      (errorMessage) => {
-        onScanError(errorMessage);
-      }
-    );
+    const html5QrCodeScanner = new Html5QrcodeScanner("reader", config, true);
 
-    // Clear the scanner when the component is unmounted
+    html5QrCodeScanner.render(onScanSuccess, onScanError);
+
+    // Clean up on unmount
     return () => {
-      scanner.clear().catch((error) => {
-        console.error("Failed to clear html5QrCodeScanner", error);
+      html5QrCodeScanner.clear().catch((error) => {
+        console.error("Failed to clear html5QrcodeScanner. ", error);
       });
     };
   }, [onScanSuccess, onScanError]);
 
-  return <div id="html5qr-reader" />;
-};
+  return <div id="reader" />;
+}
 
 export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) {
   console.log("Rendering UserTableRow with data:", row);
@@ -98,6 +83,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   const [lastName, setLastName] = useState(initialLastName);
   const [email, setEmail] = useState(row.email);
   const [phone, setPhone] = useState(row.phone);
+  const [scanResult, setScanResult] = useState<string | null>(null);
 
   // Save the row's ID to local storage when the component mounts
   useEffect(() => {
@@ -108,7 +94,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     }
   }, [row.id]);
 
-  // Save the row's ID (_id) to local storage when the component mounts
+  // Save the row's _id to local storage when the component mounts
   useEffect(() => {
     const storedIds = JSON.parse(localStorage.getItem('alls') || '[]');
     if (!storedIds.includes(row._id)) {
@@ -147,7 +133,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   const handleSubmitEdit = useCallback(async () => {
     const eventIdArray = localStorage.getItem('allRowIds'); // Retrieve from local storage
     let eventId = null;
-    console.log(eventId);
+    console.log(eventIdArray);
     if (eventIdArray) {
       try {
         const parsedIds = JSON.parse(eventIdArray);
@@ -169,8 +155,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       return;
     }
   
-    console.log(eventId);
-  
     try {
       const response = await fetch(`https://software-invite-api-self.vercel.app/guest/update-guest/${row._id}`, {
         method: 'PUT',
@@ -186,8 +170,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           eventId,
         })
       });
-      console.log(row.id);
-  
       if (!response.ok) {
         throw new Error(`Failed to update guest: ${response.statusText}`);
       }
@@ -210,9 +192,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     } finally {
       handleCloseDialog();
     }
-    console.log(row.id);
-    
-  }, [row.id, row._id, token, firstName, lastName, email, phone, handleCloseDialog]);
+  }, [row._id, token, firstName, lastName, email, phone, handleCloseDialog]);
 
   // DELETE function remains unchanged
   const handleDelete = useCallback(async () => {
@@ -252,7 +232,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         throw new Error(`Failed to get QR Code: ${response.statusText}`);
       }
       const data = await response.json();
-      console.log("QR Code data:", data);
       if (data.downloadUrl) {
         window.open(data.downloadUrl, "_blank");
         const link = document.createElement('a');
@@ -285,13 +264,11 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     handleClosePopover();
   }, [handleClosePopover]);
 
-  const handleCloseScanDialog = useCallback(() => {
-    setOpenScanDialog(false);
-  }, []);
+  const handleCloseScanDialog = useCallback(() => setOpenScanDialog(false), []);
 
   // Callback for handling the QR scan result from the Html5QrcodeScanner
   const handleScanSuccess = useCallback(
-    async (decodedText: string, decodedResult: any) => {
+    async (decodedText: string, _decodedResult: any) => {
       console.log("Scanned QR code data:", decodedText);
       try {
         const response = await fetch(`https://software-invite-api-self.vercel.app/guest/scan-qrcode`, {
@@ -311,6 +288,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           position: 'top-right',
           autoClose: 3000,
         });
+        setScanResult(decodedText);
       } catch (err) {
         console.error("Error processing scanned QR Code:", err);
         toast.error('Error processing scanned QR Code', {
@@ -401,12 +379,12 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
 
           <MenuItem onClick={handleDownloadQRCode} sx={{ color: 'success.main' }}>
             <Iconify icon="uil:cloud-download" />
-            get qr-code
+            Download
           </MenuItem>
 
           <MenuItem onClick={handleOpenScanDialog} sx={{ color: 'success.main' }}>
             <Iconify icon="uil:cloud-download" />
-            scan qr-code
+            Scan QR Code
           </MenuItem>
         </MenuList>
       </Popover>
@@ -456,7 +434,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       </Dialog>
 
       {/* Scan QR Code Dialog using Html5-QRCode */}
-      <Dialog open={openScanDialog} onClose={handleCloseScanDialog} fullWidth maxWidth="sm" sx={{ width: '100%' }}>
+      <Dialog open={openScanDialog} onClose={handleCloseScanDialog} fullWidth maxWidth="sm">
         <DialogTitle>Scan QR Code</DialogTitle>
         <DialogContent>
           <Html5QrCodeScannerComponent onScanSuccess={handleScanSuccess} onScanError={handleScanError} />
