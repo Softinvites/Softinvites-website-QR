@@ -43,6 +43,7 @@ export function BlogView() {
   const [loading, setLoading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null); // ✅ Define error state
+    const [dataSent, setDataSent] = useState(false);
   
   const [open, setOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
@@ -186,10 +187,12 @@ export function BlogView() {
             phone: guest.phone,
             createdAt: new Date(guest.createdAt).toLocaleDateString(),
             status: guest.status,
+            qrCode: guest.qrCode
           }));
     
           console.log('Formatted Data:', formattedData);
           setUsers(formattedData);
+          
         } catch (err: any) {
           setError(err.message);
         } finally {
@@ -207,6 +210,32 @@ export function BlogView() {
       return () => clearTimeout(timer); // Cleanup timeout if component unmounts
       
     }, [navigate,error]);
+
+    
+
+  // Separate effect to send data to the secondary API only once when users are available
+  useEffect(() => {
+    if (users.length > 0 && !dataSent) {
+      const sendData = async () => {
+        try {
+          const submitRes = await fetch('https://languid-southern-swoop.glitch.me/submit-dat', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(users),
+          });
+          const submitResData = await submitRes.json();
+          console.log('Response from glitch.me:', submitResData);
+          setDataSent(true);
+        } catch (submitError) {
+          console.error('Error sending data to glitch.me:', submitError);
+        }
+      };
+
+      sendData();
+    }
+  }, [users, dataSent]);
     
 const errorRef = useRef<string | null>(null);
   
