@@ -21,9 +21,6 @@ import { toast } from 'react-toastify';
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 
-// Import Html5QrcodeScanner from the html5-qrcode library
-import { Html5QrcodeScanner } from 'html5-qrcode';
-
 export type UserProps = {
   id: string;
   name: string;
@@ -42,32 +39,7 @@ type UserTableRowProps = {
   onSelectRow: () => void;
 };
 
-// ----------------------------------------------------------------------
-// Scanner component that handles mounting and unmounting of the QR scanner
-function Html5QrCodeScannerComponent({
-  onScanSuccess,
-  onScanError,
-}: {
-  onScanSuccess: (decodedText: string, decodedResult: any) => void;
-  onScanError: (errorMessage: string) => void;
-}) {
-  useEffect(() => {
-    const config = { fps: 5, qrbox: { width: 300, height: 300 } };
-
-    const html5QrCodeScanner = new Html5QrcodeScanner('reader', config, true);
-
-    html5QrCodeScanner.render(onScanSuccess, onScanError);
-
-    // Clean up on unmount
-    return () => {
-      html5QrCodeScanner.clear().catch((error) => {
-        console.error('Failed to clear html5QrcodeScanner. ', error);
-      });
-    };
-  }, [onScanSuccess, onScanError]);
-
-  return <div id="reader" />;
-}
+// -------
 
 export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) {
   console.log('Rendering UserTableRow with data:', row);
@@ -77,8 +49,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
 
   const [openPopover, setOpenPopover] = useState<HTMLButtonElement | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const [openScanDialog, setOpenScanDialog] = useState(false);
-
   // Split the full name into firstName and lastName (if possible)
   const nameParts = row.name.split(' ');
   const initialFirstName = nameParts[0];
@@ -89,7 +59,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   const [lastName, setLastName] = useState(initialLastName);
   const [email, setEmail] = useState(row.email);
   const [phone, setPhone] = useState(row.phone);
-  const [scanResult, setScanResult] = useState<string | null>(null);
 
   // Save the row's ID to local storage when the component mounts
   useEffect(() => {
@@ -348,16 +317,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
             Download
           </MenuItem>
 
-          <MenuItem
-          onClick={() => {
-  window.location.href = 'https://vv-doa7.vercel.app/';
-}}
-
-            sx={{ color: 'success.main' }}
-          >
-            <Iconify icon="uil:cloud-download" />
-            Scan QR Code
-          </MenuItem>
         </MenuList>
       </Popover>
 
