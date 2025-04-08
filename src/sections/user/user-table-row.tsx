@@ -213,11 +213,18 @@ const navigate = useNavigate();
           />
         </TableCell>
 
-        <TableCell component="th" scope="row">
-          <Box gap={2} display="flex" alignItems="center">
-            <Avatar alt={row.name} src={row.avatarUrl} />
+        
+        <TableCell>
+          
+            {row.id}
+        
+        </TableCell>
+
+
+        <TableCell>
+          
             {row.name}
-          </Box>
+        
         </TableCell>
 
         <TableCell>{row.location}</TableCell>

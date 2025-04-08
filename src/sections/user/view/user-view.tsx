@@ -242,7 +242,9 @@ export function UserView() {
                   )
                 }
                 headLabel={[
-                  { id: 'name', label: 'Name' },
+                  
+                  { id: 'id', label: 'Event-id' },
+                  { id: 'name', label: 'Event-Name' },
                   { id: 'location', label: 'Location' },
 
                   { id: 'date', label: 'Date' },

@@ -258,11 +258,11 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           />
         </TableCell>
 
-        <TableCell component="th" scope="row">
-          <Box gap={2} display="flex" alignItems="center">
-            <Avatar alt={row.name} src={row.avatarUrl} />
+        <TableCell>
+         
+           
             {row.name}
-          </Box>
+          
         </TableCell>
 
         <TableCell>{row.email}</TableCell>
