@@ -251,7 +251,17 @@ export function BlogView() {
   return (
     <DashboardContent>
       <Box display="flex" alignItems="center" mb={5}>
-        <Typography variant="h4" flexGrow={1} padding={1}>
+        <Typography
+          variant="h4"
+          flexGrow={1}
+          padding={1}
+          sx={{
+            mt: {
+              xs: -13, // extra move-up on small (mobile) screens
+              sm: -5, // normal on small and up (tablets and larger)
+            },
+          }}
+        >
           Guests
         </Typography>
 
