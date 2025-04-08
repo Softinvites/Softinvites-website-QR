@@ -87,16 +87,7 @@ const handleLogout = () => {
           },
         }}
       >
-        <Box sx={{ p: 2, pb: 1.5 }}>
-          <Typography variant="subtitle2" noWrap>
-            {_myAccount?.displayName}
-          </Typography>
-
-          <Typography variant="body2" sx={{ color: 'text.secondary' }} noWrap>
-            {_myAccount?.email}
-          </Typography>
-        </Box>
-
+       
         <Divider sx={{ borderStyle: 'dashed' }} />
 
         <MenuList
