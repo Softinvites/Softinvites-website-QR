@@ -201,9 +201,9 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     }
   }, [row, token, handleClosePopover]);
 
-  // Existing: Download QR Code function
   const handleDownloadQRCode = useCallback(async () => {
     console.log('Downloading QR code for:', row.name);
+  
     try {
       const response = await fetch(
         `https://software-invite-api-self.vercel.app/guest/download-qrcode/${row._id}`,
@@ -214,28 +214,35 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           },
         }
       );
+  
       if (!response.ok) {
-        throw new Error(`Failed to get QR Code: ${response.statusText}`);
+        throw new Error(`Failed to fetch QR code: ${response.statusText}`);
       }
-      const data = await response.json();
-      if (data.downloadUrl) {
-        window.open(data.downloadUrl, '_blank');
-        const link = document.createElement('a');
-        link.href = data.downloadUrl;
-        link.download = '';
-        link.style.display = 'none';
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-      } else {
-        toast.error('Failed to retrieve QR Code', {
-          position: 'top-right',
-          autoClose: 3000,
-        });
-      }
+  
+      // 👉 Read the response as a Blob (binary PNG)
+      const blob = await response.blob();
+  
+      // 👉 Create an object URL for the blob
+      const url = window.URL.createObjectURL(blob);
+  
+      // 👉 Create a hidden <a> to trigger the download
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `qrcode-${row._id}.png`; // filename
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+  
+      // 👉 Clean up the object URL
+      window.URL.revokeObjectURL(url);
+  
+      toast.success('QR code downloaded!', {
+        position: 'top-right',
+        autoClose: 2000,
+      });
     } catch (error) {
       console.error('Error downloading QR Code:', error);
-      toast.error('Error downloading QR Code', {
+      toast.error('Failed to download QR code', {
         position: 'top-right',
         autoClose: 3000,
       });
@@ -243,6 +250,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       handleClosePopover();
     }
   }, [row._id, row.name, token, handleClosePopover]);
+  
 
   return (
     <>
