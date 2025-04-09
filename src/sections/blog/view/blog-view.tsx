@@ -472,19 +472,22 @@ const handleDownloadAllQRCodes = async () => {
                   )
                 }
                 headLabel={[
+
+                  
                   { id: 'name', label: 'Name' },
-                 
+                  
                   { id: 'createdAt', label: 'CreatedAt' },
-
+                  
                   { id: 'status', label: 'Status' },
-
                   { id: '' },
-                  { id: '' },
+                { id: '' },
+                  { id: 'email', label: 'Email' },
+                  { id: 'phone', label: 'Number' },
                 ]}
               />
               <TableBody>
                 {loading ? (
-                  <Typography sx={{ p: 3 }}>Loading...</Typography>
+                  <Typography sx={{ p: 1 }}>Loading...</Typography>
                 ) : error ? (
                   <Typography color="error" sx={{ p: 3 }}>
                     {error}
