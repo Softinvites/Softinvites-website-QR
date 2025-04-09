@@ -128,6 +128,63 @@ export function BlogView() {
 
   const navigate = useNavigate();
 
+  // New handler for downloading all QR codes:
+// inside your BlogView component
+
+const handleDownloadAllQRCodes = async () => {
+  const token = localStorage.getItem('token');
+  const eventIdArray = localStorage.getItem('allRowIds');
+  let eventId: string | null = null;
+
+  if (eventIdArray) {
+    try {
+      const parsed = JSON.parse(eventIdArray);
+      if (Array.isArray(parsed) && parsed.length) {
+        eventId = parsed[0];
+      }
+    } catch (e) {
+      console.error('Invalid allRowIds JSON', e);
+    }
+  }
+
+  if (!eventId) {
+    toast.error('No event selected for QR‑code download');
+    return;
+  }
+
+  try {
+    // 🔄 Use GET instead of POST
+    const { data } = await axios.get<{
+      zipDownloadLink: string;
+    }>(
+      `https://software-invite-api-self.vercel.app/guest/download-all-qrcode/${eventId}`,
+      {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
+
+    if (!data.zipDownloadLink) {
+      throw new Error('No download link returned from server');
+    }
+
+    // Trigger download
+    const link = document.createElement('a');
+    link.href = data.zipDownloadLink;
+    link.setAttribute('download', `qr-codes-${eventId}.zip`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+
+    toast.success('QR‑codes download started');
+  } catch (err) {
+    console.error('Download failed', err);
+    toast.error('Failed to download QR‑codes');
+  }
+};
+
+
   useEffect(() => {
     const fetchUsers = async () => {
       setLoading(true);
@@ -324,7 +381,7 @@ export function BlogView() {
                 variant="contained"
                 color="primary" // This sets it to the default blue from MUI theme
                 startIcon={<Iconify icon="mingcute:add-line" />}
-                onClick={() => setOpen(false)}
+                onClick={handleDownloadAllQRCodes}    // wire it up here
                 sx={{
                   fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
                   padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
@@ -416,9 +473,7 @@ export function BlogView() {
                 }
                 headLabel={[
                   { id: 'name', label: 'Name' },
-                  { id: 'email', label: 'Email' },
-
-                  { id: 'phone', label: 'Number' },
+                 
                   { id: 'createdAt', label: 'CreatedAt' },
 
                   { id: 'status', label: 'Status' },

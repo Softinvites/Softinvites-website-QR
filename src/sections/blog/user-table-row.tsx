@@ -264,9 +264,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
             {row.name}
           
         </TableCell>
-
-        <TableCell>{row.email}</TableCell>
-        <TableCell>{row.phone}</TableCell>
         <TableCell>{row.createdAt}</TableCell>
         <TableCell>
           <Label color={(row.status === 'pending' && 'warning') || 'success'}>{row.status}</Label>
