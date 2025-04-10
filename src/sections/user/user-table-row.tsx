@@ -21,6 +21,7 @@ import {  toast } from 'react-toastify';
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 
 // ----------------------------------------------------------------------
 
@@ -156,6 +157,24 @@ const navigate = useNavigate();
     }
     
   }, [row.id, token, editName, editDate, editLocation, row.name,editDescription, handleCloseDialog]);
+
+  const handleGenerateTempLink = useCallback(async () => {
+      try {
+        const { data } = await axios.post<{ tempLink: string }>(
+          `https://software-invite-api-self.vercel.app/guest/generate-temp-link/${row.id}`,
+          {},
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
+        if (!data.tempLink) throw new Error();
+        window.location.href = data.tempLink;
+        toast.success('Redirecting…', { position: 'top-right', autoClose: 2000 });
+      } catch {
+        toast.error('Could not generate link.', { position: 'top-right' });
+      } finally {
+        handleClosePopover();
+      }
+    }, [row.id, token, handleClosePopover]);
+  
   
   // DELETE function remains unchanged
   const handleDelete = useCallback(async () => {
@@ -282,6 +301,11 @@ const navigate = useNavigate();
             <Iconify icon="solar:trash-bin-trash-bold" />
             Delete
           </MenuItem>
+
+             <MenuItem onClick={handleGenerateTempLink} sx={{ color: 'success.main' }}>
+                      <Iconify icon="mdi:link-variant-plus" />
+                      Generate Link
+                    </MenuItem>
         </MenuList>
       </Popover>
 
