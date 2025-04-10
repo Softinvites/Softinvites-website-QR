@@ -203,23 +203,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   }, [row, token, handleClosePopover]);
 
 
-  const handleGenerateTempLink = useCallback(async () => {
-    try {
-      const { data } = await axios.post<{ tempLink: string }>(
-        `https://software-invite-api-self.vercel.app/guest/generate-temp-link/${row.id}`,
-        {},
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      if (!data.tempLink) throw new Error();
-      window.location.href = data.tempLink;
-      toast.success('Redirecting…', { position: 'top-right', autoClose: 2000 });
-    } catch {
-      toast.error('Could not generate link.', { position: 'top-right' });
-    } finally {
-      handleClosePopover();
-    }
-  }, [row.id, token, handleClosePopover]);
-
+  
   
   const handleDownloadQRCode = useCallback(async () => {
     console.log('Downloading QR code for:', row.name);
@@ -335,10 +319,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
             Delete
           </MenuItem>
 
-          <MenuItem onClick={handleGenerateTempLink} sx={{ color: 'success.main' }}>
-            <Iconify icon="mdi:link-variant-plus" />
-            Generate Link
-          </MenuItem>
+       
 
           <MenuItem onClick={handleDownloadQRCode} sx={{ color: 'success.main' }}>
             <Iconify icon="uil:cloud-download" />
