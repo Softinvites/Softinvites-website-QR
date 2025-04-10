@@ -476,13 +476,17 @@ const handleDownloadAllQRCodes = async () => {
                   
                   { id: 'name', label: 'Name' },
                   
+                  { id: 'phone', label: 'Number' },
+                  
+                  { id: 'email', label: 'Email' },
+                  
+                  
+                  
                   { id: 'createdAt', label: 'CreatedAt' },
                   
                   { id: 'status', label: 'Status' },
-                  { id: '' },
-                { id: '' },
-                  { id: 'email', label: 'Email' },
-                  { id: 'phone', label: 'Number' },
+
+              
                 ]}
               />
               <TableBody>

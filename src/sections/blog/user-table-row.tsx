@@ -20,6 +20,7 @@ import { toast } from 'react-toastify';
 
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
+import axios from 'axios';
 
 export type UserProps = {
   id: string;
@@ -201,9 +202,28 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     }
   }, [row, token, handleClosePopover]);
 
+
+  const handleGenerateTempLink = useCallback(async () => {
+    try {
+      const { data } = await axios.post<{ tempLink: string }>(
+        `https://software-invite-api-self.vercel.app/guest/generate-temp-link/${row.id}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (!data.tempLink) throw new Error();
+      window.location.href = data.tempLink;
+      toast.success('Redirecting…', { position: 'top-right', autoClose: 2000 });
+    } catch {
+      toast.error('Could not generate link.', { position: 'top-right' });
+    } finally {
+      handleClosePopover();
+    }
+  }, [row.id, token, handleClosePopover]);
+
+  
   const handleDownloadQRCode = useCallback(async () => {
     console.log('Downloading QR code for:', row.name);
-  
+
     try {
       const response = await fetch(
         `https://software-invite-api-self.vercel.app/guest/download-qrcode/${row._id}`,
@@ -214,17 +234,17 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           },
         }
       );
-  
+
       if (!response.ok) {
         throw new Error(`Failed to fetch QR code: ${response.statusText}`);
       }
-  
+
       // 👉 Read the response as a Blob (binary PNG)
       const blob = await response.blob();
-  
+
       // 👉 Create an object URL for the blob
       const url = window.URL.createObjectURL(blob);
-  
+
       // 👉 Create a hidden <a> to trigger the download
       const link = document.createElement('a');
       link.href = url;
@@ -232,10 +252,10 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       document.body.appendChild(link);
       link.click();
       link.remove();
-  
+
       // 👉 Clean up the object URL
       window.URL.revokeObjectURL(url);
-  
+
       toast.success('QR code downloaded!', {
         position: 'top-right',
         autoClose: 2000,
@@ -250,7 +270,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       handleClosePopover();
     }
   }, [row._id, row.name, token, handleClosePopover]);
-  
 
   return (
     <>
@@ -266,12 +285,11 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           />
         </TableCell>
 
-        <TableCell>
-         
-           
-            {row.name}
-          
-        </TableCell>
+        <TableCell>{row.name}</TableCell>
+        
+        <TableCell>{row.phone}</TableCell>
+        
+        <TableCell>{row.email}</TableCell>
         <TableCell>{row.createdAt}</TableCell>
         <TableCell>
           <Label color={(row.status === 'pending' && 'warning') || 'success'}>{row.status}</Label>
@@ -317,11 +335,15 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
             Delete
           </MenuItem>
 
+          <MenuItem onClick={handleGenerateTempLink} sx={{ color: 'success.main' }}>
+            <Iconify icon="mdi:link-variant-plus" />
+            Generate Link
+          </MenuItem>
+
           <MenuItem onClick={handleDownloadQRCode} sx={{ color: 'success.main' }}>
             <Iconify icon="uil:cloud-download" />
             Download
           </MenuItem>
-
         </MenuList>
       </Popover>
 
@@ -368,8 +390,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           </Button>
         </DialogActions>
       </Dialog>
-
-     
     </>
   );
 }
