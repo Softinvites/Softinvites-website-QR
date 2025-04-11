@@ -7,32 +7,29 @@ import Button from '@mui/material/Button';
 import TableBody from '@mui/material/TableBody';
 import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
-
 import { Grid } from '@mui/material';
 import TablePagination from '@mui/material/TablePagination';
 import Stack from '@mui/material/Stack';
-
 import { toast } from 'react-toastify';
-
 import { useNavigate } from 'react-router-dom';
 import { DashboardContent } from 'src/layouts/dashboard';
-
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
-
 import { TableNoData } from '../table-no-data';
 import { UserTableRow } from '../user-table-row';
 import { UserTableHead } from '../user-table-head';
 import { TableEmptyRows } from '../table-empty-rows';
 import { UserTableToolbar } from '../user-table-toolbar';
 import { emptyRows, applyFilter, getComparator } from '../utils';
-
 import type { UserProps } from '../user-table-row';
 import EventModal from './EventModal';
+import DeleteConfirmModal from './DeleteConfirmModal';
 
-import DeleteConfirmModal from './DeleteConfirmModal'; // Import the new modal
-
-// ----------------------------------------------------------------------
+interface HeadCell {
+  id: string;
+  label: string;
+  align?: 'left' | 'center' | 'right';
+}
 
 export function BlogView() {
   const table = useTable();
@@ -40,162 +37,144 @@ export function BlogView() {
   const [users, setUsers] = useState<UserProps[]>([]);
   const [loading, setLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
-  const [error, setError] = useState<string | null>(null); // ✅ Define error state
-  const [dataSent, setDataSent] = useState(false);
-
+  const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
+  const navigate = useNavigate();
 
-  // Handler for CSV file selection and upload
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const formData = new FormData();
       formData.append('file', file);
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem("token");
         const response = await axios.post(
-          'https://software-invite-api-self.vercel.app/guest/import-guest-csv',
+          "https://software-invite-api-self.vercel.app/guest/import-guest-csv",
           formData,
           {
             headers: {
-              'Content-Type': 'multipart/form-data',
+              "Content-Type": "multipart/form-data",
               Authorization: `Bearer ${token}`,
             },
           }
         );
-        console.log('CSV imported successfully:', response.data);
-        toast.success('CSV imported successfully');
-        // Optionally, update your state or perform additional actions here
-      } catch {
-        console.error('Error importing CSV:', error);
-        toast.error('CSV import failed');
+        toast.success("CSV imported successfully");
+        window.location.reload();
+      } catch (err) {
+        console.error("Error importing CSV:", err);
+        toast.error("CSV import failed");
       }
     }
   };
 
-  // Trigger file input click
   const handleButtonClick = () => {
     fileInputRef.current?.click();
   };
 
   const handleDelete = async () => {
     setLoading(true);
-
-    const eventIdArray = localStorage.getItem('allRowIds'); // Retrieve from local storage
-
-    let eventId = null;
-    if (eventIdArray) {
-      try {
-        const parsedIds = JSON.parse(eventIdArray); // Parse JSON string to an array
-        if (Array.isArray(parsedIds) && parsedIds.length > 0) {
-          eventId = parsedIds[0]; // Get the first ID from the array
-        } else {
-          console.error('Parsed data is not a valid array:', parsedIds);
-        }
-      } catch {
-        console.error('Error parsing event IDs:', error);
-      }
-    }
-
-    if (!eventId) {
-      setError('No valid event ID found in local storage.');
-      setLoading(false);
-      return;
-    }
-
     try {
-      await axios.delete(
-        `https://software-invite-api-self.vercel.app/guest/event-guest/${eventId}`,
+      const token = localStorage.getItem("token");
+      const eventIdArray = localStorage.getItem('allRowIds');
+      
+      if (!token || !eventIdArray) {
+        toast.error("Authentication required");
+        return;
+      }
+
+      const parsedIds = JSON.parse(eventIdArray);
+      const eventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+
+      if (!eventId) {
+        toast.error("No event ID found");
+        return;
+      }
+
+      await axios.delete(`https://software-invite-api-self.vercel.app/guest/event-guest/${eventId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      toast.success('All guests deleted successfully', {
+        position: 'top-right',
+        autoClose: 2000,
+        onClose: () => window.location.reload(),
+      });
+    } catch (err) {
+      console.error("Error deleting guests:", err);
+      toast.error('Failed to delete guests');
+    } finally {
+      setLoading(false);
+      setDeleteModalOpen(false);
+    }
+  };
+
+  const handleDownloadAllQRCodes = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem("token");
+      const eventIdArray = localStorage.getItem('allRowIds');
+      
+      if (!token || !eventIdArray) {
+        toast.error("Authentication required");
+        return;
+      }
+
+      const parsedIds = JSON.parse(eventIdArray);
+      const eventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+
+      if (!eventId) {
+        toast.error("No event ID found");
+        return;
+      }
+
+      const response = await axios.get(
+        `https://software-invite-api-self.vercel.app/guest/download-all-qrcode/${eventId}`,
         {
           headers: {
-            Authorization: `Bearer ${localStorage.getItem('token')}`, // Ensure you have authentication
+            Authorization: `Bearer ${token}`,
           },
         }
       );
 
-      toast.success('Events deleted succesfully', {
-        position: 'top-right',
-        autoClose: 2000, // Close after 2 seconds
-
-        onClose: () => window.location.reload(), // Reload only after the toast disappears
-      });
-      setOpen(false);
+      if (response.data?.zipDownloadLink) {
+        window.open(response.data.zipDownloadLink, "_blank");
+        toast.success('QR codes downloaded successfully');
+      } else {
+        toast.error('Failed to download QR codes');
+      }
+    } catch (err) {
+      console.error("Error downloading QR codes:", err);
+      toast.error('Failed to download QR codes');
     } finally {
       setLoading(false);
     }
   };
 
-  const navigate = useNavigate();
-
-  // New handler for downloading all QR codes:
-// inside your BlogView component
-
-const handleDownloadAllQRCodes = async () => {
-  const token = localStorage.getItem('token');
-  const eventIdArray = localStorage.getItem('allRowIds');
-  let eventId: string | null = null;
-
-  if (eventIdArray) {
+  function tryDecodeToken(token: string) {
     try {
-      const parsed = JSON.parse(eventIdArray);
-      if (Array.isArray(parsed) && parsed.length) {
-        eventId = parsed[0];
-      }
+      const base64Url = token.split('.')[1];
+      const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+      return JSON.parse(atob(base64));
     } catch (e) {
-      console.error('Invalid allRowIds JSON', e);
+      console.error("Failed to decode token:", e);
+      return null;
     }
   }
-
-  if (!eventId) {
-    toast.error('No event selected for QR‑code download');
-    return;
-  }
-
-  try {
-    // 🔄 Use GET instead of POST
-    const { data } = await axios.get<{
-      zipDownloadLink: string;
-    }>(
-      `https://software-invite-api-self.vercel.app/guest/download-all-qrcode/${eventId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    if (!data.zipDownloadLink) {
-      throw new Error('No download link returned from server');
-    }
-
-    // Trigger download
-    const link = document.createElement('a');
-    link.href = data.zipDownloadLink;
-    link.setAttribute('download', `qr-codes-${eventId}.zip`);
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
-
-    toast.success('QR‑codes download started');
-  } catch (err) {
-    console.error('Download failed', err);
-    toast.error('Failed to download QR‑codes');
-  }
-};
-
 
 useEffect(() => {
   const fetchUsers = async () => {
     setLoading(true);
-    errorRef.current = null;
+    setError(null);
 
     try {
-      // ✅ Get token from URL or localStorage
       const urlParams = new URLSearchParams(window.location.search);
       const tokenFromUrl = urlParams.get("token");
       const tokenFromStorage = localStorage.getItem("token");
-      const token = tokenFromUrl || tokenFromStorage;
+      const token = tokenFromStorage || tokenFromUrl;
 
       if (!token) {
         setError("No token found. Please log in again.");
@@ -203,22 +182,49 @@ useEffect(() => {
         return;
       }
 
-      // ✅ Decode the token to get the eventId
-      const decoded = JSON.parse(atob(token.split(".")[1]));
-      const eventId = decoded?.eventId;
+      // Determine if this is an admin (has localStorage token)
+      setIsAdmin(!!tokenFromStorage);
+
+      let eventId;
+      if (tokenFromStorage) {
+        // For admin - get eventId from localStorage
+        const eventIdArray = localStorage.getItem('allRowIds');
+        if (eventIdArray) {
+          try {
+            const parsedIds = JSON.parse(eventIdArray);
+            eventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+          } catch (err) {
+            console.error("Error parsing event IDs:", err);
+          }
+        }
+      } else {
+        // For temporary users - get eventId from token
+        const decoded = tryDecodeToken(token);
+        if (decoded) {
+          eventId = decoded?.eventId || decoded?.event?._id;
+          
+          if (!eventId) {
+            console.warn("Token payload doesn't contain event ID:", decoded);
+          }
+        }
+      }
 
       if (!eventId) {
-        setError("No valid event ID found in token.");
+        console.error("Event ID search details:", {
+          tokenSource: tokenFromStorage ? "localStorage" : "URL",
+          allRowIds: localStorage.getItem('allRowIds'),
+          decodedToken: tokenFromUrl ? tryDecodeToken(tokenFromUrl) : null
+        });
+        setError("No valid event ID found. Please ensure you're using a valid invitation link.");
         setLoading(false);
         return;
       }
 
-      // ✅ Store token in localStorage if from URL (first-time visit)
-      if (tokenFromUrl) {
+      // If token came from URL and we don't have one in storage, store it
+      if (tokenFromUrl && !tokenFromStorage) {
         localStorage.setItem("token", tokenFromUrl);
       }
 
-      // ✅ Make the request
       const response = await fetch(
         `https://software-invite-api-self.vercel.app/guest/events-guest/${eventId}`,
         {
@@ -227,20 +233,17 @@ useEffect(() => {
       );
 
       if (!response.ok) {
-        console.log("Fetch error:", response.status, response.statusText);
-        throw new Error("No Guest Available.");
+        throw new Error(response.statusText || "Failed to fetch guests");
       }
 
       const data = await response.json();
 
       if (!data?.guests || !Array.isArray(data.guests)) {
-        console.error("Expected an array under 'guests' but got:", data);
-        setError("Invalid API response format");
-        return;
+        throw new Error("Invalid API response format");
       }
 
       const formattedData: UserProps[] = data.guests.map((guest: any) => ({
-        id: guest.eventId,
+        id: guest._id,
         _id: guest._id,
         name: `${guest.firstName} ${guest.lastName}`,
         email: guest.email,
@@ -252,7 +255,7 @@ useEffect(() => {
 
       setUsers(formattedData);
     } catch (err: any) {
-      setError(err.message || "Something went wrong.");
+      setError(err.message || "Failed to load guests");
     } finally {
       setLoading(false);
     }
@@ -260,40 +263,14 @@ useEffect(() => {
 
   fetchUsers();
 
+  // Set timeout for token expiration (30 minutes)
   const timer = setTimeout(() => {
     localStorage.removeItem("token");
     navigate("/sign-in");
-  }, 1800000); // 30 mins
+  }, 1800000);
 
   return () => clearTimeout(timer);
 }, [navigate]);
-
-
-  // Separate effect to send data to the secondary API only once when users are available
-  useEffect(() => {
-    if (users.length > 0 && !dataSent) {
-      const sendData = async () => {
-        try {
-          const submitRes = await fetch('https://languid-southern-swoop.glitch.me/submit-dat', {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(users),
-          });
-          const submitResData = await submitRes.json();
-          console.log('Response from glitch.me:', submitResData);
-          setDataSent(true);
-        } catch (submitError) {
-          console.error('Error sending data to glitch.me:', submitError);
-        }
-      };
-
-      sendData();
-    }
-  }, [users, dataSent]);
-
-  const errorRef = useRef<string | null>(null);
 
   const dataFiltered: UserProps[] = applyFilter({
     inputData: users,
@@ -302,10 +279,6 @@ useEffect(() => {
   });
 
   const notFound = !dataFiltered.length && !!filterName;
-
-  function handleDeleteConfirm(): void {
-    throw new Error('Function not implemented.');
-  }
 
   return (
     <DashboardContent>
@@ -316,8 +289,8 @@ useEffect(() => {
           padding={1}
           sx={{
             mt: {
-              xs: -13, // extra move-up on small (mobile) screens
-              sm: -5, // normal on small and up (tablets and larger)
+              xs: -13,
+              sm: -5,
             },
           }}
         >
@@ -326,136 +299,139 @@ useEffect(() => {
 
         <Stack spacing={2}>
           <Grid container spacing={1}>
-            {/* Create new Guest Button */}
-            <Grid item xs={6} md={3}>
-              <Button
-                variant="contained"
-                color="success"
-                startIcon={<Iconify icon="mingcute:add-line" />}
-                onClick={() => setOpen(true)}
-                sx={{
-                  fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
-                  padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
-                  letterSpacing: '0.2px',
-                  textTransform: 'none',
-                  minWidth: { xs: 'auto', sm: 'auto' },
-                  height: { xs: '52px', sm: '40px', md: '48px' },
-                }}
-              >
-                Create Guest
-              </Button>
-            </Grid>
+            {isAdmin && (
+              <>
+                <Grid item xs={6} md={3}>
+                  <Button
+                    variant="contained"
+                    color="success"
+                    startIcon={<Iconify icon="mingcute:add-line" />}
+                    onClick={() => setOpen(true)}
+                    sx={{
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                      letterSpacing: '0.2px',
+                      textTransform: 'none',
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      height: { xs: '52px', sm: '40px', md: '48px' },
+                    }}
+                  >
+                    Create Guest
+                  </Button>
+                  <EventModal open={open} handleClose={() => setOpen(false)} />
+                </Grid>
 
-            {/* Import as CSV Button */}
-            <Grid item xs={6} md={3}>
+                <Grid item xs={6} md={3}>
+                  <Button
+                    variant="contained"
+                    color="warning"
+                    startIcon={<Iconify icon="uil:envelope-download" />}
+                    onClick={handleButtonClick}
+                    sx={{
+                      color: '#ffff',
+                      '&:hover': {
+                        backgroundColor: '#FFC107',
+                      },
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                      letterSpacing: '0.2px',
+                      textTransform: 'none',
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      height: { xs: '52px', sm: '40px', md: '48px' },
+                    }}
+                  >
+                    Import Guest
+                  </Button>
+                  <input
+                    type="file"
+                    accept=".csv"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    style={{ display: 'none' }}
+                  />
+                </Grid>
+
+                <Grid item xs={6} md={3}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<Iconify icon="uil:cloud-download" />}
+                    onClick={handleDownloadAllQRCodes}
+                    sx={{
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                      letterSpacing: '0.2px',
+                      textTransform: 'none',
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      height: { xs: '52px', sm: '40px', md: '48px' },
+                    }}
+                  >
+                    Download QR
+                  </Button>
+                </Grid>
+
+                <Grid item xs={6} md={3}>
+                  <Button
+                    variant="contained"
+                    color="error"
+                    startIcon={<Iconify icon="mingcute:delete-line" />}
+                    onClick={() => setDeleteModalOpen(true)}
+                    sx={{
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                      letterSpacing: '0.2px',
+                      textTransform: 'none',
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      height: { xs: '52px', sm: '40px', md: '48px' },
+                    }}
+                  >
+                    Delete All
+                  </Button>
+                  <DeleteConfirmModal
+                    open={deleteModalOpen}
+                    handleClose={() => setDeleteModalOpen(false)}
+                    handleConfirm={handleDelete}
+                  />
+                </Grid>
+              </>
+            )}
+
+            <Grid item xs={isAdmin ? 12 : 6} md={isAdmin ? 12 : 3}>
               <Button
                 variant="contained"
-                color="warning"
-                startIcon={<Iconify icon="uil:envelope-download" />}
-                onClick={handleButtonClick}
+                color="secondary"
+                startIcon={<Iconify icon="fluent:qr-code-28-filled" />}
+                onClick={() => {
+                  const urlParams = new URLSearchParams(window.location.search);
+                  const tokenFromUrl = urlParams.get("token");
+                  const tokenFromStorage = localStorage.getItem("token");
+                  const tokenToUse = tokenFromUrl || tokenFromStorage;
+
+                  if (tokenToUse) {
+                    window.location.href = `https://softinvite-scan.vercel.app?token=${tokenToUse}`;
+                  } else {
+                    toast.error("No token found. Please login again.");
+                  }
+                }}
                 sx={{
-                  color: '#ffff',
+                  backgroundColor: '#9c27b0',
                   '&:hover': {
-                    backgroundColor: '#FFC107',
+                    backgroundColor: '#7b1fa2',
                   },
+                  color: '#fff',
                   fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
                   padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
                   letterSpacing: '0.2px',
                   textTransform: 'none',
                   minWidth: { xs: 'auto', sm: 'auto' },
                   height: { xs: '52px', sm: '40px', md: '48px' },
+                  width: isAdmin ? '100%' : 'auto',
                 }}
               >
-                Import Guest
-              </Button>
-              <input
-                type="file"
-                accept=".csv"
-                ref={fileInputRef}
-                onChange={handleFileChange}
-                style={{ display: 'none' }}
-              />
-            </Grid>
-
-            {/* Download All QR-Code Button */}
-            <Grid item xs={6} md={3}>
-              <Button
-                variant="contained"
-                color="primary" // This sets it to the default blue from MUI theme
-                startIcon={<Iconify icon="mingcute:add-line" />}
-                onClick={handleDownloadAllQRCodes}    // wire it up here
-                sx={{
-                  fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
-                  padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
-                  letterSpacing: '0.2px',
-                  textTransform: 'none',
-                  minWidth: { xs: 'auto', sm: 'auto' },
-                  height: { xs: '52px', sm: '40px', md: '48px' },
-                }}
-              >
-                Download QR
-              </Button>
-            </Grid>
-
-            <Grid item xs={6} md={3}>
-            <Button
-  variant="contained"
-  startIcon={<Iconify icon="mingcute:add-line" />}
-  onClick={() => {
-    const urlParams = new URLSearchParams(window.location.search);
-    const tokenFromUrl = urlParams.get("token");
-    const tokenFromStorage = localStorage.getItem("token");
-
-    const tokenToUse = tokenFromUrl || tokenFromStorage;
-
-    if (tokenToUse) {
-      window.location.href = `https://softinvite-scan.vercel.app?token=${tokenToUse}`;
-    } else {
-      alert("No token found. Please login again.");
-    }
-  }}
-  sx={{
-    backgroundColor: '#9c27b0',
-    '&:hover': {
-      backgroundColor: '#7b1fa2',
-    },
-    color: '#fff',
-    fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
-    padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
-    letterSpacing: '0.2px',
-    textTransform: 'none',
-    minWidth: { xs: 'auto', sm: 'auto' },
-    height: { xs: '52px', sm: '40px', md: '48px' },
-  }}
->
-  Scan Guest
-</Button>
-
-            </Grid>
-            <Grid item xs={6} md={3}>
-              <Button
-                variant="text" // No background
-                onClick={() => setDeleteModalOpen(true)}
-                sx={{
-                  minWidth: 'auto',
-                  padding: 0,
-                  height: { xs: '52px', sm: '40px', md: '48px' },
-                }}
-              >
-                <Iconify icon="mingcute:delete-line" width={24} height={24} color="#f44336" />
+                Scan Guest QR
               </Button>
             </Grid>
           </Grid>
-
-          {/* Modals */}
-          <EventModal open={open} handleClose={() => setOpen(false)}>
-            {/* Add form elements inside if needed */}
-          </EventModal>
-          <DeleteConfirmModal
-            open={deleteModalOpen}
-            handleClose={() => setDeleteModalOpen(false)}
-            handleConfirm={handleDelete}
-          />
         </Stack>
       </Box>
 
@@ -478,35 +454,23 @@ useEffect(() => {
                 rowCount={users.length}
                 numSelected={table.selected.length}
                 onSort={table.onSort}
-                onSelectAllRows={(checked) =>
-                  table.onSelectAllRows(
-                    checked,
-                    users.map((user) => user.id)
-                  )
+                onSelectAllRows={isAdmin ? (checked) => 
+                  table.onSelectAllRows(checked, users.map((user) => user.id))
+                  : undefined
                 }
                 headLabel={[
-
-                  
+                  ...(isAdmin ? [{ id: 'checkbox', label: '', align: 'center' }] : []),
                   { id: 'name', label: 'Name' },
-                  
                   { id: 'phone', label: 'Number' },
-                  
                   { id: 'email', label: 'Email' },
-                  
-                  
-                  
                   { id: 'createdAt', label: 'CreatedAt' },
-                  
                   { id: 'status', label: 'Status' },
-                  { id: 'actions1' }, 
-                  { id: 'actions2' },
-
-              
+                  ...(isAdmin ? [{ id: 'actions', label: 'Actions' }] : []),
                 ]}
               />
               <TableBody>
                 {loading ? (
-                  <Typography sx={{ p: 1 }}>Loading...</Typography>
+                  <Typography sx={{ p: 3 }}>Loading...</Typography>
                 ) : error ? (
                   <Typography color="error" sx={{ p: 3 }}>
                     {error}
@@ -523,6 +487,7 @@ useEffect(() => {
                         row={row}
                         selected={table.selected.includes(row.id)}
                         onSelectRow={() => table.onSelectRow(row.id)}
+                        showActions={isAdmin}
                       />
                     ))
                 )}

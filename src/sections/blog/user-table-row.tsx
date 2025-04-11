@@ -1,5 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
-
+import { useState, useCallback } from 'react';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import Popover from '@mui/material/Popover';
@@ -15,12 +14,9 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
-
 import { toast } from 'react-toastify';
-
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
-import axios from 'axios';
 
 export type UserProps = {
   id: string;
@@ -32,69 +28,37 @@ export type UserProps = {
   email: string;
   avatarUrl: string;
   isVerified: boolean;
+  qrCode?: string;
 };
 
 type UserTableRowProps = {
   row: UserProps;
   selected: boolean;
   onSelectRow: () => void;
+  showActions: boolean;
 };
 
-// -------
-
-export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) {
-  console.log('Rendering UserTableRow with data:', row);
-
-  // Retrieve the token from local storage (or via context)
+export function UserTableRow({ row, selected, onSelectRow, showActions }: UserTableRowProps) {
   const token = localStorage.getItem('token');
-
   const [openPopover, setOpenPopover] = useState<HTMLButtonElement | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
-  // Split the full name into firstName and lastName (if possible)
   const nameParts = row.name.split(' ');
   const initialFirstName = nameParts[0];
   const initialLastName = nameParts.slice(1).join(' ') || '';
-
-  // Editable state values
   const [firstName, setFirstName] = useState(initialFirstName);
   const [lastName, setLastName] = useState(initialLastName);
   const [email, setEmail] = useState(row.email);
   const [phone, setPhone] = useState(row.phone);
 
-  // Save the row's ID to local storage when the component mounts
-  useEffect(() => {
-    const storedIds = JSON.parse(localStorage.getItem('alls') || '[]');
-    if (!storedIds.includes(row.id)) {
-      storedIds.push(row.id);
-      localStorage.setItem('allRowIds', JSON.stringify(storedIds));
-    }
-  }, [row.id]);
-
-  // Save the row's _id to local storage when the component mounts
-  useEffect(() => {
-    const storedIds = JSON.parse(localStorage.getItem('alls') || '[]');
-    if (!storedIds.includes(row._id)) {
-      storedIds.push(row._id);
-      localStorage.setItem('allRwIds', JSON.stringify(storedIds));
-    }
-  }, [row._id]);
-
-  const handleOpenPopover = useCallback(
-    (event: React.MouseEvent<HTMLButtonElement>) => {
-      console.log('Opening popover for:', row.name);
-      setOpenPopover(event.currentTarget);
-    },
-    [row.name]
-  );
+  const handleOpenPopover = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
+    setOpenPopover(event.currentTarget);
+  }, []);
 
   const handleClosePopover = useCallback(() => {
-    console.log('Closing popover');
     setOpenPopover(null);
   }, []);
 
-  // Open the edit dialog and initialize form values
   const handleOpenEditDialog = useCallback(() => {
-    console.log('Opening edit dialog for:', row.name);
     setFirstName(initialFirstName);
     setLastName(initialLastName);
     setEmail(row.email);
@@ -104,36 +68,10 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   }, [row, initialFirstName, initialLastName, handleClosePopover]);
 
   const handleCloseDialog = useCallback(() => {
-    console.log('Closing edit dialog');
     setOpenDialog(false);
   }, []);
 
-  // Submit the edit using the new endpoint and payload structure
   const handleSubmitEdit = useCallback(async () => {
-    const eventIdArray = localStorage.getItem('allRowIds'); // Retrieve from local storage
-    let eventId = null;
-    console.log(eventIdArray);
-    if (eventIdArray) {
-      try {
-        const parsedIds = JSON.parse(eventIdArray);
-        if (Array.isArray(parsedIds) && parsedIds.length > 0) {
-          eventId = parsedIds[0];
-        } else {
-          console.error('Parsed data is not a valid array:', parsedIds);
-        }
-      } catch (error) {
-        console.error('Error parsing event IDs:', error);
-      }
-    }
-
-    if (!eventId) {
-      toast.error('No valid event ID found in local storage.', {
-        position: 'top-right',
-        autoClose: 3000,
-      });
-      return;
-    }
-
     try {
       const response = await fetch(
         `https://software-invite-api-self.vercel.app/guest/update-guest/${row._id}`,
@@ -148,16 +86,13 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
             lastName,
             email,
             phone,
-            eventId,
           }),
         }
       );
+      
       if (!response.ok) {
         throw new Error(`Failed to update guest: ${response.statusText}`);
       }
-
-      const data = await response.json();
-      console.log('Guest updated:', data);
 
       toast.success('Edited successfully!', {
         position: 'top-right',
@@ -175,9 +110,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     }
   }, [row._id, token, firstName, lastName, email, phone, handleCloseDialog]);
 
-  // DELETE function remains unchanged
   const handleDelete = useCallback(async () => {
-    console.log('Delete clicked for:', row.name);
     try {
       const response = await fetch(
         `https://software-invite-api-self.vercel.app/guest/single-guest/${row._id}`,
@@ -188,26 +121,28 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           },
         }
       );
-      const data = await response.json();
-      console.log('Delete response:', data);
-    } catch (error) {
-      console.error('Error deleting event:', error);
-    } finally {
-      handleClosePopover();
+      
+      if (!response.ok) {
+        throw new Error('Failed to delete guest');
+      }
+      
       toast.success('Deletion successful!', {
         position: 'top-right',
         autoClose: 2000,
       });
       window.location.reload();
+    } catch (error) {
+      console.error('Error deleting guest:', error);
+      toast.error('Failed to delete guest', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } finally {
+      handleClosePopover();
     }
-  }, [row, token, handleClosePopover]);
+  }, [row._id, token, handleClosePopover]);
 
-
-  
-  
   const handleDownloadQRCode = useCallback(async () => {
-    console.log('Downloading QR code for:', row.name);
-
     try {
       const response = await fetch(
         `https://software-invite-api-self.vercel.app/guest/download-qrcode/${row._id}`,
@@ -223,27 +158,16 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         throw new Error(`Failed to fetch QR code: ${response.statusText}`);
       }
 
-      // 👉 Read the response as a Blob (binary PNG)
-      const blob = await response.blob();
-
-      // 👉 Create an object URL for the blob
-      const url = window.URL.createObjectURL(blob);
-
-      // 👉 Create a hidden <a> to trigger the download
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = `qrcode-${row._id}.png`; // filename
-      document.body.appendChild(link);
-      link.click();
-      link.remove();
-
-      // 👉 Clean up the object URL
-      window.URL.revokeObjectURL(url);
-
-      toast.success('QR code downloaded!', {
-        position: 'top-right',
-        autoClose: 2000,
-      });
+      const data = await response.json();
+      if (data.downloadUrl) {
+        window.open(data.downloadUrl, "_blank");
+        toast.success('QR code opened in new tab!', {
+          position: 'top-right',
+          autoClose: 2000,
+        });
+      } else {
+        throw new Error('No download URL found');
+      }
     } catch (error) {
       console.error('Error downloading QR Code:', error);
       toast.error('Failed to download QR code', {
@@ -253,80 +177,86 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     } finally {
       handleClosePopover();
     }
-  }, [row._id, row.name, token, handleClosePopover]);
+  }, [row._id, token, handleClosePopover]);
 
   return (
     <>
       <TableRow hover tabIndex={-1} role="checkbox" selected={selected}>
-        <TableCell padding="checkbox">
-          <Checkbox
-            disableRipple
-            checked={selected}
-            onChange={() => {
-              console.log('Checkbox clicked for:', row.name, 'Selected:', !selected);
-              onSelectRow();
-            }}
-          />
-        </TableCell>
+        {showActions && (
+          <TableCell padding="checkbox">
+            <Checkbox
+              disableRipple
+              checked={selected}
+              onChange={onSelectRow}
+            />
+          </TableCell>
+        )}
 
-        <TableCell>{row.name}</TableCell>
-        
+        <TableCell>
+          <Box display="flex" alignItems="center" gap={2}>
+            <Avatar alt={row.name} src={row.avatarUrl} />
+            {row.name}
+          </Box>
+        </TableCell>
         <TableCell>{row.phone}</TableCell>
-        
         <TableCell>{row.email}</TableCell>
         <TableCell>{row.createdAt}</TableCell>
         <TableCell>
-          <Label color={(row.status === 'pending' && 'warning') || 'success'}>{row.status}</Label>
+          <Label color={(row.status === 'pending' && 'warning') || 'success'}>
+            {row.status}
+          </Label>
         </TableCell>
 
-        <TableCell align="right">
-          <IconButton onClick={handleOpenPopover}>
-            <Iconify icon="eva:more-vertical-fill" />
-          </IconButton>
-        </TableCell>
+        {showActions && (
+          <TableCell align="right">
+            <IconButton onClick={handleOpenPopover}>
+              <Iconify icon="eva:more-vertical-fill" />
+            </IconButton>
+          </TableCell>
+        )}
       </TableRow>
 
-      <Popover
-        open={!!openPopover}
-        anchorEl={openPopover}
-        onClose={handleClosePopover}
-        anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
-        transformOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
-        <MenuList
-          disablePadding
-          sx={{
-            p: 0.5,
-            gap: 0.5,
-            width: 140,
-            display: 'flex',
-            flexDirection: 'column',
-            [`& .${menuItemClasses.root}`]: {
-              px: 1,
-              gap: 2,
-              borderRadius: 0.75,
-              [`&.${menuItemClasses.selected}`]: { bgcolor: 'action.selected' },
-            },
-          }}
+      {showActions && (
+        <Popover
+          open={!!openPopover}
+          anchorEl={openPopover}
+          onClose={handleClosePopover}
+          anchorOrigin={{ vertical: 'top', horizontal: 'left' }}
+          transformOrigin={{ vertical: 'top', horizontal: 'right' }}
         >
-          <MenuItem onClick={handleOpenEditDialog}>
-            <Iconify icon="solar:pen-bold" />
-            Edit
-          </MenuItem>
+          <MenuList
+            disablePadding
+            sx={{
+              p: 0.5,
+              gap: 0.5,
+              width: 140,
+              display: 'flex',
+              flexDirection: 'column',
+              [`& .${menuItemClasses.root}`]: {
+                px: 1,
+                gap: 2,
+                borderRadius: 0.75,
+                [`&.${menuItemClasses.selected}`]: { bgcolor: 'action.selected' },
+              },
+            }}
+          >
+            <MenuItem onClick={handleOpenEditDialog}>
+              <Iconify icon="solar:pen-bold" />
+              Edit
+            </MenuItem>
 
-          <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
-            <Iconify icon="solar:trash-bin-trash-bold" />
-            Delete
-          </MenuItem>
+            <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
+              <Iconify icon="solar:trash-bin-trash-bold" />
+              Delete
+            </MenuItem>
 
-       
-
-          <MenuItem onClick={handleDownloadQRCode} sx={{ color: 'success.main' }}>
-            <Iconify icon="uil:cloud-download" />
-            Download
-          </MenuItem>
-        </MenuList>
-      </Popover>
+            <MenuItem onClick={handleDownloadQRCode} sx={{ color: 'success.main' }}>
+              <Iconify icon="uil:cloud-download" />
+              Get QR Code
+            </MenuItem>
+          </MenuList>
+        </Popover>
+      )}
 
       <Dialog open={openDialog} onClose={handleCloseDialog}>
         <DialogTitle>Edit Guest</DialogTitle>
