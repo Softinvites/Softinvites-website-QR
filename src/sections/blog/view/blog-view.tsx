@@ -185,87 +185,89 @@ const handleDownloadAllQRCodes = async () => {
 };
 
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setLoading(true);
-      errorRef.current = null; // Reset error
+useEffect(() => {
+  const fetchUsers = async () => {
+    setLoading(true);
+    errorRef.current = null;
 
-      try {
-        const token = localStorage.getItem('token');
+    try {
+      // ✅ Get token from URL or localStorage
+      const urlParams = new URLSearchParams(window.location.search);
+      const tokenFromUrl = urlParams.get("token");
+      const tokenFromStorage = localStorage.getItem("token");
+      const token = tokenFromUrl || tokenFromStorage;
 
-        const eventIdArray = localStorage.getItem('allRowIds'); // Retrieve from local storage
-
-        let eventId = null;
-        if (eventIdArray) {
-          try {
-            const parsedIds = JSON.parse(eventIdArray); // Parse JSON string to an array
-            if (Array.isArray(parsedIds) && parsedIds.length > 0) {
-              eventId = parsedIds[0]; // Get the first ID from the array
-            } else {
-              console.error('Parsed data is not a valid array:', parsedIds);
-            }
-          } catch {
-            console.error('Error parsing event IDs:', error);
-          }
-        }
-
-        if (!eventId) {
-          setError('No valid event ID found in local storage.');
-          setLoading(false);
-          return;
-        }
-
-        const response = await fetch(
-          `https://software-invite-api-self.vercel.app/guest/events-guest/${eventId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-
-        if (!response.ok) {
-          console.log('Fetch error:', response.status, response.statusText);
-
-          throw new Error('No Guest Available.');
-        }
-
-        const data = await response.json();
-        console.log('Fetched Data:', data); // Debugging log
-
-        if (!data?.guests || !Array.isArray(data.guests)) {
-          console.error('Expected an array under "guests" but got:', data);
-          setError('Invalid API response format');
-          return;
-        }
-
-        const formattedData: UserProps[] = data.guests.map((guest: any) => ({
-          id: guest.eventId, // Make sure this is the correct ID you need
-          _id: guest._id,
-          name: `${guest.firstName} ${guest.lastName}`,
-          email: guest.email,
-          phone: guest.phone,
-          createdAt: new Date(guest.createdAt).toLocaleDateString(),
-          status: guest.status,
-          qrCode: guest.qrCode,
-        }));
-
-        console.log('Formatted Data:', formattedData);
-        setUsers(formattedData);
-      } catch (err: any) {
-        setError(err.message);
-      } finally {
+      if (!token) {
+        setError("No token found. Please log in again.");
         setLoading(false);
+        return;
       }
-    };
 
-    fetchUsers();
+      // ✅ Decode the token to get the eventId
+      const decoded = JSON.parse(atob(token.split(".")[1]));
+      const eventId = decoded?.eventId;
 
-    const timer = setTimeout(() => {
-      localStorage.removeItem('token');
-      navigate('/sign-in'); // Redirect to sign-in page
-    }, 1800000); // 30 minutes (1,800,000 ms)
+      if (!eventId) {
+        setError("No valid event ID found in token.");
+        setLoading(false);
+        return;
+      }
 
-    return () => clearTimeout(timer); // Cleanup timeout if component unmounts
-  }, [navigate, error]);
+      // ✅ Store token in localStorage if from URL (first-time visit)
+      if (tokenFromUrl) {
+        localStorage.setItem("token", tokenFromUrl);
+      }
+
+      // ✅ Make the request
+      const response = await fetch(
+        `https://software-invite-api-self.vercel.app/guest/events-guest/${eventId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+
+      if (!response.ok) {
+        console.log("Fetch error:", response.status, response.statusText);
+        throw new Error("No Guest Available.");
+      }
+
+      const data = await response.json();
+
+      if (!data?.guests || !Array.isArray(data.guests)) {
+        console.error("Expected an array under 'guests' but got:", data);
+        setError("Invalid API response format");
+        return;
+      }
+
+      const formattedData: UserProps[] = data.guests.map((guest: any) => ({
+        id: guest.eventId,
+        _id: guest._id,
+        name: `${guest.firstName} ${guest.lastName}`,
+        email: guest.email,
+        phone: guest.phone,
+        createdAt: new Date(guest.createdAt).toLocaleDateString(),
+        status: guest.status,
+        qrCode: guest.qrCode,
+      }));
+
+      setUsers(formattedData);
+    } catch (err: any) {
+      setError(err.message || "Something went wrong.");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  fetchUsers();
+
+  const timer = setTimeout(() => {
+    localStorage.removeItem("token");
+    navigate("/sign-in");
+  }, 1800000); // 30 mins
+
+  return () => clearTimeout(timer);
+}, [navigate]);
+
 
   // Separate effect to send data to the secondary API only once when users are available
   useEffect(() => {
@@ -396,40 +398,39 @@ const handleDownloadAllQRCodes = async () => {
             </Grid>
 
             <Grid item xs={6} md={3}>
-              <Button
-                variant="contained"
-                startIcon={<Iconify icon="mingcute:add-line" />}
-                  onClick={() => {
+            <Button
+  variant="contained"
+  startIcon={<Iconify icon="mingcute:add-line" />}
+  onClick={() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get("token");
+    const tokenFromStorage = localStorage.getItem("token");
 
-    
-  const urlParams = new URLSearchParams(window.location.search);
-  const tokenFromUrl = urlParams.get("token");
-  const tokenFromStorage = localStorage.getItem("token");
+    const tokenToUse = tokenFromUrl || tokenFromStorage;
 
-  const tokenToUse = tokenFromUrl || tokenFromStorage;
+    if (tokenToUse) {
+      window.location.href = `https://softinvite-scan.vercel.app?token=${tokenToUse}`;
+    } else {
+      alert("No token found. Please login again.");
+    }
+  }}
+  sx={{
+    backgroundColor: '#9c27b0',
+    '&:hover': {
+      backgroundColor: '#7b1fa2',
+    },
+    color: '#fff',
+    fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+    padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+    letterSpacing: '0.2px',
+    textTransform: 'none',
+    minWidth: { xs: 'auto', sm: 'auto' },
+    height: { xs: '52px', sm: '40px', md: '48px' },
+  }}
+>
+  Scan Guest
+</Button>
 
-  if (tokenToUse) {
-    window.location.href = `softinvitte-scan.vercel.app?token=${tokenToUse}`;
-  } else {
-    alert("No token found. Please login again.");
-  }
-}}
-                sx={{
-                  backgroundColor: '#9c27b0', // Deep purple 500
-                  '&:hover': {
-                    backgroundColor: '#7b1fa2', // Deep purple 700
-                  },
-                  color: '#fff',
-                  fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
-                  padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
-                  letterSpacing: '0.2px',
-                  textTransform: 'none',
-                  minWidth: { xs: 'auto', sm: 'auto' },
-                  height: { xs: '52px', sm: '40px', md: '48px' },
-                }}
-              >
-                Scan Guest
-              </Button>
             </Grid>
             <Grid item xs={6} md={3}>
               <Button
