@@ -15,9 +15,19 @@ interface GuestModalProps {
   open: boolean;
   handleClose: () => void;
 }
+interface GuestData {
+  firstName: string;
+  lastName: string;
+  email?: string;
+  phone?: string;
+  eventId: string;
+  qrCodeBgColor: string;
+  qrCodeCenterColor: string;
+  qrCodeEdgeColor: string;
+}
 
 const EventModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
-  const [guestData, setGuestData] = React.useState({
+  const [guestData, setGuestData] = React.useState<GuestData>({
     firstName: '',
     lastName: '',
     email: '',
