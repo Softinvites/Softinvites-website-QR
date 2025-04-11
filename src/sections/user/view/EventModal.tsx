@@ -94,14 +94,17 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
           margin="dense"
         />
 
-<TextField
-          fullWidth
-          label="Description"
-          name="description"
-          value={eventData.description}
-          onChange={handleChange}
-          margin="dense"
-        />
+      <TextField
+        fullWidth
+        label="Description"
+        name="description"
+        value={eventData.description}
+        onChange={handleChange}
+        margin="dense"
+        multiline
+        minRows={4} 
+      />
+
         
       </DialogContent>
       <DialogActions>
