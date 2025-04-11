@@ -95,8 +95,9 @@ const EventModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
         qrCodeEdgeColor: hexToRgb(guestData.qrCodeEdgeColor),
       };
 
-        if (!payload.email?.trim()) delete payload.email;
-        if (!payload.phone?.trim()) delete payload.phone;
+          // Remove empty email/phone if not provided
+        if (!guestData.email?.trim()) delete payload.email;
+        if (!guestData.phone?.trim()) delete payload.phone;
 
       const response = await fetch('https://software-invite-api-self.vercel.app/guest/add-guest', {
         method: 'POST',
