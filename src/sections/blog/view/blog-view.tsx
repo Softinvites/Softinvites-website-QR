@@ -497,6 +497,8 @@ const handleDownloadAllQRCodes = async () => {
                   { id: 'createdAt', label: 'CreatedAt' },
                   
                   { id: 'status', label: 'Status' },
+                  { id: 'actions1' }, 
+                  { id: 'actions2' },
 
               
                 ]}
