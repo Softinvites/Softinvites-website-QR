@@ -116,8 +116,11 @@ console.log('Final Payload:', payload);
         body: JSON.stringify(payload),
       });
 
+      const result = await response.json(); // 👈 this is important
+
       if (!response.ok) {
-        throw new Error('Failed to add guest');
+        console.error('Full error response:', result); // 👈 log backend error
+        throw new Error(result.message || 'Failed to add guest');
       }
       
       toast.success('Guest added successfully', {
