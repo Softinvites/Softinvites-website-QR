@@ -340,7 +340,7 @@ const handleDownloadAllQRCodes = async () => {
                   height: { xs: '52px', sm: '40px', md: '48px' },
                 }}
               >
-                Create new Guest
+                Create Guest
               </Button>
             </Grid>
 
@@ -391,7 +391,7 @@ const handleDownloadAllQRCodes = async () => {
                   height: { xs: '52px', sm: '40px', md: '48px' },
                 }}
               >
-                Download All qr-code
+                Download QR
               </Button>
             </Grid>
 
@@ -399,9 +399,21 @@ const handleDownloadAllQRCodes = async () => {
               <Button
                 variant="contained"
                 startIcon={<Iconify icon="mingcute:add-line" />}
-                onClick={() => {
-                  window.location.href = 'https://vv-doa7.vercel.app/';
-                }}
+                  onClick={() => {
+
+    
+  const urlParams = new URLSearchParams(window.location.search);
+  const tokenFromUrl = urlParams.get("token");
+  const tokenFromStorage = localStorage.getItem("token");
+
+  const tokenToUse = tokenFromUrl || tokenFromStorage;
+
+  if (tokenToUse) {
+    window.location.href = `softinvitte-scan.vercel.app?token=${tokenToUse}`;
+  } else {
+    alert("No token found. Please login again.");
+  }
+}}
                 sx={{
                   backgroundColor: '#9c27b0', // Deep purple 500
                   '&:hover': {
@@ -416,7 +428,7 @@ const handleDownloadAllQRCodes = async () => {
                   height: { xs: '52px', sm: '40px', md: '48px' },
                 }}
               >
-                Checking Guest
+                Scan Guest
               </Button>
             </Grid>
             <Grid item xs={6} md={3}>

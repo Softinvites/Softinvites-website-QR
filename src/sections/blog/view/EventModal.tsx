@@ -114,83 +114,83 @@ const EventModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth="sm" fullWidth>
-      <DialogTitle>Add New Guest</DialogTitle>
-      <DialogContent>
-        <TextField
-          fullWidth
-          label="First Name"
-          name="firstName"
-          value={guestData.firstName}
-          onChange={handleChange}
-          margin="dense"
-        />
-        <TextField
-          fullWidth
-          label="Last Name"
-          name="lastName"
-          value={guestData.lastName}
-          onChange={handleChange}
-          margin="dense"
-        />
-        <TextField
-          fullWidth
-          label="Email"
-          name="email"
-          type="email"
-          value={guestData.email}
-          onChange={handleChange}
-          margin="dense"
-        />
-        <TextField
-          fullWidth
-          label="Phone"
-          name="phone"
-          value={guestData.phone}
-          onChange={handleChange}
-          margin="dense"
-        />
-        <div style={{ margin: '20px 0' }}>
-          <div>
-            <strong>QR Code Background Color</strong>
-          </div>
-          <SketchPicker
-            color={guestData.qrCodeBgColor}
-            onChangeComplete={(color) => handleColorChange(color, 'qrCodeBgColor')}
-          />
+    <DialogTitle>Add New Guest</DialogTitle>
+    <DialogContent>
+      <TextField
+        fullWidth
+        label="First Name"
+        name="firstName"
+        value={guestData.firstName}
+        onChange={handleChange}
+        margin="dense"
+      />
+      <TextField
+        fullWidth
+        label="Last Name"
+        name="lastName"
+        value={guestData.lastName}
+        onChange={handleChange}
+        margin="dense"
+      />
+      <TextField
+        fullWidth
+        label="Email"
+        name="email"
+        type="email"
+        value={guestData.email}
+        onChange={handleChange}
+        margin="dense"
+      />
+      <TextField
+        fullWidth
+        label="Phone"
+        name="phone"
+        value={guestData.phone}
+        onChange={handleChange}
+        margin="dense"
+      />
+      <div style={{ margin: '20px 0', display:"flex", flexDirection:"column", justifyContent:"center", alignItems:"center" }}>
+        <div>
+          <strong>QR Code Background Color</strong>
         </div>
-        <div style={{ margin: '20px 0' }}>
-          <div>
-            <strong>QR Code Center Color</strong>
-          </div>
-          <SketchPicker
-            color={guestData.qrCodeCenterColor}
-            onChangeComplete={(color) => handleColorChange(color, 'qrCodeCenterColor')}
-          />
+        <SketchPicker
+          color={guestData.qrCodeBgColor}
+          onChangeComplete={(color) => handleColorChange(color, 'qrCodeBgColor')}
+        />
+      </div>
+      <div style={{ margin: '20px 0', display:"flex", flexDirection:"column", justifyContent:"center", alignItems:"center" }}>
+        <div>
+          <strong>QR Code Center Color</strong>
         </div>
-        <div style={{ margin: '20px 0' }}>
-          <div>
-            <strong>QR Code Edge Color</strong>
-          </div>
-          <SketchPicker
-            color={guestData.qrCodeEdgeColor}
-            onChangeComplete={(color) => handleColorChange(color, 'qrCodeEdgeColor')}
-          />
+        <SketchPicker
+          color={guestData.qrCodeCenterColor}
+          onChangeComplete={(color) => handleColorChange(color, 'qrCodeCenterColor')}
+        />
+      </div>
+      <div style={{ margin: '20px 0', display:"flex", flexDirection:"column", justifyContent:"center", alignItems:"center" }}>
+        <div>
+          <strong>QR Code Edge Color</strong>
         </div>
-      </DialogContent>
-      <DialogActions>
-        <Button onClick={handleClose} color="error">
-          Cancel
-        </Button>
-        <Button
-          variant="contained"
-          color="primary"
-          onClick={handleSubmit}
-          disabled={loading}
-        >
-          {loading ? <CircularProgress size={24} color="inherit" /> : 'Add Guest'}
-        </Button>
-      </DialogActions>
-    </Dialog>
+        <SketchPicker
+          color={guestData.qrCodeEdgeColor}
+          onChangeComplete={(color) => handleColorChange(color, 'qrCodeEdgeColor')}
+        />
+      </div>
+    </DialogContent>
+    <DialogActions>
+      <Button onClick={handleClose} color="error">
+        Cancel
+      </Button>
+      <Button
+        variant="contained"
+        color="primary"
+        onClick={handleSubmit}
+        disabled={loading}
+      >
+        {loading ? <CircularProgress size={24} color="inherit" /> : 'Add Guest'}
+      </Button>
+    </DialogActions>
+  </Dialog>
   );
 };
 
