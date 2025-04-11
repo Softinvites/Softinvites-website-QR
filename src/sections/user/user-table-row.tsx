@@ -1,7 +1,5 @@
 import { useState, useCallback, useEffect } from 'react';
 
-import Box from '@mui/material/Box';
-import Avatar from '@mui/material/Avatar';
 import Popover from '@mui/material/Popover';
 import TableRow from '@mui/material/TableRow';
 import Checkbox from '@mui/material/Checkbox';
@@ -50,6 +48,12 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   const token = localStorage.getItem('token');
 
   const [openPopover, setOpenPopover] = useState<HTMLButtonElement | null>(null);
+
+  
+  const [tempLink, setTempLink] = useState<string | null>(null);
+  const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
+
+  
   const [openDialog, setOpenDialog] = useState(false);
 
   // These states hold the editable values.
@@ -157,23 +161,37 @@ const navigate = useNavigate();
     }
     
   }, [row.id, token, editName, editDate, editLocation, row.name,editDescription, handleCloseDialog]);
+ // —————— Copy-Link Dialog ——————
+ const handleGenerateTempLink = useCallback(async () => {
+  try {
+    const { data } = await axios.post<{ tempLink: string }>(
+      `https://software-invite-api-self.vercel.app/guest/generate-temp-link/${row.id}`,
+      {},
+      { headers: { Authorization: `Bearer ${token}` } }
+    );
+    if (!data.tempLink) throw new Error();
 
-  const handleGenerateTempLink = useCallback(async () => {
-      try {
-        const { data } = await axios.post<{ tempLink: string }>(
-          `https://software-invite-api-self.vercel.app/guest/generate-temp-link/${row.id}`,
-          {},
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        if (!data.tempLink) throw new Error();
-        window.location.href = data.tempLink;
-        toast.success('Redirecting…', { position: 'top-right', autoClose: 2000 });
-      } catch {
-        toast.error('Could not generate link.', { position: 'top-right' });
-      } finally {
-        handleClosePopover();
-      }
-    }, [row.id, token, handleClosePopover]);
+    setTempLink(data.tempLink);
+    setIsLinkDialogOpen(true);
+    toast.success('Link generated!', { position: 'top-right', autoClose: 2000 });
+  } catch {
+    toast.error('Could not generate link.', { position: 'top-right' });
+  } finally {
+    handleClosePopover();
+  }
+}, [row.id, token, handleClosePopover]);
+
+const handleCopyLink = () => {
+  if (!tempLink) return;
+  navigator.clipboard
+    .writeText(tempLink)
+    .then(() => toast.success('Copied to clipboard!', { position: 'top-right', autoClose: 1500 }))
+    .catch(() => toast.error('Failed to copy.', { position: 'top-right' }));
+};
+
+const handleCloseLinkDialog = () => {
+  setIsLinkDialogOpen(false);
+};
   
   
   // DELETE function remains unchanged
@@ -350,6 +368,26 @@ const navigate = useNavigate();
           <Button onClick={handleSubmitEdit} variant="contained">
             Save
           </Button>
+        </DialogActions>
+      </Dialog>
+
+          {/* Copy-Link Dialog */}
+          <Dialog open={isLinkDialogOpen} onClose={handleCloseLinkDialog}>
+        <DialogTitle>Temporary Link</DialogTitle>
+        <DialogContent>
+          <TextField
+            margin="dense"
+            label="Link"
+            fullWidth
+            variant="outlined"
+            value={tempLink || ''}
+            InputProps={{ readOnly: true }}
+            onFocus={(e) => e.currentTarget.select()}
+          />
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCopyLink}>Copy</Button>
+          <Button onClick={handleCloseLinkDialog}>Close</Button>
         </DialogActions>
       </Dialog>
     </>
