@@ -49,22 +49,22 @@ export function BlogView() {
       const formData = new FormData();
       formData.append('file', file);
       try {
-        const token = localStorage.getItem("token");
+        const token = localStorage.getItem('token');
         const response = await axios.post(
-          "https://software-invite-api-self.vercel.app/guest/import-guest-csv",
+          'https://software-invite-api-self.vercel.app/guest/import-guest-csv',
           formData,
           {
             headers: {
-              "Content-Type": "multipart/form-data",
+              'Content-Type': 'multipart/form-data',
               Authorization: `Bearer ${token}`,
             },
           }
         );
-        toast.success("CSV imported successfully");
-        window.location.reload();
-      } catch (err) {
-        console.error("Error importing CSV:", err);
-        toast.error("CSV import failed");
+        console.log('CSV imported successfully:', response.data);
+        toast.success('CSV imported successfully');
+      } catch {
+        console.error('Error importing CSV:', error);
+        toast.error('CSV import failed');
       }
     }
   };
@@ -76,11 +76,11 @@ export function BlogView() {
   const handleDelete = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem('token');
       const eventIdArray = localStorage.getItem('allRowIds');
-      
+
       if (!token || !eventIdArray) {
-        toast.error("Authentication required");
+        toast.error('Authentication required');
         return;
       }
 
@@ -88,15 +88,18 @@ export function BlogView() {
       const eventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
 
       if (!eventId) {
-        toast.error("No event ID found");
+        toast.error('No event ID found');
         return;
       }
 
-      await axios.delete(`https://software-invite-api-self.vercel.app/guest/event-guest/${eventId}`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
+      await axios.delete(
+        `https://software-invite-api-self.vercel.app/guest/event-guest/${eventId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       toast.success('All guests deleted successfully', {
         position: 'top-right',
@@ -104,7 +107,7 @@ export function BlogView() {
         onClose: () => window.location.reload(),
       });
     } catch (err) {
-      console.error("Error deleting guests:", err);
+      console.error('Error deleting guests:', err);
       toast.error('Failed to delete guests');
     } finally {
       setLoading(false);
@@ -115,11 +118,11 @@ export function BlogView() {
   const handleDownloadAllQRCodes = async () => {
     setLoading(true);
     try {
-      const token = localStorage.getItem("token");
+      const token = localStorage.getItem('token');
       const eventIdArray = localStorage.getItem('allRowIds');
-      
+
       if (!token || !eventIdArray) {
-        toast.error("Authentication required");
+        toast.error('Authentication required');
         return;
       }
 
@@ -127,7 +130,7 @@ export function BlogView() {
       const eventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
 
       if (!eventId) {
-        toast.error("No event ID found");
+        toast.error('No event ID found');
         return;
       }
 
@@ -141,13 +144,13 @@ export function BlogView() {
       );
 
       if (response.data?.zipDownloadLink) {
-        window.open(response.data.zipDownloadLink, "_blank");
+        window.open(response.data.zipDownloadLink, '_blank');
         toast.success('QR codes downloaded successfully');
       } else {
         toast.error('Failed to download QR codes');
       }
     } catch (err) {
-      console.error("Error downloading QR codes:", err);
+      console.error('Error downloading QR codes:', err);
       toast.error('Failed to download QR codes');
     } finally {
       setLoading(false);
@@ -160,117 +163,117 @@ export function BlogView() {
       const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
       return JSON.parse(atob(base64));
     } catch (e) {
-      console.error("Failed to decode token:", e);
+      console.error('Failed to decode token:', e);
       return null;
     }
   }
 
-useEffect(() => {
-  const fetchUsers = async () => {
-    setLoading(true);
-    setError(null);
+  useEffect(() => {
+    const fetchUsers = async () => {
+      setLoading(true);
+      setError(null);
 
-    try {
-      const urlParams = new URLSearchParams(window.location.search);
-      const tokenFromUrl = urlParams.get("token");
-      const tokenFromStorage = localStorage.getItem("token");
-      const token = tokenFromStorage || tokenFromUrl;
+      try {
+        const urlParams = new URLSearchParams(window.location.search);
+        const tokenFromUrl = urlParams.get('token');
+        const tokenFromStorage = localStorage.getItem('token');
+        const token = tokenFromStorage || tokenFromUrl;
 
-      if (!token) {
-        setError("No token found. Please log in again.");
-        setLoading(false);
-        return;
-      }
+        if (!token) {
+          setError('No token found. Please log in again.');
+          setLoading(false);
+          return;
+        }
 
-      // Determine if this is an admin (has localStorage token)
-      setIsAdmin(!!tokenFromStorage);
+        // Determine if this is an admin (has localStorage token)
+        setIsAdmin(!!tokenFromStorage);
 
-      let eventId;
-      if (tokenFromStorage) {
-        // For admin - get eventId from localStorage
-        const eventIdArray = localStorage.getItem('allRowIds');
-        if (eventIdArray) {
-          try {
-            const parsedIds = JSON.parse(eventIdArray);
-            eventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
-          } catch (err) {
-            console.error("Error parsing event IDs:", err);
+        let eventId;
+        if (tokenFromStorage) {
+          // For admin - get eventId from localStorage
+          const eventIdArray = localStorage.getItem('allRowIds');
+          if (eventIdArray) {
+            try {
+              const parsedIds = JSON.parse(eventIdArray);
+              eventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+            } catch (err) {
+              console.error('Error parsing event IDs:', err);
+            }
+          }
+        } else {
+          // For temporary users - get eventId from token
+          const decoded = tryDecodeToken(token);
+          if (decoded) {
+            eventId = decoded?.eventId || decoded?.event?._id;
+
+            if (!eventId) {
+              console.warn("Token payload doesn't contain event ID:", decoded);
+            }
           }
         }
-      } else {
-        // For temporary users - get eventId from token
-        const decoded = tryDecodeToken(token);
-        if (decoded) {
-          eventId = decoded?.eventId || decoded?.event?._id;
-          
-          if (!eventId) {
-            console.warn("Token payload doesn't contain event ID:", decoded);
+
+        if (!eventId) {
+          console.error('Event ID search details:', {
+            tokenSource: tokenFromStorage ? 'localStorage' : 'URL',
+            allRowIds: localStorage.getItem('allRowIds'),
+            decodedToken: tokenFromUrl ? tryDecodeToken(tokenFromUrl) : null,
+          });
+          setError("No valid event ID found. Please ensure you're using a valid invitation link.");
+          setLoading(false);
+          return;
+        }
+
+        // If token came from URL and we don't have one in storage, store it
+        if (tokenFromUrl && !tokenFromStorage) {
+          localStorage.setItem('token', tokenFromUrl);
+        }
+
+        const response = await fetch(
+          `https://software-invite-api-self.vercel.app/guest/events-guest/${eventId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
           }
-        }
-      }
+        );
 
-      if (!eventId) {
-        console.error("Event ID search details:", {
-          tokenSource: tokenFromStorage ? "localStorage" : "URL",
-          allRowIds: localStorage.getItem('allRowIds'),
-          decodedToken: tokenFromUrl ? tryDecodeToken(tokenFromUrl) : null
-        });
-        setError("No valid event ID found. Please ensure you're using a valid invitation link.");
+        if (!response.ok) {
+          throw new Error(response.statusText || 'Failed to fetch guests');
+        }
+
+        const data = await response.json();
+
+        if (!data?.guests || !Array.isArray(data.guests)) {
+          throw new Error('Invalid API response format');
+        }
+
+        const formattedData: UserProps[] = data.guests.map((guest: any) => ({
+          id: guest._id,
+          _id: guest._id,
+          name: `${guest.firstName} ${guest.lastName}`,
+          email: guest.email,
+          phone: guest.phone,
+          createdAt: new Date(guest.createdAt).toLocaleDateString(),
+          status: guest.status,
+          qrCode: guest.qrCode,
+        }));
+
+        setUsers(formattedData);
+      } catch (err: any) {
+        setError(err.message || 'Failed to load guests');
+      } finally {
         setLoading(false);
-        return;
       }
+    };
 
-      // If token came from URL and we don't have one in storage, store it
-      if (tokenFromUrl && !tokenFromStorage) {
-        localStorage.setItem("token", tokenFromUrl);
-      }
+    fetchUsers();
 
-      const response = await fetch(
-        `https://software-invite-api-self.vercel.app/guest/events-guest/${eventId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+    // Set timeout for token expiration (30 minutes)
+    const timer = setTimeout(() => {
+      localStorage.removeItem('token');
+      navigate('/sign-in');
+    }, 1800000);
 
-      if (!response.ok) {
-        throw new Error(response.statusText || "Failed to fetch guests");
-      }
-
-      const data = await response.json();
-
-      if (!data?.guests || !Array.isArray(data.guests)) {
-        throw new Error("Invalid API response format");
-      }
-
-      const formattedData: UserProps[] = data.guests.map((guest: any) => ({
-        id: guest._id,
-        _id: guest._id,
-        name: `${guest.firstName} ${guest.lastName}`,
-        email: guest.email,
-        phone: guest.phone,
-        createdAt: new Date(guest.createdAt).toLocaleDateString(),
-        status: guest.status,
-        qrCode: guest.qrCode,
-      }));
-
-      setUsers(formattedData);
-    } catch (err: any) {
-      setError(err.message || "Failed to load guests");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  fetchUsers();
-
-  // Set timeout for token expiration (30 minutes)
-  const timer = setTimeout(() => {
-    localStorage.removeItem("token");
-    navigate("/sign-in");
-  }, 1800000);
-
-  return () => clearTimeout(timer);
-}, [navigate]);
+    return () => clearTimeout(timer);
+  }, [navigate]);
 
   const dataFiltered: UserProps[] = applyFilter({
     inputData: users,
@@ -403,14 +406,14 @@ useEffect(() => {
                 startIcon={<Iconify icon="fluent:qr-code-28-filled" />}
                 onClick={() => {
                   const urlParams = new URLSearchParams(window.location.search);
-                  const tokenFromUrl = urlParams.get("token");
-                  const tokenFromStorage = localStorage.getItem("token");
+                  const tokenFromUrl = urlParams.get('token');
+                  const tokenFromStorage = localStorage.getItem('token');
                   const tokenToUse = tokenFromUrl || tokenFromStorage;
 
                   if (tokenToUse) {
                     window.location.href = `https://softinvite-scan.vercel.app?token=${tokenToUse}`;
                   } else {
-                    toast.error("No token found. Please login again.");
+                    toast.error('No token found. Please login again.');
                   }
                 }}
                 sx={{
@@ -454,9 +457,14 @@ useEffect(() => {
                 rowCount={users.length}
                 numSelected={table.selected.length}
                 onSort={table.onSort}
-                onSelectAllRows={isAdmin ? (checked) => 
-                  table.onSelectAllRows(checked, users.map((user) => user.id))
-                  : undefined
+                onSelectAllRows={
+                  isAdmin
+                    ? (checked) =>
+                        table.onSelectAllRows(
+                          checked,
+                          users.map((user) => user.id)
+                        )
+                    : undefined
                 }
                 headLabel={[
                   ...(isAdmin ? [{ id: 'checkbox', label: '', align: 'center' }] : []),
