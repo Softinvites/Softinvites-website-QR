@@ -74,7 +74,7 @@ export function Router() {
       ),
     },
     {
-      path: 'register',
+      path: 'sign_up',
       element: (
         <AuthLayout>
         

@@ -51,12 +51,12 @@ export function SignInView() {
     <>
       <Box gap={1.5} display="flex" flexDirection="column" alignItems="center" sx={{ mb: 5 }}>
         <Typography variant="h5">Sign in</Typography>
-        <Typography variant="body2" color="text.secondary">
+        {/* <Typography variant="body2" color="text.secondary">
           Don’t have an account?
           <Link variant="subtitle2" sx={{ ml: 0.5 }} href="/register">
             Get started
           </Link>
-        </Typography>
+        </Typography> */}
       </Box>
 
       {error && <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>}
@@ -72,9 +72,9 @@ export function SignInView() {
           sx={{ mb: 3 }}
         />
 
-        <Link variant="body2" color="inherit" sx={{ mb: 1.5 }} href="/forgot-password">
+        {/* <Link variant="body2" color="inherit" sx={{ mb: 1.5 }} href="/forgot-password">
           Forgot password?
-        </Link>
+        </Link> */}
 
         <TextField
           fullWidth
