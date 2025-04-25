@@ -431,7 +431,7 @@ export function BlogView() {
                   width: isAdmin ? '100%' : 'auto',
                 }}
               >
-                Scan Guest QR
+                Scan Guest
               </Button>
             </Grid>
           </Grid>
@@ -517,7 +517,7 @@ export function BlogView() {
           count={users.length}
           rowsPerPage={table.rowsPerPage}
           onPageChange={table.onChangePage}
-          rowsPerPageOptions={[5, 10, 25]}
+          rowsPerPageOptions={[5, 10, 25, 50, 100]}
           onRowsPerPageChange={table.onChangeRowsPerPage}
         />
       </Card>

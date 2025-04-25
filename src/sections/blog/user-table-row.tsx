@@ -143,42 +143,42 @@ export function UserTableRow({ row, selected, onSelectRow, showActions }: UserTa
   }, [row._id, token, handleClosePopover]);
 
   const handleDownloadQRCode = useCallback(async () => {
+    console.log("Downloading QR code for:", row.name);
     try {
-      const response = await fetch(
-        `https://software-invite-api-self.vercel.app/guest/download-qrcode/${row._id}`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+      const response = await fetch(`https://software-invite-api-self.vercel.app/guest/download-qrcode/${row._id}`, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${token}`
         }
-      );
-
+      });
+  
       if (!response.ok) {
-        throw new Error(`Failed to fetch QR code: ${response.statusText}`);
+        throw new Error(`Failed to get QR Code: ${response.statusText}`);
       }
-
-      const data = await response.json();
-      if (data.downloadUrl) {
-        window.open(data.downloadUrl, "_blank");
-        toast.success('QR code opened in new tab!', {
-          position: 'top-right',
-          autoClose: 2000,
-        });
-      } else {
-        throw new Error('No download URL found');
-      }
+  
+      const blob = await response.blob(); // ✅ This reads the binary PNG
+  
+      // Create a URL for the blob and trigger the download
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `qr-${row.name || 'guest'}.png`; // Optional: nicer filename
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url); // Clean up
+  
     } catch (error) {
-      console.error('Error downloading QR Code:', error);
-      toast.error('Failed to download QR code', {
+      console.error("Error downloading QR Code:", error);
+      toast.error('Error downloading QR Code', {
         position: 'top-right',
         autoClose: 3000,
       });
     } finally {
       handleClosePopover();
     }
-  }, [row._id, token, handleClosePopover]);
-
+  }, [row._id, row.name, token, handleClosePopover]);
+  
   return (
     <>
       <TableRow hover tabIndex={-1} role="checkbox" selected={selected}>
