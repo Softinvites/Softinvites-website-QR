@@ -1,7 +1,6 @@
 import type { StackProps } from '@mui/material/Stack';
 
 import Box from '@mui/material/Box';
-import Typography from '@mui/material/Typography';
 
 
 // ----------------------------------------------------------------------
@@ -16,10 +15,7 @@ export function NavUpgrade({ sx, ...other }: StackProps) {
       {...other}
     >
      
-      <Typography variant="body2" sx={{ color: 'text.secondary', mt: 0.5 }}>
-        {`Working In Progress `}
-    
-      </Typography>
+
 
       <Box
         component="img"

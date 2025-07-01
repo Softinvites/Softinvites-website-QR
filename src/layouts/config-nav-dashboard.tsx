@@ -15,7 +15,7 @@ export const navData = [
   },
   {
     title: 'Event',
-    path: '/user',
+    path: '/event',
     icon: icon('ic-user'),
   },
  

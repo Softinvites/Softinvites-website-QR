@@ -24,6 +24,9 @@ import { emptyRows, applyFilter, getComparator } from '../utils';
 import type { UserProps } from '../user-table-row';
 import EventModal from './EventModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
+import { AnalyticsCurrentVisits } from '../../overview/analytics-current-visits';
+import { AnalyticsWebsiteVisits } from '../../overview/analytics-website-visits';
+import { AnalyticsWidgetSummary } from '../../overview/analytics-widget-summary';
 
 interface HeadCell {
   id: string;
@@ -31,7 +34,7 @@ interface HeadCell {
   align?: 'left' | 'center' | 'right';
 }
 
-export function BlogView() {
+export function GuestView() {
   const table = useTable();
   const [filterName, setFilterName] = useState('');
   const [users, setUsers] = useState<UserProps[]>([]);
@@ -42,6 +45,16 @@ export function BlogView() {
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
+  const [analytics, setAnalytics] = useState({
+    totalGuests: 0,
+    checkedInGuests: 0,
+    unusedCodes: 0,
+    guestStatusBreakdown: {
+      checkedIn: 0,
+      pending: 0,
+    },
+    checkInTrend: [],
+  });
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -122,7 +135,7 @@ export function BlogView() {
       const eventIdArray = localStorage.getItem('allRowIds');
 
       if (!token || !eventIdArray) {
-        toast.error('Authentication required');
+        toast.error('Authentication required or no event IDs found');
         return;
       }
 
@@ -130,24 +143,23 @@ export function BlogView() {
       const eventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
 
       if (!eventId) {
-        toast.error('No event ID found');
+        toast.error('No valid event ID found');
         return;
       }
 
       const response = await axios.get(
         `https://software-invite-api-self.vercel.app/guest/download-all-qrcode/${eventId}`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 60000,
         }
       );
 
       if (response.data?.zipDownloadLink) {
         window.open(response.data.zipDownloadLink, '_blank');
-        toast.success('QR codes downloaded successfully');
+        toast.success('QR codes download started!');
       } else {
-        toast.error('Failed to download QR codes');
+        toast.error('Download link not available');
       }
     } catch (err) {
       console.error('Error downloading QR codes:', err);
@@ -236,7 +248,7 @@ export function BlogView() {
         );
 
         if (!response.ok) {
-          throw new Error(response.statusText || 'Failed to fetch guests');
+          throw new Error(response.statusText);
         }
 
         const data = await response.json();
@@ -245,10 +257,19 @@ export function BlogView() {
           throw new Error('Invalid API response format');
         }
 
+        const analyticsRes = await axios.get(
+          `https://software-invite-api-self.vercel.app/guest/event-analytics/${eventId}`,
+          {
+            headers: { Authorization: `Bearer ${token}` },
+          }
+        );
+        setAnalytics(analyticsRes.data);
+
         const formattedData: UserProps[] = data.guests.map((guest: any) => ({
           id: guest._id,
           _id: guest._id,
-          name: `${guest.firstName} ${guest.lastName}`,
+          fullname: guest.fullname,
+          seatNo: guest.seatNo,
           email: guest.email,
           phone: guest.phone,
           createdAt: new Date(guest.createdAt).toLocaleDateString(),
@@ -285,6 +306,7 @@ export function BlogView() {
 
   return (
     <DashboardContent>
+   
       <Box display="flex" alignItems="center" mb={5}>
         <Typography
           variant="h4"
@@ -438,6 +460,69 @@ export function BlogView() {
         </Stack>
       </Box>
 
+      <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid xs={12} sm={6} md={4}>
+          <AnalyticsWidgetSummary
+            title="Total Guests"
+            total={analytics.totalGuests}
+            percent={analytics.totalGuests}
+            icon={<img alt="icon" src="/assets/icons/glass/ic-glass-users.svg" />}
+            color="primary"
+          />
+        </Grid>
+        <Grid xs={12} sm={6} md={4}>
+          <AnalyticsWidgetSummary
+            title="Checked-in Guests"
+            total={analytics.checkedInGuests}
+            percent={analytics.checkedInGuests}
+            icon={<img alt="icon" src="/assets/icons/glass/ic-glass-buy.svg" />}
+            color="success"
+          />
+        </Grid>
+        <Grid xs={12} sm={6} md={4}>
+          <AnalyticsWidgetSummary
+            title="Unused Codes"
+            total={analytics.unusedCodes}
+            percent={analytics.unusedCodes}
+            icon={<img alt="icon" src="/assets/icons/glass/ic-glass-message.svg" />}
+            color="error"
+          />
+        </Grid>
+
+        <Grid xs={12} md={6} lg={4}>
+          <AnalyticsCurrentVisits
+            title="Guest Status Breakdown"
+            chart={{
+              // series: [
+              //   { label: 'Checked-in', value: analytics.guestStatusBreakdown.checkedIn },
+              //   { label: 'Pending', value: analytics.guestStatusBreakdown.pending },
+              // ],
+              series: [
+                { label: 'Checked-in', value: 60 },
+                { label: 'Pending', value: 40 },
+              ],
+            }}
+          />
+        </Grid>
+
+        <Grid xs={12} md={6} lg={8}>
+          <AnalyticsWebsiteVisits
+            title="Check-in Trend"
+            subheader="This Week"
+            chart={{
+              categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
+              // series: [{ name: 'Check-ins', data: analytics.checkInTrend }],
+              series: [
+                {
+                  name: 'Check-ins',
+                  data: [5, 12, 8, 15, 10, 20, 18],
+                },
+              ],
+            }}
+          />
+        </Grid>
+      </Grid>
+
       <Card>
         <UserTableToolbar
           numSelected={table.selected.length}
@@ -468,7 +553,8 @@ export function BlogView() {
                 }
                 headLabel={[
                   ...(isAdmin ? [{ id: 'checkbox', label: '', align: 'center' }] : []),
-                  { id: 'name', label: 'Name' },
+                  { id: 'fullname', label: 'Full Name' },
+                  { id: 'seatNo', label: 'Seat No.' },
                   { id: 'phone', label: 'Number' },
                   { id: 'email', label: 'Email' },
                   { id: 'createdAt', label: 'CreatedAt' },
@@ -529,7 +615,7 @@ export function BlogView() {
 
 export function useTable() {
   const [page, setPage] = useState(0);
-  const [orderBy, setOrderBy] = useState('name');
+  const [orderBy, setOrderBy] = useState('fullname');
   const [rowsPerPage, setRowsPerPage] = useState(5);
   const [selected, setSelected] = useState<string[]>([]);
   const [order, setOrder] = useState<'asc' | 'desc'>('asc');

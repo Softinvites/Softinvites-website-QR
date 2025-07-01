@@ -55,6 +55,8 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
 
   
   const [openDialog, setOpenDialog] = useState(false);
+  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+
 
   // These states hold the editable values.
   // If you want to pre-populate with your specific details, you could also initialize here:
@@ -195,36 +197,46 @@ const handleCloseLinkDialog = () => {
   
   
   // DELETE function remains unchanged
-  const handleDelete = useCallback(async () => {
-    console.log("Delete clicked for:", row.name);
+  const handleDelete = useCallback(() => {
+    setOpenConfirmDialog(true);
+    handleClosePopover();
+  }, [handleClosePopover]);
+
+  const confirmDelete = useCallback(async () => {
     try {
-      const response = await fetch(`https://software-invite-api-self.vercel.app/events/events/${row.id}`, {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`
+      const response = await fetch(
+        `https://software-invite-api-self.vercel.app/events/events/${row.id}`,
+        {
+          method: 'DELETE',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
         }
-      });
-      const data = await response.json();
-
-      
-
-    // Remove allRowIds from localStorage
-    localStorage.removeItem("allRowIds");
-      console.log("Delete response:", data);
-    } catch (error) {
-      console.error("Error deleting event:", error);
-    } finally {
-      handleClosePopover();
-      toast.success('successful!', {
+      );
+  
+      if (!response.ok) {
+        throw new Error('Failed to delete event');
+      }
+  
+      localStorage.removeItem("allRowIds");
+  
+      toast.success('Deleted successfully!', {
         position: 'top-right',
-        autoClose: 2000, // Close after 2 seconds
+        autoClose: 2000,
       });
   
-      
-      window.location.reload(); // Refresh the page
+      window.location.reload();
+    } catch (error) {
+      console.error('Error deleting event:', error);
+      toast.error('Failed to delete event', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } finally {
+      setOpenConfirmDialog(false);
     }
-  }, [row, token, handleClosePopover]);
-
+  }, [row.id, token]);
+  
   
   // This function saves the current row's id into localStorage as an array,
   // then navigates to the guest page.
@@ -232,7 +244,7 @@ const handleCloseLinkDialog = () => {
     console.log("Navigating to guest page for row:", row.id);
     const allRowIds = [row.id];
     localStorage.setItem("allRowIds", JSON.stringify(allRowIds));
-    navigate('/blog');
+    navigate('/guest');
   }, [row.id, navigate]);
 
 
@@ -268,7 +280,7 @@ const handleCloseLinkDialog = () => {
         <TableCell>{row.date}</TableCell>
         <TableCell>{row.createdAt}</TableCell>
         
-        <TableCell>{row.description}</TableCell>
+        <TableCell sx={{ whiteSpace: 'pre-line', wordBreak: 'break-word' }}>{row.description}</TableCell>
         <TableCell>
           <Label color={(row.status === 'banned' && 'error') || 'success'}>
             {row.status}
@@ -372,17 +384,19 @@ const handleCloseLinkDialog = () => {
       </Dialog>
 
           {/* Copy-Link Dialog */}
-          <Dialog open={isLinkDialogOpen} onClose={handleCloseLinkDialog}>
-        <DialogTitle>Temporary Link</DialogTitle>
-        <DialogContent>
+          <Dialog open={isLinkDialogOpen} onClose={handleCloseLinkDialog} >
+        <DialogTitle sx={{width:"100%", padding:"0px 100px"}}>Temporary Link</DialogTitle>
+        <DialogContent sx={{width:"100%"}}>
           <TextField
             margin="dense"
             label="Link"
             fullWidth
             variant="outlined"
+            multiline
             value={tempLink || ''}
             InputProps={{ readOnly: true }}
             onFocus={(e) => e.currentTarget.select()}
+            
           />
         </DialogContent>
         <DialogActions>
@@ -390,6 +404,22 @@ const handleCloseLinkDialog = () => {
           <Button onClick={handleCloseLinkDialog}>Close</Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={openConfirmDialog} onClose={() => setOpenConfirmDialog(false)}>
+  <DialogTitle>Confirm Deletion</DialogTitle>
+  <DialogContent>
+    Are you sure you want to delete <strong>{row.name}</strong>? This action cannot be undone.
+  </DialogContent>
+  <DialogActions>
+    <Button onClick={() => setOpenConfirmDialog(false)} color="inherit">
+      Cancel
+    </Button>
+    <Button onClick={confirmDelete} variant="contained" color="error">
+      Yes, Delete
+    </Button>
+  </DialogActions>
+</Dialog>
+
     </>
   );
 }

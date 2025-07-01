@@ -20,7 +20,8 @@ import { Iconify } from 'src/components/iconify';
 
 export type UserProps = {
   id: string;
-  name: string;
+  fullname: string;
+  seatNo: string;
   status: string;
   _id: string;
   phone: string;
@@ -42,13 +43,11 @@ export function UserTableRow({ row, selected, onSelectRow, showActions }: UserTa
   const token = localStorage.getItem('token');
   const [openPopover, setOpenPopover] = useState<HTMLButtonElement | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
-  const nameParts = row.name.split(' ');
-  const initialFirstName = nameParts[0];
-  const initialLastName = nameParts.slice(1).join(' ') || '';
-  const [firstName, setFirstName] = useState(initialFirstName);
-  const [lastName, setLastName] = useState(initialLastName);
+  const [fullname, setFullname] = useState(row.fullname);
+  const [seatNo, setSeatNo] = useState(row.seatNo);
   const [email, setEmail] = useState(row.email);
   const [phone, setPhone] = useState(row.phone);
+  const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
 
   const handleOpenPopover = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     setOpenPopover(event.currentTarget);
@@ -59,13 +58,13 @@ export function UserTableRow({ row, selected, onSelectRow, showActions }: UserTa
   }, []);
 
   const handleOpenEditDialog = useCallback(() => {
-    setFirstName(initialFirstName);
-    setLastName(initialLastName);
+    setFullname(row.fullname);
+    setSeatNo(row.seatNo);
     setEmail(row.email);
     setPhone(row.phone);
     setOpenDialog(true);
     handleClosePopover();
-  }, [row, initialFirstName, initialLastName, handleClosePopover]);
+  }, [row, handleClosePopover]);
 
   const handleCloseDialog = useCallback(() => {
     setOpenDialog(false);
@@ -82,8 +81,8 @@ export function UserTableRow({ row, selected, onSelectRow, showActions }: UserTa
             Authorization: `Bearer ${token}`,
           },
           body: JSON.stringify({
-            firstName,
-            lastName,
+            fullname,
+            seatNo,
             email,
             phone,
           }),
@@ -108,9 +107,9 @@ export function UserTableRow({ row, selected, onSelectRow, showActions }: UserTa
     } finally {
       handleCloseDialog();
     }
-  }, [row._id, token, firstName, lastName, email, phone, handleCloseDialog]);
+  }, [row._id, token, fullname, seatNo, email, phone, handleCloseDialog]);
 
-  const handleDelete = useCallback(async () => {
+  const confirmDelete = useCallback(async () => {
     try {
       const response = await fetch(
         `https://software-invite-api-self.vercel.app/guest/single-guest/${row._id}`,
@@ -121,15 +120,16 @@ export function UserTableRow({ row, selected, onSelectRow, showActions }: UserTa
           },
         }
       );
-      
+  
       if (!response.ok) {
         throw new Error('Failed to delete guest');
       }
-      
+  
       toast.success('Deletion successful!', {
         position: 'top-right',
         autoClose: 2000,
       });
+  
       window.location.reload();
     } catch (error) {
       console.error('Error deleting guest:', error);
@@ -138,12 +138,19 @@ export function UserTableRow({ row, selected, onSelectRow, showActions }: UserTa
         autoClose: 3000,
       });
     } finally {
+      setOpenConfirmDialog(false);
       handleClosePopover();
     }
   }, [row._id, token, handleClosePopover]);
 
+  const handleDelete = useCallback(() => {
+    setOpenConfirmDialog(true);
+    handleClosePopover();
+  }, [handleClosePopover]);
+
+  
   const handleDownloadQRCode = useCallback(async () => {
-    console.log("Downloading QR code for:", row.name);
+    console.log("Downloading QR code for:", row.fullname);
     try {
       const response = await fetch(`https://software-invite-api-self.vercel.app/guest/download-qrcode/${row._id}`, {
         method: 'GET',
@@ -162,7 +169,7 @@ export function UserTableRow({ row, selected, onSelectRow, showActions }: UserTa
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `qr-${row.name || 'guest'}.png`; // Optional: nicer filename
+      link.download = `qr-${row.fullname || 'guest'}.png`; // Optional: nicer filename
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
@@ -177,7 +184,7 @@ export function UserTableRow({ row, selected, onSelectRow, showActions }: UserTa
     } finally {
       handleClosePopover();
     }
-  }, [row._id, row.name, token, handleClosePopover]);
+  }, [row._id, row.fullname, token, handleClosePopover]);
   
   return (
     <>
@@ -194,10 +201,11 @@ export function UserTableRow({ row, selected, onSelectRow, showActions }: UserTa
 
         <TableCell>
           <Box display="flex" alignItems="center" gap={2}>
-            <Avatar alt={row.name} src={row.avatarUrl} />
-            {row.name}
+            {/* <Avatar alt={row.name} src={row.avatarUrl} /> */}
+            {row.fullname}
           </Box>
         </TableCell>
+        <TableCell>{row.seatNo}</TableCell>
         <TableCell>{row.phone}</TableCell>
         <TableCell>{row.email}</TableCell>
         <TableCell>{row.createdAt}</TableCell>
@@ -263,19 +271,19 @@ export function UserTableRow({ row, selected, onSelectRow, showActions }: UserTa
         <DialogContent>
           <TextField
             margin="dense"
-            label="First Name"
+            label="Full Name"
             fullWidth
             variant="outlined"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
+            value={fullname}
+            onChange={(e) => setFullname(e.target.value)}
           />
           <TextField
             margin="dense"
-            label="Last Name"
+            label="Seat Number"
             fullWidth
             variant="outlined"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
+            value={seatNo}
+            onChange={(e) => setSeatNo(e.target.value)}
           />
           <TextField
             margin="dense"
@@ -301,6 +309,22 @@ export function UserTableRow({ row, selected, onSelectRow, showActions }: UserTa
           </Button>
         </DialogActions>
       </Dialog>
+
+      <Dialog open={openConfirmDialog} onClose={() => setOpenConfirmDialog(false)}>
+  <DialogTitle>Confirm Deletion</DialogTitle>
+  <DialogContent>
+    Are you sure you want to delete <strong>{row.fullname}</strong>? This action cannot be undone.
+  </DialogContent>
+  <DialogActions>
+    <Button onClick={() => setOpenConfirmDialog(false)} color="inherit">
+      Cancel
+    </Button>
+    <Button onClick={confirmDelete} variant="contained" color="error">
+      Yes, Delete
+    </Button>
+  </DialogActions>
+</Dialog>
+
     </>
   );
 }
