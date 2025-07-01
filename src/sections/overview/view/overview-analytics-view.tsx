@@ -15,6 +15,11 @@ export function OverviewAnalyticsView() {
     totalGuests: 0,
     checkedInGuests: 0,
     unusedCodes: 0,
+    guestStatusBreakdown: {
+      checkedIn: 0,
+      pending: 0,
+    },
+    checkInTrend: [],
   });
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -25,7 +30,7 @@ export function OverviewAnalyticsView() {
 
     if (!token) {
       console.error("No token found in local storage.");
-      navigate('/sign-in'); // Redirect to login page
+      navigate('/sign-in');
       setLoading(false);
       return;
     }
@@ -50,7 +55,6 @@ export function OverviewAnalyticsView() {
         if (eventsData && Array.isArray(eventsData.events)) {
           setEvents(eventsData.events);
         }
-        
         if (analyticsData) {
           setAnalytics(analyticsData);
         }
@@ -58,18 +62,16 @@ export function OverviewAnalyticsView() {
       })
       .catch((err) => {
         console.error("Error fetching data:", err);
-        navigate('/sign-in'); // Redirect to login page
+        navigate('/sign-in');
         setError(err.message);
         setLoading(false);
       });
-
-   
   }, [navigate]);
 
   return (
     <DashboardContent maxWidth="xl">
       <Typography variant="h4" sx={{ mb: { xs: 3, md: 5 } }}>
-        Hi, Welcome back 👋
+        Hi, Welcome Admin
       </Typography>
 
       {error && (
@@ -124,16 +126,17 @@ export function OverviewAnalyticsView() {
             />
           </Grid>
 
-          
-<Grid xs={12} md={6} lg={4}>
+          <Grid xs={12} md={6} lg={4}>
             <AnalyticsCurrentVisits
-              title="Current visits"
+              title="Guest Status Breakdown"
               chart={{
+                // series: [
+                //   { label: 'Checked In', value: analytics.guestStatusBreakdown.checkedIn },
+                //   { label: 'Pending', value: analytics.guestStatusBreakdown.pending },
+                // ],
                 series: [
-                  { label: 'America', value: 3500 },
-                  { label: 'Asia', value: 2500 },
-                  { label: 'Europe', value: 1500 },
-                  { label: 'Africa', value: 500 },
+                  { label: 'Checked-in', value: 60 },
+                  { label: 'Pending', value: 40 },
                 ],
               }}
             />
@@ -141,13 +144,21 @@ export function OverviewAnalyticsView() {
 
           <Grid xs={12} md={6} lg={8}>
             <AnalyticsWebsiteVisits
-              title="Website visits"
-              subheader="(+43%) than last year"
+              title="Check-in Trend"
+              subheader="Last 9 months"
               chart={{
                 categories: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep'],
+                // series: [
+                //   {
+                //     name: 'Check-ins',
+                //     data: analytics.checkInTrend,
+                //   },
+                // ],
                 series: [
-                  { name: 'Team A', data: [43, 33, 22, 37, 67, 68, 37, 24, 55] },
-                  { name: 'Team B', data: [51, 70, 47, 67, 40, 37, 24, 70, 24] },
+                  {
+                    name: 'Check-ins',
+                    data: [5, 12, 8, 15, 10, 20, 18],
+                  },
                 ],
               }}
             />
@@ -157,8 +168,3 @@ export function OverviewAnalyticsView() {
     </DashboardContent>
   );
 }
-
-
-
-
-

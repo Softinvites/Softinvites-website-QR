@@ -16,8 +16,8 @@ interface GuestModalProps {
   handleClose: () => void;
 }
 interface GuestData {
-  firstName: string;
-  lastName: string;
+  fullname: string;
+  seatNo?: string;
   email?: string;
   phone?: string;
   eventId: string;
@@ -28,8 +28,8 @@ interface GuestData {
 
 const EventModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
   const [guestData, setGuestData] = React.useState<GuestData>({
-    firstName: '',
-    lastName: '',
+    fullname: '',
+    seatNo: '',
     email: '',
     phone: '',
     eventId: '',
@@ -97,6 +97,10 @@ const EventModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
 
 
 // Clean empty optional fields
+
+if (!guestData.seatNo || guestData.seatNo.trim() === '') {
+  delete payload.seatNo;
+}
 if (!guestData.email || guestData.email.trim() === '') {
   delete payload.email;
 }
@@ -143,17 +147,17 @@ console.log('Final Payload:', payload);
     <DialogContent>
       <TextField
         fullWidth
-        label="First Name"
-        name="firstName"
-        value={guestData.firstName}
+        label="Full Name"
+        name="fullname"
+        value={guestData.fullname}
         onChange={handleChange}
         margin="dense"
       />
       <TextField
         fullWidth
-        label="Last Name"
-        name="lastName"
-        value={guestData.lastName}
+        label="Seat No."
+        name="seatNo"
+        value={guestData.seatNo}
         onChange={handleChange}
         margin="dense"
       />

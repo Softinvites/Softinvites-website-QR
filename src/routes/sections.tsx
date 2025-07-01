@@ -14,8 +14,8 @@ import ProtectedRoute from 'src/components/ProtectedRoute';
 // ------------------------------------------c----------------------------
 
 export const HomePage = lazy(() => import('src/pages/home'));
-export const BlogPage = lazy(() => import('src/pages/blog'));
-export const UserPage = lazy(() => import('src/pages/user'));
+export const GuestPage = lazy(() => import('src/pages/guest'));
+export const EventPage = lazy(() => import('src/pages/event'));
 export const SignInPage = lazy(() => import('src/pages/sign-in'));
 export const RegisterPage = lazy(() => import('src/pages/register'));
 export const Page404 = lazy(() => import('src/pages/page-not-found'));
@@ -56,10 +56,10 @@ export function Router() {
           element: <ProtectedRoute />, // ✅ Protect all dashboard routes
           children: [
             { path: 'home', element: <HomePage /> },
-            { path: 'user', element: <UserPage /> },
+            { path: 'event', element: <EventPage /> },
             
 
-            { path: 'blog', element: <BlogPage /> },
+            { path: 'guest', element: <GuestPage /> },
           ],
         },
       ],
