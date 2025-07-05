@@ -252,8 +252,8 @@ export function UserView() {
 
                   { id: 'description', label: 'Description' },
 
-                  { id: '' },
-                  { id: 'aaa' },
+                  { id: 'status', label:"Status" },
+                  { id: 'action', label:"Action" },
                 ]}
               />
               <TableBody>

@@ -22,7 +22,7 @@ import { TableEmptyRows } from '../table-empty-rows';
 import { UserTableToolbar } from '../user-table-toolbar';
 import { emptyRows, applyFilter, getComparator } from '../utils';
 import type { UserProps } from '../user-table-row';
-import EventModal from './EventModal';
+import EventModal from './GuestModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { AnalyticsCurrentVisits } from '../../overview/analytics-current-visits';
 import { AnalyticsWebsiteVisits } from '../../overview/analytics-website-visits';
@@ -55,6 +55,8 @@ export function GuestView() {
     },
     checkInTrend: [],
   });
+  const showOthersColumn = users.some((user) => !!user.others?.trim());
+
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -269,10 +271,11 @@ export function GuestView() {
           id: guest._id,
           _id: guest._id,
           fullname: guest.fullname,
-          seatNo: guest.seatNo,
+          TableNo: guest.TableNo,
           email: guest.email,
           phone: guest.phone,
           createdAt: new Date(guest.createdAt).toLocaleDateString(),
+          others: guest.others || '',
           status: guest.status,
           qrCode: guest.qrCode,
         }));
@@ -551,13 +554,16 @@ export function GuestView() {
                         )
                     : undefined
                 }
+
+                
                 headLabel={[
                   ...(isAdmin ? [{ id: 'checkbox', label: '', align: 'center' }] : []),
                   { id: 'fullname', label: 'Full Name' },
-                  { id: 'seatNo', label: 'Seat No.' },
+                  { id: 'TableNo', label: 'Table No.' },
                   { id: 'phone', label: 'Number' },
                   { id: 'email', label: 'Email' },
                   { id: 'createdAt', label: 'CreatedAt' },
+                  ...(showOthersColumn ? [{ id: 'others', label: 'Others' }] : []),
                   { id: 'status', label: 'Status' },
                   ...(isAdmin ? [{ id: 'actions', label: 'Actions' }] : []),
                 ]}
@@ -582,6 +588,7 @@ export function GuestView() {
                         selected={table.selected.includes(row.id)}
                         onSelectRow={() => table.onSelectRow(row.id)}
                         showActions={isAdmin}
+                        showOthersColumn={showOthersColumn} 
                       />
                     ))
                 )}
