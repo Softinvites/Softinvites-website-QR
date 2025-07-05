@@ -6,11 +6,11 @@ import {
   DialogTitle,
   Button,
   TextField,
-  
-  CircularProgress, // Import CircularProgress for the spinner
+  CircularProgress,
+  Typography,
 } from '@mui/material';
 
-import {  toast } from 'react-toastify';
+import { toast } from 'react-toastify';
 
 interface EventModalProps {
   open: boolean;
@@ -23,16 +23,31 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
     date: '',
     location: '',
     description: '',
+    iv: '',
   });
 
-  
-  const [loading, setLoading] = React.useState(false); // Loading state
-  // Handle input change
+  const [loading, setLoading] = React.useState(false);
+  const [previewImage, setPreviewImage] = React.useState<string | null>(null);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setEventData({ ...eventData, [e.target.name]: e.target.value });
   };
 
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      const base64String = reader.result as string;
+      setEventData({ ...eventData, iv: base64String });
+      setPreviewImage(base64String);
+    };
+    reader.readAsDataURL(file);
+  };
+
   const handleSubmit = async () => {
+    setLoading(true);
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -52,16 +67,18 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
       if (!response.ok) {
         throw new Error('Failed to create event');
       }
-      toast.success('Events created succesfully', {
+
+      toast.success('Event created successfully', {
         position: 'top-right',
-        autoClose: 3000, // Close after 2 seconds
-        
-        onClose: () => window.location.reload(), // Reload only after the toast disappears
+        autoClose: 3000,
+        onClose: () => window.location.reload(),
       });
-      handleClose(); // Close the modal
+      handleClose();
     } catch (error) {
       console.error('Error creating event:', error);
       alert('Error creating event');
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -81,9 +98,11 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
           fullWidth
           label="Date"
           name="date"
+          type="date"
           value={eventData.date}
           onChange={handleChange}
           margin="dense"
+          InputLabelProps={{ shrink: true }}
         />
         <TextField
           fullWidth
@@ -93,20 +112,35 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
           onChange={handleChange}
           margin="dense"
         />
+        <TextField
+          fullWidth
+          label="Description"
+          name="description"
+          value={eventData.description}
+          onChange={handleChange}
+          margin="dense"
+          multiline
+          minRows={4}
+        />
 
-      <TextField
-        fullWidth
-        label="Description"
-        name="description"
-        value={eventData.description}
-        onChange={handleChange}
-        margin="dense"
-        multiline
-        minRows={4} 
-      />
-
-        
+        <Typography variant="subtitle1" sx={{ mt: 2 }}>
+          Upload IV Image (PNG):
+        </Typography>
+        <input
+          accept="image/png"
+          type="file"
+          onChange={handleFileChange}
+          style={{ marginTop: 8, marginBottom: 12 }}
+        />
+        {previewImage && (
+          <img
+            src={previewImage}
+            alt="IV Preview"
+            style={{ width: '100%', borderRadius: 8, marginTop: 10 }}
+          />
+        )}
       </DialogContent>
+
       <DialogActions>
         <Button onClick={handleClose} color="error">
           Cancel
@@ -115,7 +149,7 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
           variant="contained"
           color="primary"
           onClick={handleSubmit}
-          disabled={loading} // Disable button when loading
+          disabled={loading}
         >
           {loading ? <CircularProgress size={24} color="inherit" /> : 'Create'}
         </Button>
