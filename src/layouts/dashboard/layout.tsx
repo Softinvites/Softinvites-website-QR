@@ -15,7 +15,7 @@ import { layoutClasses } from '../classes';
 import { NavMobile, NavDesktop } from './nav';
 import { navData } from '../config-nav-dashboard';
 import { Searchbar } from '../components/searchbar';
-import { _workspaces } from '../config-nav-workspace';
+// import { _workspaces } from '../config-nav-workspace';
 import { MenuButton } from '../components/menu-button';
 import { LayoutSection } from '../core/layout-section';
 import { HeaderSection } from '../core/header-section';
@@ -72,7 +72,7 @@ export function DashboardLayout({ sx, children, header }: DashboardLayoutProps) 
                   data={navData}
                   open={navOpen}
                   onClose={() => setNavOpen(false)}
-                  workspaces={_workspaces}
+                  // workspaces={_workspaces}
                 />
               </>
             ),
@@ -107,7 +107,9 @@ export function DashboardLayout({ sx, children, header }: DashboardLayoutProps) 
        * Sidebar
        *************************************** */
       sidebarSection={
-        <NavDesktop data={navData} layoutQuery={layoutQuery} workspaces={_workspaces} />
+        <NavDesktop data={navData} layoutQuery={layoutQuery}
+        //  workspaces={_workspaces}
+          />
       }
       /** **************************************
        * Footer
@@ -134,4 +136,4 @@ export function DashboardLayout({ sx, children, header }: DashboardLayoutProps) 
       <Main>{children}</Main>
     </LayoutSection>
   );
-}
+}   

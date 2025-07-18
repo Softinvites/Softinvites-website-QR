@@ -190,6 +190,8 @@ const GuestModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
           value={guestData.message}
           onChange={handleChange}
           margin="dense"
+          multiline
+          minRows={4}
         />
         <TextField
           fullWidth

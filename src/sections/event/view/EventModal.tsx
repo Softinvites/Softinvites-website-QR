@@ -39,9 +39,10 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
 
     const reader = new FileReader();
     reader.onloadend = () => {
-      const base64String = reader.result as string;
-      setEventData({ ...eventData, iv: base64String });
-      setPreviewImage(base64String);
+      const fullBase64 = reader.result as string;
+      const pureBase64 = fullBase64.split(',')[1]; // ✅ strip "data:image/png;base64,"
+      setEventData({ ...eventData, iv: pureBase64 });
+      setPreviewImage(fullBase64); // for preview, keep full string
     };
     reader.readAsDataURL(file);
   };
@@ -65,7 +66,8 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
       });
 
       if (!response.ok) {
-        throw new Error('Failed to create event');
+        const err = await response.json();
+        throw new Error(err?.message || 'Failed to create event');
       }
 
       toast.success('Event created successfully', {
@@ -73,10 +75,11 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
         autoClose: 3000,
         onClose: () => window.location.reload(),
       });
+
       handleClose();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error creating event:', error);
-      alert('Error creating event');
+      alert(error.message || 'Error creating event');
     } finally {
       setLoading(false);
     }

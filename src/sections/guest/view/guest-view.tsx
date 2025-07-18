@@ -24,15 +24,8 @@ import { emptyRows, applyFilter, getComparator } from '../utils';
 import type { UserProps } from '../user-table-row';
 import EventModal from './GuestModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
-import { AnalyticsCurrentVisits } from '../../overview/analytics-current-visits';
-import { AnalyticsWebsiteVisits } from '../../overview/analytics-website-visits';
 import { AnalyticsWidgetSummary } from '../../overview/analytics-widget-summary';
 
-interface HeadCell {
-  id: string;
-  label: string;
-  align?: 'left' | 'center' | 'right';
-}
 
 export function GuestView() {
   const table = useTable();
@@ -489,39 +482,6 @@ export function GuestView() {
             percent={analytics.unusedCodes}
             icon={<img alt="icon" src="/assets/icons/glass/ic-glass-message.svg" />}
             color="error"
-          />
-        </Grid>
-
-        <Grid xs={12} md={6} lg={4}>
-          <AnalyticsCurrentVisits
-            title="Guest Status Breakdown"
-            chart={{
-              // series: [
-              //   { label: 'Checked-in', value: analytics.guestStatusBreakdown.checkedIn },
-              //   { label: 'Pending', value: analytics.guestStatusBreakdown.pending },
-              // ],
-              series: [
-                { label: 'Checked-in', value: 60 },
-                { label: 'Pending', value: 40 },
-              ],
-            }}
-          />
-        </Grid>
-
-        <Grid xs={12} md={6} lg={8}>
-          <AnalyticsWebsiteVisits
-            title="Check-in Trend"
-            subheader="This Week"
-            chart={{
-              categories: ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
-              // series: [{ name: 'Check-ins', data: analytics.checkInTrend }],
-              series: [
-                {
-                  name: 'Check-ins',
-                  data: [5, 12, 8, 15, 10, 20, 18],
-                },
-              ],
-            }}
           />
         </Grid>
       </Grid>
