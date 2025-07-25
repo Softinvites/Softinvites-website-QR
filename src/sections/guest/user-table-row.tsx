@@ -174,7 +174,8 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = `qr-${row.fullname || 'guest'}.png`; // Optional: nicer filename
+      // link.download = `qr-${row.fullname || 'guest'}.png`; // Optional: nicer filename
+      link.download = `qr-${row.fullname}-${row.TableNo || 'NoTable'}-${row.others || 'NoOthers'}.png`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
