@@ -189,7 +189,8 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
     } finally {
       handleClosePopover();
     }
-  }, [row._id, row.fullname, token, handleClosePopover]);
+  }, [row._id, row.fullname, row.TableNo, row.others, token, handleClosePopover]);
+
 
   return (
     <>
