@@ -31,6 +31,7 @@ export type UserProps = {
   avatarUrl: string;
   isVerified: boolean;
   qrCode?: string;
+  eventId: string;
 };
 
 
@@ -39,7 +40,7 @@ export type UserProps = {
     selected: boolean;
     onSelectRow: () => void;
     showActions: boolean;
-    showOthersColumn?: boolean; // ✅ Add this
+    showOthersColumn?: boolean; 
   };
   
 
@@ -53,6 +54,7 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
   const [email, setEmail] = useState(row.email);
   const [phone, setPhone] = useState(row.phone);
   const [others, setOthers] = useState(row.others);
+   const [eventId, setEventId] = useState(row.eventId);
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
 
   const handleOpenPopover = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
@@ -69,6 +71,7 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
     setEmail(row.email);
     setPhone(row.phone);
     setPhone(row.others);
+    setEventId(row.eventId);
     setOpenDialog(true);
     handleClosePopover();
   }, [row, handleClosePopover]);
@@ -77,44 +80,88 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
     setOpenDialog(false);
   }, []);
 
+  // const handleSubmitEdit = useCallback(async () => {
+  //   try {
+  //     const response = await fetch(`https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/update-guest/${row._id}`, {
+  //       method: 'PUT',
+  //       headers: {
+  //         'Content-Type': 'application/json',
+  //         Authorization: `Bearer ${token}`,
+  //       },
+  //       body: JSON.stringify({ fullname, TableNo, email, phone, others, eventId}),
+  //     });
+    
+  //     if (!response.ok) {
+  //       const errorText = await response.text();
+  //       console.error("Server responded with:", errorText);
+  //       throw new Error(`Failed to update guest: ${response.status} - ${errorText}`);
+  //     }
+    
+  //     toast.success('Edited successfully!', {
+  //       position: 'top-right',
+  //       autoClose: 3000,
+  //       onClose: () => window.location.reload(),
+  //     });
+  //   } catch (error) {
+  //     console.error('Error editing guest:', error);
+  //     toast.error(error.message || 'Failed to edit guest.', {
+  //       position: 'top-right',
+  //       autoClose: 3000,
+  //     });
+  //   } finally {
+  //     handleCloseDialog();
+  //   }
+    
+  // }, [row._id, token, fullname, TableNo, email, phone, others, eventId, handleCloseDialog]);
+
   const handleSubmitEdit = useCallback(async () => {
-    try {
-      const response = await fetch(`https://software-invite-api-self.vercel.app/guest/update-guest/${row._id}`, {
-        method: 'PUT',
+  try {
+    const response = await fetch(
+      `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/update-guest`,
+      {
+        method: "PUT",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
           Authorization: `Bearer ${token}`,
         },
-        body: JSON.stringify({ fullname, TableNo, email, phone, others }),
-      });
-    
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error("Server responded with:", errorText);
-        throw new Error(`Failed to update guest: ${response.status} - ${errorText}`);
+        body: JSON.stringify({
+          id: row.id, 
+          fullname,
+          TableNo,
+          email,
+          phone,
+          others,
+        }),
       }
-    
-      toast.success('Edited successfully!', {
-        position: 'top-right',
-        autoClose: 3000,
-        onClose: () => window.location.reload(),
-      });
-    } catch (error) {
-      console.error('Error editing guest:', error);
-      toast.error(error.message || 'Failed to edit guest.', {
-        position: 'top-right',
-        autoClose: 3000,
-      });
-    } finally {
-      handleCloseDialog();
+    );
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("Server responded with:", errorText);
+      throw new Error(`Failed to update guest: ${response.status} - ${errorText}`);
     }
-    
-  }, [row._id, token, fullname, TableNo, email, phone, others, handleCloseDialog]);
+
+    toast.success("Edited successfully!", {
+      position: "top-right",
+      autoClose: 3000,
+      onClose: () => window.location.reload(),
+    });
+  } catch (error: any) {
+    console.error("Error editing guest:", error);
+    toast.error(error.message || "Failed to edit guest.", {
+      position: "top-right",
+      autoClose: 3000,
+    });
+  } finally {
+    handleCloseDialog();
+  }
+}, [row.id, token, fullname, TableNo, email, phone, others, handleCloseDialog]);
+
 
   const confirmDelete = useCallback(async () => {
     try {
       const response = await fetch(
-        `https://software-invite-api-self.vercel.app/guest/single-guest/${row._id}`,
+        `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/single-guest/${row._id}`,
         {
           method: 'DELETE',
           headers: {
@@ -152,44 +199,59 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
   }, [handleClosePopover]);
 
   const handleDownloadQRCode = useCallback(async () => {
-    console.log('Downloading QR code for:', row.fullname);
-    try {
-      const response = await fetch(
-        `https://software-invite-api-self.vercel.app/guest/download-qrcode/${row._id}`,
-        {
-          method: 'GET',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+  try {
+    const response = await fetch(
+      `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/download-qrcode/${row._id}`,
+      {
+        method: 'GET',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      }
+    );
 
-      if (!response.ok) {
-        throw new Error(`Failed to get QR Code: ${response.statusText}`);
+    if (!response.ok) {
+      throw new Error(`Failed to get QR Code: ${response.statusText}`);
+    }
+
+    // 👇 Parse JSON since backend wraps base64 inside "body"
+    const data = await response.json();
+
+    // Decode base64 body into binary
+    const binaryString = atob(data.body);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+      for (let i = 0; i < len; i += 1) {
+        bytes[i] = binaryString.charCodeAt(i);
       }
 
-      const blob = await response.blob(); // ✅ This reads the binary PNG
+    const blob = new Blob([bytes], { type: data.headers["Content-Type"] || "image/png" });
 
-      // Create a URL for the blob and trigger the download
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      // link.download = `qr-${row.fullname || 'guest'}.png`; // Optional: nicer filename
-      link.download = `qr-${row.fullname}-${row.TableNo || 'NoTable'}-${row.others || 'NoOthers'}.png`;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url); // Clean up
-    } catch (error) {
-      console.error('Error downloading QR Code:', error);
-      toast.error('Error downloading QR Code', {
-        position: 'top-right',
-        autoClose: 3000,
-      });
-    } finally {
-      handleClosePopover();
-    }
-  }, [row._id, row.fullname, row.TableNo, row.others, token, handleClosePopover]);
+    // Create a URL for the blob and trigger the download
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+
+    // Extract filename from Content-Disposition header
+    const disposition = data.headers["Content-Disposition"];
+    const match = disposition?.match(/filename="(.+)"/);
+    const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+  } catch (error) {
+    console.error('Error downloading QR Code:', error);
+    toast.error('Error downloading QR Code', {
+      position: 'top-right',
+      autoClose: 3000,
+    });
+  } finally {
+    handleClosePopover();
+  }
+}, [row._id, row.fullname, token, handleClosePopover]);
 
 
   return (

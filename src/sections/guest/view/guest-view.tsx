@@ -59,7 +59,7 @@ export function GuestView() {
       try {
         const token = localStorage.getItem('token');
         const response = await axios.post(
-          'https://software-invite-api-self.vercel.app/guest/import-guest-csv',
+          'https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/import-guest-csv',
           formData,
           {
             headers: {
@@ -69,6 +69,7 @@ export function GuestView() {
           }
         );
         console.log('CSV imported successfully:', response.data);
+        console.log('CSV imported successfully:', response);
         toast.success('CSV imported successfully');
       } catch {
         console.error('Error importing CSV:', error);
@@ -101,7 +102,7 @@ export function GuestView() {
       }
 
       await axios.delete(
-        `https://software-invite-api-self.vercel.app/guest/event-guest/${eventId}`,
+        `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/event-guest/${eventId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -143,7 +144,7 @@ export function GuestView() {
       }
 
       const response = await axios.get(
-        `https://software-invite-api-self.vercel.app/guest/download-all-qrcode/${eventId}`,
+        `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/download-all-qrcode/${eventId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           timeout: 60000,
@@ -236,7 +237,7 @@ export function GuestView() {
         }
 
         const response = await fetch(
-          `https://software-invite-api-self.vercel.app/guest/events-guest/${eventId}`,
+          `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/events-guest/${eventId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -253,7 +254,7 @@ export function GuestView() {
         }
 
         const analyticsRes = await axios.get(
-          `https://software-invite-api-self.vercel.app/guest/event-analytics/${eventId}`,
+          `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/event-analytics/${eventId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }

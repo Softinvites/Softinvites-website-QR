@@ -36,7 +36,7 @@ export function RegisterPage() {
 
     try {
       await axios.post(
-        'https://software-invite-api-self.vercel.app/admin/register',
+        'https://292x833w13.execute-api.us-east-2.amazonaws.com/admin/register',
         {
           username: formData.username,
           email: formData.email,

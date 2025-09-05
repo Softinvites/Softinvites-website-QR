@@ -36,14 +36,14 @@ export function OverviewAnalyticsView() {
     }
 
     Promise.all([
-      fetch("https://software-invite-api-self.vercel.app/events/events", {
+      fetch("https://292x833w13.execute-api.us-east-2.amazonaws.com/events/events", {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       }).then((res) => res.json()),
-      fetch("https://software-invite-api-self.vercel.app/guest/get-analytics/", {
+      fetch("https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/get-analytics/", {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,

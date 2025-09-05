@@ -52,7 +52,7 @@ export function UserView() {
   const handleDelete = async () => {
     setLoading(true);
     try {
-      await axios.delete("https://software-invite-api-self.vercel.app/events/events/", {
+      await axios.delete("https://292x833w13.execute-api.us-east-2.amazonaws.com/events/events/", {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`, // Ensure you have authentication
         },
@@ -85,7 +85,7 @@ export function UserView() {
         const token = localStorage.getItem('token');
         //    console.log('Token:', token); // Debugging
 
-        const response = await fetch('https://software-invite-api-self.vercel.app/events/events', {
+        const response = await fetch('https://292x833w13.execute-api.us-east-2.amazonaws.com/events/events', {
           headers: { Authorization: `Bearer ${token}` },
         });
 

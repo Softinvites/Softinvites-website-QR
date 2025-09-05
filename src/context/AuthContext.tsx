@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback(async (email: string, password: string) => {
     try {
       const response = await axios.post<{ token: string; user: User }>(
-        "https://software-invite-api-self.vercel.app/login",
+        "https://292x833w13.execute-api.us-east-2.amazonaws.com/login",
         { email, password }
       );
 
