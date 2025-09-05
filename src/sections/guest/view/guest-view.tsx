@@ -26,7 +26,6 @@ import EventModal from './GuestModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { AnalyticsWidgetSummary } from '../../overview/analytics-widget-summary';
 
-
 export function GuestView() {
   const table = useTable();
   const [filterName, setFilterName] = useState('');
@@ -50,31 +49,39 @@ export function GuestView() {
   });
   const showOthersColumn = users.some((user) => !!user.others?.trim());
 
+  // ✅ state for eventId and userEmail
+  const [eventId, setEventId] = useState<string | null>(null);
+  const [userEmail, setUserEmail] = useState<string | null>(null);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
       const formData = new FormData();
-      formData.append('file', file);
+      formData.append("file", file);
+      if (eventId) formData.append("eventId", eventId);
+      if (userEmail) formData.append("userEmail", userEmail);
+
       try {
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem("token");
         const response = await axios.post(
-          'https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/import-guest-csv',
+          "https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/import-guest-csv",
           formData,
           {
             headers: {
-              'Content-Type': 'multipart/form-data',
+              "Content-Type": "multipart/form-data",
               Authorization: `Bearer ${token}`,
             },
           }
         );
-        console.log('CSV imported successfully:', response.data);
-        console.log('CSV imported successfully:', response);
-        toast.success('CSV imported successfully');
-      } catch {
-        console.error('Error importing CSV:', error);
-        toast.error('CSV import failed');
+
+        console.log("Response from backend:", response.data);
+
+        toast.success(response.data.message || "CSV imported successfully");
+          } catch (err: any) {
+        console.error("Error importing CSV:", err);
+        toast.error(err.response?.data?.message || "CSV import failed");
       }
+
     }
   };
 
@@ -94,15 +101,15 @@ export function GuestView() {
       }
 
       const parsedIds = JSON.parse(eventIdArray);
-      const eventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+          const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
 
-      if (!eventId) {
-        toast.error('No event ID found');
-        return;
-      }
+          if (!derivedEventId) {
+            toast.error('No event ID found');
+            return;
+          }
 
       await axios.delete(
-        `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/event-guest/${eventId}`,
+        `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/event-guest/${derivedEventId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -124,7 +131,7 @@ export function GuestView() {
     }
   };
 
-  const handleDownloadAllQRCodes = async () => {
+    const handleDownloadAllQRCodes = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -136,15 +143,15 @@ export function GuestView() {
       }
 
       const parsedIds = JSON.parse(eventIdArray);
-      const eventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+        const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
 
-      if (!eventId) {
-        toast.error('No valid event ID found');
-        return;
-      }
+        if (!derivedEventId) {
+          toast.error('No valid event ID found');
+          return;
+        }
 
       const response = await axios.get(
-        `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/download-all-qrcode/${eventId}`,
+        `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/download-all-qrcode/${derivedEventId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           timeout: 60000,
@@ -165,6 +172,7 @@ export function GuestView() {
     }
   };
 
+  
   function tryDecodeToken(token: string) {
     try {
       const base64Url = token.split('.')[1];
@@ -196,36 +204,35 @@ export function GuestView() {
         // Determine if this is an admin (has localStorage token)
         setIsAdmin(!!tokenFromStorage);
 
-        let eventId;
+        let currentEventId: string | null = null;
+
         if (tokenFromStorage) {
           // For admin - get eventId from localStorage
           const eventIdArray = localStorage.getItem('allRowIds');
           if (eventIdArray) {
             try {
               const parsedIds = JSON.parse(eventIdArray);
-              eventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+              currentEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
             } catch (err) {
               console.error('Error parsing event IDs:', err);
             }
           }
         } else {
-          // For temporary users - get eventId from token
+          // For temporary users - get eventId and email from token
           const decoded = tryDecodeToken(token);
           if (decoded) {
-            eventId = decoded?.eventId || decoded?.event?._id;
+            currentEventId = decoded?.eventId || decoded?.event?._id;
+            setUserEmail(decoded?.email || null);
 
-            if (!eventId) {
+            if (!currentEventId) {
               console.warn("Token payload doesn't contain event ID:", decoded);
             }
           }
         }
 
-        if (!eventId) {
-          console.error('Event ID search details:', {
-            tokenSource: tokenFromStorage ? 'localStorage' : 'URL',
-            allRowIds: localStorage.getItem('allRowIds'),
-            decodedToken: tokenFromUrl ? tryDecodeToken(tokenFromUrl) : null,
-          });
+        setEventId(currentEventId);
+
+        if (!currentEventId) {
           setError("No valid event ID found. Please ensure you're using a valid invitation link.");
           setLoading(false);
           return;
@@ -237,7 +244,7 @@ export function GuestView() {
         }
 
         const response = await fetch(
-          `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/events-guest/${eventId}`,
+          `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/events-guest/${currentEventId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -254,7 +261,7 @@ export function GuestView() {
         }
 
         const analyticsRes = await axios.get(
-          `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/event-analytics/${eventId}`,
+          `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/event-analytics/${currentEventId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -284,7 +291,6 @@ export function GuestView() {
 
     fetchUsers();
 
-    // Set timeout for token expiration (30 minutes)
     const timer = setTimeout(() => {
       localStorage.removeItem('token');
       navigate('/sign-in');
