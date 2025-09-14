@@ -88,12 +88,12 @@ export function DashboardLayout({ sx, children, header }: DashboardLayoutProps) 
                     },
                     {
                       label: 'Profile',
-                      href: '#',
+                      href: '/profile',
                       icon: <Iconify width={22} icon="solar:shield-keyhole-bold-duotone" />,
                     },
                     {
                       label: 'Settings',
-                      href: '#',
+                      href: '/change-password',
                       icon: <Iconify width={22} icon="solar:settings-bold-duotone" />,
                     },
                   ]}

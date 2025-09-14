@@ -17,18 +17,18 @@ export const navData = [
     path: '/event',
     icon: icon('ic-user'),
   },
- 
-  
 
-  {
-    title: 'Sign in',
-    path: '/sign-in',
+
+    {
+    title: 'Change Password',
+    path: '/change-password',
     icon: icon('ic-lock'),
   },
 
-  {
-    title: 'Not found',
-    path: '/404',
-    icon: icon('ic-disabled'),
+      {
+    title: 'Profile',
+    path: '/profile',
+    icon: icon('ic-lock'),
   },
+
 ];

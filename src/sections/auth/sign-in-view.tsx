@@ -34,6 +34,7 @@ export function SignInView() {
       );
   
       localStorage.setItem('token', response.data.token);
+       localStorage.setItem('adminId', response.data.admin._id);
        // Show success toast before navigation
     toast.success('Sign in successful!', {
       position: 'top-right',

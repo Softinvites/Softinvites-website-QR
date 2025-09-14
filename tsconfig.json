@@ -22,7 +22,7 @@
     "allowSyntheticDefaultImports": true,
     "forceConsistentCasingInFileNames": true
   },
-  "include": ["src"],
+  "include": ["src", "src/pages/change-password.jsx"],
   "exclude": ["node_modules"],
   "references": [
     {

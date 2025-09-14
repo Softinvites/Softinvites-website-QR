@@ -13,9 +13,9 @@ export default function Page() {
         <title> Softinvite</title>
         <meta
           name="description"
-          content="Entrepreneur, Guest Management, QR Code Generation, RSVP Management, E-Invitation Distribution, Event Management @shoriaevents"
+          content="Guest Management, QR Code Generation, RSVP Management, E-Invitation Distribution, Event Management @shoriaevents"
         />
-        <meta name="keywords" content="react,material,kit,application,dashboard,admin,template" />
+        <meta name="keywords" content="Guest Management, QR Code Generation, RSVP Management, E-Invitation Distribution, Event Management" />
       </Helmet>
 
       <OverviewAnalyticsView />

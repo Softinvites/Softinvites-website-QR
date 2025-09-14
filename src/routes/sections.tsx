@@ -19,6 +19,9 @@ export const GuestPage = lazy(() => import('src/pages/guest'));
 export const EventPage = lazy(() => import('src/pages/event'));
 export const SignInPage = lazy(() => import('src/pages/sign-in'));
 export const RegisterPage = lazy(() => import('src/pages/register'));
+export const ChangePassword = lazy(() => import('src/pages/change-password'));
+export const Profile = lazy(() => import('src/pages/profile'));
+
 export const Page404 = lazy(() => import('src/pages/page-not-found'));
 
 // ----------------------------------------------------------------------
@@ -61,6 +64,8 @@ export function Router() {
             
 
             { path: 'guest', element: <GuestPage /> },
+             { path: 'change-password', element: <ChangePassword /> },
+              { path: 'profile', element: <Profile /> },
           ],
         },
       ],
