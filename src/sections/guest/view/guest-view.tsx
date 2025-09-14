@@ -23,6 +23,7 @@ import { UserTableToolbar } from '../user-table-toolbar';
 import { emptyRows, applyFilter, getComparator } from '../utils';
 import type { UserProps } from '../user-table-row';
 import EventModal from './GuestModal';
+import BatchDownloadModal from './BatchDownloadModal'
 import DeleteConfirmModal from './DeleteConfirmModal';
 import { AnalyticsWidgetSummary } from '../../overview/analytics-widget-summary';
 
@@ -52,6 +53,7 @@ export function GuestView() {
   // ✅ state for eventId and userEmail
   const [eventId, setEventId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [batchModalOpen, setBatchModalOpen] = useState(false);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -171,6 +173,50 @@ export function GuestView() {
       setLoading(false);
     }
   };
+
+const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) => {
+  setLoading(true);
+  try {
+    const token = localStorage.getItem("token");
+    const eventIdArray = localStorage.getItem("allRowIds");
+
+    if (!token || !eventIdArray) {
+      toast.error("Authentication required or no event IDs found");
+      return;
+    }
+
+    const parsedIds = JSON.parse(eventIdArray);
+    const derivedEventId =
+      Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+
+    if (!derivedEventId) {
+      toast.error("No valid event ID found");
+      return;
+    }
+
+    const response = await axios.post(
+      `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/batch-qrcode-download/${derivedEventId}/timestamp`,
+      { start: startDate, end: endDate},
+      
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 60000,
+      }
+    );
+
+    if (response.data?.zipDownloadLink) {
+      window.open(response.data.zipDownloadLink, "_blank");
+      toast.success("Batch QR codes download started!");
+    } else {
+      toast.error("Download link not available");
+    }
+  } catch (err) {
+    console.error("Error downloading batch QR codes:", err);
+    toast.error("Failed to download batch QR codes");
+  } finally {
+    setLoading(false);
+  }
+};
 
   
   function tryDecodeToken(token: string) {
@@ -329,7 +375,7 @@ export function GuestView() {
           <Grid container spacing={1}>
             {isAdmin && (
               <>
-                <Grid item xs={6} md={3}>
+                <Grid item xs={6} md={2.4}>
                   <Button
                     variant="contained"
                     color="success"
@@ -349,7 +395,7 @@ export function GuestView() {
                   <EventModal open={open} handleClose={() => setOpen(false)} />
                 </Grid>
 
-                <Grid item xs={6} md={3}>
+                <Grid item xs={6} md={2.4}>
                   <Button
                     variant="contained"
                     color="warning"
@@ -379,26 +425,7 @@ export function GuestView() {
                   />
                 </Grid>
 
-                <Grid item xs={6} md={3}>
-                  <Button
-                    variant="contained"
-                    color="primary"
-                    startIcon={<Iconify icon="uil:cloud-download" />}
-                    onClick={handleDownloadAllQRCodes}
-                    sx={{
-                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
-                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
-                      letterSpacing: '0.2px',
-                      textTransform: 'none',
-                      minWidth: { xs: 'auto', sm: 'auto' },
-                      height: { xs: '52px', sm: '40px', md: '48px' },
-                    }}
-                  >
-                    Download QR
-                  </Button>
-                </Grid>
-
-                <Grid item xs={6} md={3}>
+                <Grid item xs={6} md={2.4}>
                   <Button
                     variant="contained"
                     color="error"
@@ -421,6 +448,51 @@ export function GuestView() {
                     handleConfirm={handleDelete}
                   />
                 </Grid>
+
+                                <Grid item xs={6} md={2.4}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<Iconify icon="uil:cloud-download" />}
+                    onClick={handleDownloadAllQRCodes}
+                    sx={{
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                      letterSpacing: '0.2px',
+                      textTransform: 'none',
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      height: { xs: '52px', sm: '40px', md: '48px' },
+                    }}
+                  >
+                    Download QR
+                  </Button>
+                </Grid>
+
+                  <Grid item xs={6} md={2.4}>
+                    <Button
+                      variant="contained"
+                      color="primary"
+                      startIcon={<Iconify icon="uil:cloud-download" />}
+                      onClick={() => setBatchModalOpen(true)}
+                      sx={{
+                        fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
+                        padding: { xs: "2px 6px", sm: "6px 8px", md: "8px 10px" },
+                        letterSpacing: "0.2px",
+                        textTransform: "none",
+                        minWidth: { xs: "auto", sm: "auto" },
+                        height: { xs: "52px", sm: "40px", md: "48px" },
+                      }}
+                    >
+                      Batch Download
+                    </Button>
+
+                    <BatchDownloadModal
+                      open={batchModalOpen}
+                      onClose={() => setBatchModalOpen(false)}
+                      onSubmit={handleBatchDownloadQRCodes}
+                    />
+                  </Grid>
+
               </>
             )}
 

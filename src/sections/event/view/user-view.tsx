@@ -96,7 +96,7 @@ export function UserView() {
         }
 
         const data = await response.json();
-        // console.log('Fetched Data:', data); // Debugging log
+        console.log('Fetched Data:', data); // Debugging log
         
         
 

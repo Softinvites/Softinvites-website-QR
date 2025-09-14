@@ -80,39 +80,6 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
     setOpenDialog(false);
   }, []);
 
-  // const handleSubmitEdit = useCallback(async () => {
-  //   try {
-  //     const response = await fetch(`https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/update-guest/${row._id}`, {
-  //       method: 'PUT',
-  //       headers: {
-  //         'Content-Type': 'application/json',
-  //         Authorization: `Bearer ${token}`,
-  //       },
-  //       body: JSON.stringify({ fullname, TableNo, email, phone, others, eventId}),
-  //     });
-    
-  //     if (!response.ok) {
-  //       const errorText = await response.text();
-  //       console.error("Server responded with:", errorText);
-  //       throw new Error(`Failed to update guest: ${response.status} - ${errorText}`);
-  //     }
-    
-  //     toast.success('Edited successfully!', {
-  //       position: 'top-right',
-  //       autoClose: 3000,
-  //       onClose: () => window.location.reload(),
-  //     });
-  //   } catch (error) {
-  //     console.error('Error editing guest:', error);
-  //     toast.error(error.message || 'Failed to edit guest.', {
-  //       position: 'top-right',
-  //       autoClose: 3000,
-  //     });
-  //   } finally {
-  //     handleCloseDialog();
-  //   }
-    
-  // }, [row._id, token, fullname, TableNo, email, phone, others, eventId, handleCloseDialog]);
 
   const handleSubmitEdit = useCallback(async () => {
   try {
@@ -272,7 +239,12 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
         <TableCell>{row.TableNo}</TableCell>
         <TableCell>{row.phone}</TableCell>
         <TableCell>{row.email}</TableCell>
-        <TableCell>{row.createdAt}</TableCell>
+        <TableCell> {row.createdAt} </TableCell>
+
+
+
+
+
         {showOthersColumn && <TableCell>{row.others}</TableCell>}
         <TableCell>
           <Label color={(row.status === 'pending' && 'warning') || 'success'}>{row.status}</Label>
