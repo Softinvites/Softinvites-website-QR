@@ -19,11 +19,7 @@ module.exports = {
       },
     },
   },
-  /**
-   * 0 ~ 'off'
-   * 1 ~ 'warn'
-   * 2 ~ 'error'
-   */
+
   rules: {
     // general
     'no-alert': 0,
