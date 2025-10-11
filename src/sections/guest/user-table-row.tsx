@@ -70,7 +70,7 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
     setTableNo(row.TableNo);
     setEmail(row.email);
     setPhone(row.phone);
-    setPhone(row.others);
+    setOthers(row.others);
     setEventId(row.eventId);
     setOpenDialog(true);
     handleClosePopover();
