@@ -297,7 +297,7 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
 const handleDownloadQRCode = useCallback(async () => {
   try {
     console.log('🔄 Starting single QR code download for:', row._id);
-    
+
     const response = await fetch(
       `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/download-qrcode/${row._id}`,
       {
@@ -309,68 +309,69 @@ const handleDownloadQRCode = useCallback(async () => {
     );
 
     console.log('📨 Response status:', response.status, response.statusText);
-    
-    // Get the response text first to see what's actually coming back
-    const responseText = await response.text();
-    console.log('📄 Raw response:', responseText);
 
     if (!response.ok) {
-      // Try to parse as JSON to get the error details
+      const errorText = await response.text();
+      console.error('❌ Error response text:', errorText);
+
       let errorData;
       try {
-        errorData = JSON.parse(responseText);
-        console.log('❌ Error data:', errorData);
-      } catch (e) {
-        console.log('❌ Response is not JSON');
+        errorData = JSON.parse(errorText);
+      } catch {
+        errorData = { message: 'Invalid JSON error response' };
       }
-      
-      throw new Error(errorData?.message || `Failed to get QR Code: ${response.status} ${response.statusText}`);
+
+      throw new Error(errorData?.message || `Failed to get QR Code (${response.status})`);
     }
 
-    // If we get here, response is OK, parse as JSON
-    const data = JSON.parse(responseText);
-    console.log('✅ JSON response received:', data);
+    // ✅ Handle base64 encoded binary data (common for Lambda/API Gateway)
+    const result = await response.json();
+    console.log('✅ Parsed JSON response:', result);
 
-    // Rest of your download logic...
-    if (!data.body) {
-      throw new Error('No image data in response');
+    // Make sure base64 body is present
+    if (!result.body) {
+      throw new Error('No QR code data received from server');
     }
 
-    const binaryString = atob(data.body);
+    // Decode base64 string to binary
+    const binaryString = atob(result.body);
     const len = binaryString.length;
     const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i += 1) {
+    for (let i = 0; i < len; i++) {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
-    const blob = new Blob([bytes], { 
-      type: data.headers?.["Content-Type"] || "image/png" 
+    // Create Blob for download
+    const blob = new Blob([bytes], {
+      type: result.headers?.['Content-Type'] || 'image/png',
     });
 
+    // Create Object URL and trigger browser download
     const url = window.URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
 
-    const disposition = data.headers?.["Content-Disposition"];
-    const match = disposition?.match(/filename="(.+)"/);
+    // Try to extract filename from Content-Disposition
+    const disposition = result.headers?.['Content-Disposition'];
+    const match = disposition?.match(/filename="?(.+?)"?$/);
     const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
 
     link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+
+    // Clean up URL object
     window.URL.revokeObjectURL(url);
-    
-    console.log('✅ Download completed for:', filename);
-    
+
+    console.log(`✅ Successfully downloaded: ${filename}`);
+    toast.success(`QR Code downloaded for ${row.fullname}`, {
+      position: 'top-right',
+      autoClose: 3000,
+    });
+
   } catch (error) {
     console.error('❌ Error downloading QR Code:', error);
-    console.error('Error details:', {
-      message: error.message,
-      guestId: row._id,
-      tokenPresent: !!token
-    });
-    
     toast.error(`Error downloading QR Code: ${error.message}`, {
       position: 'top-right',
       autoClose: 5000,
@@ -379,6 +380,9 @@ const handleDownloadQRCode = useCallback(async () => {
     handleClosePopover();
   }
 }, [row._id, row.fullname, token, handleClosePopover]);
+
+
+
   return (
     <>
       <TableRow hover tabIndex={-1} role="checkbox" selected={selected}>
