@@ -220,29 +220,122 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
 //   }
 // }, [row._id, row.fullname, token, handleClosePopover]);
 
+// const handleDownloadQRCode = useCallback(async () => {
+//   try {
+//     const response = await fetch(
+//       `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/download-qrcode/${row._id}`,
+//       {
+//         method: 'GET',
+//         headers: {
+//           Authorization: `Bearer ${token}`,
+//         },
+//       }
+//     );
+
+//     if (!response.ok) {
+//       throw new Error(`Failed to get QR Code: ${response.statusText}`);
+//     }
+
+//     // Check if response is JSON (API Gateway format) or direct PNG
+//     const contentType = response.headers.get('content-type');
+    
+//     if (contentType?.includes('application/json')) {
+//       // Handle API Gateway JSON format (like email download)
+//       const data = await response.json();
+      
+//       // Decode base64 body into binary
+//       const binaryString = atob(data.body);
+//       const len = binaryString.length;
+//       const bytes = new Uint8Array(len);
+//       for (let i = 0; i < len; i += 1) {
+//         bytes[i] = binaryString.charCodeAt(i);
+//       }
+
+//       const blob = new Blob([bytes], { type: data.headers["Content-Type"] || "image/png" });
+
+//       // Create a URL for the blob and trigger the download
+//       const url = window.URL.createObjectURL(blob);
+//       const link = document.createElement('a');
+//       link.href = url;
+
+//       // Extract filename from Content-Disposition header
+//       const disposition = data.headers["Content-Disposition"];
+//       const match = disposition?.match(/filename="(.+)"/);
+//       const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
+
+//       link.download = filename;
+//       document.body.appendChild(link);
+//       link.click();
+//       document.body.removeChild(link);
+//       window.URL.revokeObjectURL(url);
+//     } else {
+//       // Handle direct PNG response (current downloadQRCode behavior)
+//       const blob = await response.blob();
+//       const url = window.URL.createObjectURL(blob);
+//       const link = document.createElement('a');
+//       link.href = url;
+      
+//       // Extract filename from Content-Disposition header or use default
+//       const disposition = response.headers.get('content-disposition');
+//       const match = disposition?.match(/filename="(.+)"/);
+//       const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
+      
+//       link.download = filename;
+//       document.body.appendChild(link);
+//       link.click();
+//       document.body.removeChild(link);
+//       window.URL.revokeObjectURL(url);
+//     }
+//   } catch (error) {
+//     console.error('Error downloading QR Code:', error);
+//     toast.error('Error downloading QR Code');
+//   } finally {
+//     handleClosePopover();
+//   }
+// }, [row._id, row.fullname, token, handleClosePopover]);
+
 const handleDownloadQRCode = useCallback(async () => {
   try {
+    console.log('🔄 Starting single QR code download for:', row._id);
+    
     const response = await fetch(
       `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/download-qrcode/${row._id}`,
       {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json', // Add this
         },
       }
     );
 
+    console.log('📨 Response status:', response.status, response.statusText);
+    
     if (!response.ok) {
-      throw new Error(`Failed to get QR Code: ${response.statusText}`);
+      // Get more detailed error info
+      let errorMessage = `Failed to get QR Code: ${response.status} ${response.statusText}`;
+      try {
+        const errorData = await response.json();
+        errorMessage = errorData.message || errorMessage;
+      } catch (e) {
+        // If response is not JSON, use the status text
+      }
+      throw new Error(errorMessage);
     }
 
-    // Check if response is JSON (API Gateway format) or direct PNG
+    // Check content type to handle both direct PNG and API Gateway responses
     const contentType = response.headers.get('content-type');
-    
-    if (contentType?.includes('application/json')) {
-      // Handle API Gateway JSON format (like email download)
+    console.log('📄 Content-Type:', contentType);
+
+    if (contentType && contentType.includes('application/json')) {
+      // Handle API Gateway JSON format (like your Postman response)
       const data = await response.json();
-      
+      console.log('✅ JSON response received:', data);
+
+      if (!data.body) {
+        throw new Error('No image data in response');
+      }
+
       // Decode base64 body into binary
       const binaryString = atob(data.body);
       const len = binaryString.length;
@@ -251,7 +344,9 @@ const handleDownloadQRCode = useCallback(async () => {
         bytes[i] = binaryString.charCodeAt(i);
       }
 
-      const blob = new Blob([bytes], { type: data.headers["Content-Type"] || "image/png" });
+      const blob = new Blob([bytes], { 
+        type: data.headers?.["Content-Type"] || "image/png" 
+      });
 
       // Create a URL for the blob and trigger the download
       const url = window.URL.createObjectURL(blob);
@@ -259,7 +354,7 @@ const handleDownloadQRCode = useCallback(async () => {
       link.href = url;
 
       // Extract filename from Content-Disposition header
-      const disposition = data.headers["Content-Disposition"];
+      const disposition = data.headers?.["Content-Disposition"];
       const match = disposition?.match(/filename="(.+)"/);
       const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
 
@@ -268,14 +363,17 @@ const handleDownloadQRCode = useCallback(async () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
+      
+      console.log('✅ Download completed for:', filename);
     } else {
-      // Handle direct PNG response (current downloadQRCode behavior)
+      // Handle direct PNG response (if backend changes)
+      console.log('🖼️ Direct PNG response');
       const blob = await response.blob();
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
       
-      // Extract filename from Content-Disposition header or use default
+      // Extract filename from Content-Disposition header
       const disposition = response.headers.get('content-disposition');
       const match = disposition?.match(/filename="(.+)"/);
       const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
@@ -285,10 +383,21 @@ const handleDownloadQRCode = useCallback(async () => {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
+      
+      console.log('✅ Download completed for:', filename);
     }
   } catch (error) {
-    console.error('Error downloading QR Code:', error);
-    toast.error('Error downloading QR Code');
+    console.error('❌ Error downloading QR Code:', error);
+    console.error('Error details:', {
+      message: error.message,
+      guestId: row._id,
+      tokenPresent: !!token
+    });
+    
+    toast.error(`Error downloading QR Code: ${error.message}`, {
+      position: 'top-right',
+      autoClose: 5000,
+    });
   } finally {
     handleClosePopover();
   }
