@@ -337,7 +337,7 @@ const handleDownloadQRCode = useCallback(async () => {
     const binaryString = atob(result.body);
     const len = binaryString.length;
     const bytes = new Uint8Array(len);
-    for (let i = 0; i < len; i++) {
+    for (let i = 0; i < len; i += 1) {
       bytes[i] = binaryString.charCodeAt(i);
     }
 
