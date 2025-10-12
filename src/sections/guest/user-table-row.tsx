@@ -304,88 +304,65 @@ const handleDownloadQRCode = useCallback(async () => {
         method: 'GET',
         headers: {
           Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json', // Add this
         },
       }
     );
 
     console.log('📨 Response status:', response.status, response.statusText);
     
+    // Get the response text first to see what's actually coming back
+    const responseText = await response.text();
+    console.log('📄 Raw response:', responseText);
+
     if (!response.ok) {
-      // Get more detailed error info
-      let errorMessage = `Failed to get QR Code: ${response.status} ${response.statusText}`;
+      // Try to parse as JSON to get the error details
+      let errorData;
       try {
-        const errorData = await response.json();
-        errorMessage = errorData.message || errorMessage;
+        errorData = JSON.parse(responseText);
+        console.log('❌ Error data:', errorData);
       } catch (e) {
-        // If response is not JSON, use the status text
+        console.log('❌ Response is not JSON');
       }
-      throw new Error(errorMessage);
+      
+      throw new Error(errorData?.message || `Failed to get QR Code: ${response.status} ${response.statusText}`);
     }
 
-    // Check content type to handle both direct PNG and API Gateway responses
-    const contentType = response.headers.get('content-type');
-    console.log('📄 Content-Type:', contentType);
+    // If we get here, response is OK, parse as JSON
+    const data = JSON.parse(responseText);
+    console.log('✅ JSON response received:', data);
 
-    if (contentType && contentType.includes('application/json')) {
-      // Handle API Gateway JSON format (like your Postman response)
-      const data = await response.json();
-      console.log('✅ JSON response received:', data);
-
-      if (!data.body) {
-        throw new Error('No image data in response');
-      }
-
-      // Decode base64 body into binary
-      const binaryString = atob(data.body);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i += 1) {
-        bytes[i] = binaryString.charCodeAt(i);
-      }
-
-      const blob = new Blob([bytes], { 
-        type: data.headers?.["Content-Type"] || "image/png" 
-      });
-
-      // Create a URL for the blob and trigger the download
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-
-      // Extract filename from Content-Disposition header
-      const disposition = data.headers?.["Content-Disposition"];
-      const match = disposition?.match(/filename="(.+)"/);
-      const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
-
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      console.log('✅ Download completed for:', filename);
-    } else {
-      // Handle direct PNG response (if backend changes)
-      console.log('🖼️ Direct PNG response');
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      
-      // Extract filename from Content-Disposition header
-      const disposition = response.headers.get('content-disposition');
-      const match = disposition?.match(/filename="(.+)"/);
-      const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
-      
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      
-      console.log('✅ Download completed for:', filename);
+    // Rest of your download logic...
+    if (!data.body) {
+      throw new Error('No image data in response');
     }
+
+    const binaryString = atob(data.body);
+    const len = binaryString.length;
+    const bytes = new Uint8Array(len);
+    for (let i = 0; i < len; i += 1) {
+      bytes[i] = binaryString.charCodeAt(i);
+    }
+
+    const blob = new Blob([bytes], { 
+      type: data.headers?.["Content-Type"] || "image/png" 
+    });
+
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+
+    const disposition = data.headers?.["Content-Disposition"];
+    const match = disposition?.match(/filename="(.+)"/);
+    const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
+
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    
+    console.log('✅ Download completed for:', filename);
+    
   } catch (error) {
     console.error('❌ Error downloading QR Code:', error);
     console.error('Error details:', {
@@ -402,7 +379,6 @@ const handleDownloadQRCode = useCallback(async () => {
     handleClosePopover();
   }
 }, [row._id, row.fullname, token, handleClosePopover]);
-
   return (
     <>
       <TableRow hover tabIndex={-1} role="checkbox" selected={selected}>
