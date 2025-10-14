@@ -174,7 +174,6 @@ export function GuestView() {
     }
   };
 
-
   const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) => {
     setLoading(true);
     try {
@@ -204,13 +203,19 @@ export function GuestView() {
       );
   
       if (response.data?.zipDownloadLink) {
-        // Create invisible anchor tag and trigger click
+        // Try to fetch the file as blob
+        const fileResponse = await fetch(response.data.zipDownloadLink);
+        const blob = await fileResponse.blob();
+        const url = window.URL.createObjectURL(blob);
+        
         const link = document.createElement('a');
-        link.href = response.data.zipDownloadLink;
-        link.target = '_blank';
-        link.download = `qr-codes-${derivedEventId}.zip`; // Optional: suggest filename
+        link.href = url;
+        link.download = `qr-codes-${derivedEventId}.zip`;
         document.body.appendChild(link);
         link.click();
+        
+        // Clean up
+        window.URL.revokeObjectURL(url);
         document.body.removeChild(link);
         
         toast.success("Batch QR codes download started!");
@@ -219,11 +224,91 @@ export function GuestView() {
       }
     } catch (err) {
       console.error("Error downloading batch QR codes:", err);
-      toast.error("Failed to download batch QR codes");
+      // Fallback to direct window.open if blob method fails
+      if (err instanceof Error && err.message.includes('CORS')) {
+        const token = localStorage.getItem("token");
+        const eventIdArray = localStorage.getItem("allRowIds");
+    
+        if (!token || !eventIdArray) {
+          toast.error("Authentication required or no event IDs found");
+          return;
+        }
+    
+        const parsedIds = JSON.parse(eventIdArray);
+        const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+    
+        if (!derivedEventId) {
+          toast.error("No valid event ID found");
+          return;
+        }
+
+        const response = await axios.post(
+          `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/batch-qrcode-download/${derivedEventId}/timestamp`,
+          { start: startDate, end: endDate },
+          {
+            headers: { Authorization: `Bearer ${token}` },
+            timeout: 60000,
+          }
+        );
+    
+        window.open(response.data.zipDownloadLink, '_blank');
+      } else {
+        toast.error("Failed to download batch QR codes");
+      }
     } finally {
       setLoading(false);
     }
   };
+
+  // const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) => {
+  //   setLoading(true);
+  //   try {
+  //     const token = localStorage.getItem("token");
+  //     const eventIdArray = localStorage.getItem("allRowIds");
+  
+  //     if (!token || !eventIdArray) {
+  //       toast.error("Authentication required or no event IDs found");
+  //       return;
+  //     }
+  
+  //     const parsedIds = JSON.parse(eventIdArray);
+  //     const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+  
+  //     if (!derivedEventId) {
+  //       toast.error("No valid event ID found");
+  //       return;
+  //     }
+  
+  //     const response = await axios.post(
+  //       `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/batch-qrcode-download/${derivedEventId}/timestamp`,
+  //       { start: startDate, end: endDate },
+  //       {
+  //         headers: { Authorization: `Bearer ${token}` },
+  //         timeout: 60000,
+  //       }
+  //     );
+  
+  //     if (response.data?.zipDownloadLink) {
+  //       // Create invisible anchor tag and trigger click
+  //       const link = document.createElement('a');
+  //       link.href = response.data.zipDownloadLink;
+  //       link.target = '_blank';
+  //       link.download = `qr-codes-${derivedEventId}.zip`; // Optional: suggest filename
+  //       document.body.appendChild(link);
+  //       link.click();
+  //       document.body.removeChild(link);
+        
+  //       toast.success("Batch QR codes download started!");
+  //     } else {
+  //       toast.error("Download link not available");
+  //     }
+  //   } catch (err) {
+  //     console.error("Error downloading batch QR codes:", err);
+  //     toast.error("Failed to download batch QR codes");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
 
 // const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) => {
 //   setLoading(true);
