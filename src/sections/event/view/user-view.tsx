@@ -107,15 +107,33 @@ export function UserView() {
           return;
         }
 
-        const formattedData: UserProps[] = data.events.map((event: any) => ({
-          id: event._id,
-          name: event.name,
-          date: event.date,
-          description: event.description,
-          location: event.location,
-          createdAt: new Date(event.createdAt).toLocaleDateString(),
-          status: event.isActive ? 'Active' : 'Inactive',
-        }));
+        const formattedData: UserProps[] = data.events.map((event: any) => {
+          // Calculate event status based on date (2 days after event date)
+          // Handle ordinal dates like "November 1st, 2025" by removing ordinal suffixes
+          const cleanedDate = event.date.replace(/(\d+)(st|nd|rd|th)/g, '$1');
+          const eventDate = new Date(cleanedDate);
+          const expirationDate = new Date(eventDate.getTime() + (2 * 24 * 60 * 60 * 1000));
+          const now = new Date();
+          const isExpired = now > expirationDate;
+          
+          // Determine status with priority: Expired > Inactive > Active
+          let status = 'Active';
+          if (isExpired) {
+            status = 'Expired';
+          } else if (!event.isActive) {
+            status = 'Inactive';
+          }
+          
+          return {
+            id: event._id,
+            name: event.name,
+            date: event.date,
+            description: event.description,
+            location: event.location,
+            createdAt: new Date(event.createdAt).toLocaleDateString(),
+            status,
+          };
+        });
         
 
         console.log('Formatted Data:', formattedData);

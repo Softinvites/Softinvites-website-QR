@@ -5,7 +5,7 @@ import IconButton from '@mui/material/IconButton';
 import OutlinedInput from '@mui/material/OutlinedInput';
 import InputAdornment from '@mui/material/InputAdornment';
 
-import { Iconify } from 'src/components/iconify';
+import { Iconify } from 'src/components/iconify/iconify';
 
 // ----------------------------------------------------------------------
 
@@ -13,9 +13,10 @@ type UserTableToolbarProps = {
   numSelected: number;
   filterName: string;
   onFilterName: (event: React.ChangeEvent<HTMLInputElement>) => void;
+  eventName?: string;
 };
 
-export function UserTableToolbar({ numSelected, filterName, onFilterName }: UserTableToolbarProps) {
+export function UserTableToolbar({ numSelected, filterName, onFilterName, eventName }: UserTableToolbarProps) {
   return (
     <Toolbar
       sx={{
@@ -34,18 +35,24 @@ export function UserTableToolbar({ numSelected, filterName, onFilterName }: User
           {numSelected} selected
         </Typography>
       ) : (
-        <OutlinedInput
-          fullWidth
-          value={filterName}
-          onChange={onFilterName}
-          placeholder="Search user..."
-          startAdornment={
-            <InputAdornment position="start">
-              <Iconify width={20} icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
-            </InputAdornment>
-          }
-          sx={{ maxWidth: 320 }}
-        />
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+          <OutlinedInput
+            value={filterName}
+            onChange={onFilterName}
+            placeholder="Search user..."
+            startAdornment={
+              <InputAdornment position="start">
+                <Iconify width={20} icon="eva:search-fill" sx={{ color: 'text.disabled' }} />
+              </InputAdornment>
+            }
+            sx={{ maxWidth: 320 }}
+          />
+          {eventName && (
+            <Typography variant="h6" sx={{ color: 'text.primary', fontWeight: 500 }}>
+              {eventName} Event
+            </Typography>
+          )}
+        </div>
       )}
 
       {numSelected > 0 ? (

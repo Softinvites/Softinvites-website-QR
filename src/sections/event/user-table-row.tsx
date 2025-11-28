@@ -298,10 +298,10 @@ export type UserProps = {
   date: string;
   createdAt: string;
   location: string;
-  avatarUrl: string;
-  isVerified: boolean;
+  avatarUrl?: string;
+  isVerified?: boolean;
   description: string;
-  iv: string;
+  iv?: string;
 };
 
 type UserTableRowProps = {
@@ -459,7 +459,20 @@ const handleSubmitEdit = useCallback(async () => {
 
   return (
     <>
-      <TableRow hover tabIndex={-1} role="checkbox" selected={selected}>
+      <TableRow 
+        hover 
+        tabIndex={-1} 
+        role="checkbox" 
+        selected={selected}
+        sx={{
+          ...(row.status === 'Expired' && {
+            backgroundColor: 'rgba(255, 0, 0, 0.05)',
+            '&:hover': {
+              backgroundColor: 'rgba(255, 0, 0, 0.1)',
+            }
+          })
+        }}
+      >
         <TableCell padding="checkbox">
           <Checkbox disableRipple checked={selected} onChange={onSelectRow} />
         </TableCell>
@@ -470,7 +483,20 @@ const handleSubmitEdit = useCallback(async () => {
         <TableCell>{row.createdAt}</TableCell>
         <TableCell sx={{ whiteSpace: "pre-line" }}>{row.description}</TableCell>
         <TableCell>
-          <Label color={(row.status === "banned" && "error") || "success"}>
+          <Label 
+            color={
+              row.status === 'Expired' ? 'error' : 
+              row.status === 'Active' ? 'success' : 
+              'warning'
+            }
+            title={
+              row.status === 'Expired' 
+                ? `Event expired 2 days after ${row.date}` 
+                : row.status === 'Active' 
+                ? `Event expires 2 days after ${row.date}` 
+                : 'Event is inactive'
+            }
+          >
             {row.status}
           </Label>
         </TableCell>

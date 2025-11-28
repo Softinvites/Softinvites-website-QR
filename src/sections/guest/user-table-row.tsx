@@ -16,7 +16,7 @@ import TextField from '@mui/material/TextField';
 import Button from '@mui/material/Button';
 import { toast } from 'react-toastify';
 import { Label } from 'src/components/label';
-import { Iconify } from 'src/components/iconify';
+import { Iconify } from 'src/components/iconify/iconify';
 
 export type UserProps = {
   id: string;

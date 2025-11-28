@@ -13,7 +13,7 @@ import Stack from '@mui/material/Stack';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { DashboardContent } from 'src/layouts/dashboard';
-import { Iconify } from 'src/components/iconify';
+import { Iconify } from 'src/components/iconify/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { TableNoData } from '../table-no-data';
 import { UserTableRow } from '../user-table-row';
@@ -53,6 +53,8 @@ export function GuestView() {
   // ✅ state for eventId and userEmail
   const [eventId, setEventId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState<string | null>(null);
+  const [eventName, setEventName] = useState<string>('Event Report');
+  const [eventDate, setEventDate] = useState<string>('');
   const [batchModalOpen, setBatchModalOpen] = useState(false);
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -312,6 +314,22 @@ const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) =>
           }
         );
         setAnalytics(analyticsRes.data);
+        
+        // Get event details for report
+        try {
+          const eventRes = await axios.get(
+            `https://292x833w13.execute-api.us-east-2.amazonaws.com/events/events/${currentEventId}`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          if (eventRes.data?.event) {
+            setEventName(eventRes.data.event.name || 'Event Report');
+            setEventDate(eventRes.data.event.date || '');
+          }
+        } catch (eventErr) {
+          console.warn('Could not fetch event details:', eventErr);
+        }
 
         const formattedData: UserProps[] = data.guests.map((guest: any) => ({
           id: guest._id,
@@ -492,6 +510,64 @@ const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) =>
                     />
                   </Grid>
 
+                  <Grid item xs={6} md={2.4}>
+                    <Button
+                      variant="contained"
+                      color="info"
+                      startIcon={<Iconify icon="material-symbols:download" />}
+                      onClick={() => {
+                        const reportDate = new Date().toLocaleDateString();
+                        const csvContent = [
+                          // Event Header
+                          [`EVENT REPORT`],
+                          [`Event Name: ${eventName}`],
+                          [`Event Date: ${eventDate}`],
+                          [`Report Generated: ${reportDate}`],
+                          [''],
+                          // Metrics Section
+                          ['METRICS SUMMARY'],
+                          [`Total Guests: ${analytics.totalGuests}`],
+                          [`Checked-in Guests: ${analytics.checkedInGuests}`],
+                          [`Unchecked Guests: ${analytics.unusedCodes}`],
+                          [`Check-in Rate: ${analytics.totalGuests > 0 ? Math.round((analytics.checkedInGuests / analytics.totalGuests) * 100) : 0}%`],
+                          [''],
+                          // Guest List Header
+                          ['GUEST LIST'],
+                          ['Name', 'Table No', 'Others', 'Email', 'Phone', 'Status', 'Created At'],
+                          // Guest Data
+                          ...users.map(user => [
+                            user.fullname,
+                            user.TableNo || 'N/A',
+                            user.others || 'N/A',
+                            user.email || 'N/A',
+                            user.phone || 'N/A',
+                            user.status === 'checked-in' ? 'Checked In' : 'Pending',
+                            user.createdAt
+                          ])
+                        ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
+                        
+                        const blob = new Blob([csvContent], { type: 'text/csv' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = `${eventName.replace(/[^a-zA-Z0-9]/g, '_')}_Report_${new Date().toISOString().split('T')[0]}.csv`;
+                        a.click();
+                        URL.revokeObjectURL(url);
+                        toast.success('Event report downloaded successfully!');
+                      }}
+                      sx={{
+                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                        padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                        letterSpacing: '0.2px',
+                        textTransform: 'none',
+                        minWidth: { xs: 'auto', sm: 'auto' },
+                        height: { xs: '52px', sm: '40px', md: '48px' },
+                      }}
+                    >
+                      Download Report
+                    </Button>
+                  </Grid>
+
               </>
             )}
 
@@ -572,6 +648,7 @@ const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) =>
             setFilterName(event.target.value);
             table.onResetPage();
           }}
+          eventName={eventName}
         />
 
         <Scrollbar>
