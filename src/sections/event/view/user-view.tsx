@@ -66,8 +66,8 @@ export function UserView() {
         onClose: () => window.location.reload(),
       });
       setOpen(false);
-    } catch (error) {
-      Sentry.captureException(error, {
+    } catch (deleteError) {
+      Sentry.captureException(deleteError, {
         tags: { section: 'events', action: 'delete_all' },
         user: { id: localStorage.getItem('token')?.substring(0, 10) }
       });
@@ -93,12 +93,12 @@ export function UserView() {
         });
 
         if (!response.ok) {
-          const error = new Error(`Failed to fetch data (Status: ${response.status})`);
-          Sentry.captureException(error, {
+          const fetchError = new Error(`Failed to fetch data (Status: ${response.status})`);
+          Sentry.captureException(fetchError, {
             tags: { section: 'events', action: 'fetch' },
             extra: { status: response.status, statusText: response.statusText }
           });
-          throw error;
+          throw fetchError;
         }
 
         const data = await response.json();
@@ -108,8 +108,8 @@ export function UserView() {
 
         // ✅ Check if "events" exists and is an array
         if (!data?.events || !Array.isArray(data.events)) {
-          const error = new Error('Invalid API response format');
-          Sentry.captureException(error, {
+          const parseError = new Error('Invalid API response format');
+          Sentry.captureException(parseError, {
             tags: { section: 'events', action: 'parse' },
             extra: { receivedData: data }
           });
@@ -149,8 +149,8 @@ export function UserView() {
         console.log('Formatted Data:', formattedData);
         setUsers(formattedData);
         
-      } catch (error) {
-        Sentry.captureException(error, {
+      } catch (fetchAllError) {
+        Sentry.captureException(fetchAllError, {
           tags: { section: 'events', action: 'fetch_all' }
         });
         setError('Failed to load events');
