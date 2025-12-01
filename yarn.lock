@@ -494,6 +494,61 @@
   resolved "https://registry.npmjs.org/@rollup/rollup-darwin-x64/-/rollup-darwin-x64-4.21.0.tgz"
   integrity sha512-7doS8br0xAkg48SKE2QNtMSFPFUlRdw9+votl27MvT46vo44ATBmdZdGysOevNELmZlfd+NEa0UYOA8f01WSrg==
 
+"@sentry-internal/browser-utils@10.27.0":
+  version "10.27.0"
+  resolved "https://registry.npmjs.org/@sentry-internal/browser-utils/-/browser-utils-10.27.0.tgz"
+  integrity sha512-17tO6AXP+rmVQtLJ3ROQJF2UlFmvMWp7/8RDT5x9VM0w0tY31z8Twc0gw2KA7tcDxa5AaHDUbf9heOf+R6G6ow==
+  dependencies:
+    "@sentry/core" "10.27.0"
+
+"@sentry-internal/feedback@10.27.0":
+  version "10.27.0"
+  resolved "https://registry.npmjs.org/@sentry-internal/feedback/-/feedback-10.27.0.tgz"
+  integrity sha512-UecsIDJcv7VBwycge/MDvgSRxzevDdcItE1i0KSwlPz00rVVxLY9kV28PJ4I2E7r6/cIaP9BkbWegCEcv09NuA==
+  dependencies:
+    "@sentry/core" "10.27.0"
+
+"@sentry-internal/replay-canvas@10.27.0":
+  version "10.27.0"
+  resolved "https://registry.npmjs.org/@sentry-internal/replay-canvas/-/replay-canvas-10.27.0.tgz"
+  integrity sha512-inhsRYSVBpu3BI1kZphXj6uB59baJpYdyHeIPCiTfdFNBE5tngNH0HS/aedZ1g9zICw290lwvpuyrWJqp4VBng==
+  dependencies:
+    "@sentry-internal/replay" "10.27.0"
+    "@sentry/core" "10.27.0"
+
+"@sentry-internal/replay@10.27.0":
+  version "10.27.0"
+  resolved "https://registry.npmjs.org/@sentry-internal/replay/-/replay-10.27.0.tgz"
+  integrity sha512-tKSzHq1hNzB619Ssrqo25cqdQJ84R3xSSLsUWEnkGO/wcXJvpZy94gwdoS+KmH18BB1iRRRGtnMxZcUkiPSesw==
+  dependencies:
+    "@sentry-internal/browser-utils" "10.27.0"
+    "@sentry/core" "10.27.0"
+
+"@sentry/browser@10.27.0":
+  version "10.27.0"
+  resolved "https://registry.npmjs.org/@sentry/browser/-/browser-10.27.0.tgz"
+  integrity sha512-G8q362DdKp9y1b5qkQEmhTFzyWTOVB0ps1rflok0N6bVA75IEmSDX1pqJsNuY3qy14VsVHYVwQBJQsNltQLS0g==
+  dependencies:
+    "@sentry-internal/browser-utils" "10.27.0"
+    "@sentry-internal/feedback" "10.27.0"
+    "@sentry-internal/replay" "10.27.0"
+    "@sentry-internal/replay-canvas" "10.27.0"
+    "@sentry/core" "10.27.0"
+
+"@sentry/core@10.27.0":
+  version "10.27.0"
+  resolved "https://registry.npmjs.org/@sentry/core/-/core-10.27.0.tgz"
+  integrity sha512-Zc68kdH7tWTDtDbV1zWIbo3Jv0fHAU2NsF5aD2qamypKgfSIMSbWVxd22qZyDBkaX8gWIPm/0Sgx6aRXRBXrYQ==
+
+"@sentry/react@^10.27.0":
+  version "10.27.0"
+  resolved "https://registry.npmjs.org/@sentry/react/-/react-10.27.0.tgz"
+  integrity sha512-xoIRBlO1IhLX/O9aQgVYW1F3Qhw8TdkOiZjh6mrPsnCpBLufsQ4aS1nDQi9miZuWeslW0s2zNy0ACBpICZR/sw==
+  dependencies:
+    "@sentry/browser" "10.27.0"
+    "@sentry/core" "10.27.0"
+    hoist-non-react-statics "^3.3.2"
+
 "@swc/core-darwin-x64@1.7.14":
   version "1.7.14"
   resolved "https://registry.npmjs.org/@swc/core-darwin-x64/-/core-darwin-x64-1.7.14.tgz"
@@ -1990,7 +2045,7 @@ history@^5.3.0:
   dependencies:
     "@babel/runtime" "^7.7.6"
 
-hoist-non-react-statics@^3.3.1:
+hoist-non-react-statics@^3.3.1, hoist-non-react-statics@^3.3.2:
   version "3.3.2"
   resolved "https://registry.npmjs.org/hoist-non-react-statics/-/hoist-non-react-statics-3.3.2.tgz"
   integrity sha512-/gGivxi8JPKWNm/W0jSmzcMPpfpPLc3dY/6GxhX2hQ9iGj3aDfklV4ET7NjKpSinLpJ5vafa9iiGIEZg10SfBw==
@@ -2779,7 +2834,7 @@ react-transition-group@^4.4.5:
     loose-envify "^1.4.0"
     prop-types "^15.6.2"
 
-react@*, "react@^16.6.0 || ^17.0.0 || ^18.0.0", "react@^17.0.0 || ^18.0.0", "react@^17.0.0 || ^18.0.0 || ^19.0.0", "react@^18 || ^19", react@^18.3.1, react@>=0.13, react@>=16, react@>=16.6.0, react@>=16.8, react@>=16.8.0:
+react@*, "react@^16.14.0 || 17.x || 18.x || 19.x", "react@^16.6.0 || ^17.0.0 || ^18.0.0", "react@^17.0.0 || ^18.0.0", "react@^17.0.0 || ^18.0.0 || ^19.0.0", "react@^18 || ^19", react@^18.3.1, react@>=0.13, react@>=16, react@>=16.6.0, react@>=16.8, react@>=16.8.0:
   version "18.3.1"
   resolved "https://registry.npmjs.org/react/-/react-18.3.1.tgz"
   integrity sha512-wS+hAgJShR0KhEvPJArfuPVN1+Hz1t0Y6n5jLrGQbkb4urgPE/0Rve+1kMB1v/oWgHgm4WIcV+i7F2pTVj+2iQ==

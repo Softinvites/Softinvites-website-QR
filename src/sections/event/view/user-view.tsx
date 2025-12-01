@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import * as Sentry from '@sentry/react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
@@ -44,7 +45,6 @@ export function UserView() {
   const [open, setOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
 
-  
 
 
 
@@ -54,21 +54,24 @@ export function UserView() {
     try {
       await axios.delete("https://292x833w13.execute-api.us-east-2.amazonaws.com/events/events/", {
         headers: {
-          Authorization: `Bearer ${localStorage.getItem("token")}`, // Ensure you have authentication
+          Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
       });
 
-    // Remove allRowIds from localStorage
-    localStorage.removeItem("allRowIds");
+      localStorage.removeItem("allRowIds");
 
       toast.success('Events deleted succesfully', {
         position: 'top-right',
-        autoClose: 2000, // Close after 2 seconds
-        
-        onClose: () => window.location.reload(), // Reload only after the toast disappears
+        autoClose: 2000,
+        onClose: () => window.location.reload(),
       });
       setOpen(false);
-  
+    } catch (error) {
+      Sentry.captureException(error, {
+        tags: { section: 'events', action: 'delete_all' },
+        user: { id: localStorage.getItem('token')?.substring(0, 10) }
+      });
+      toast.error('Failed to delete events');
     } finally {
       setLoading(false);
     }
@@ -90,9 +93,12 @@ export function UserView() {
         });
 
         if (!response.ok) {
-          console.error('Fetch error:', response.status, response.statusText);
-           
-          throw new Error(`Failed to fetch data (Status: ${response.status})`);
+          const error = new Error(`Failed to fetch data (Status: ${response.status})`);
+          Sentry.captureException(error, {
+            tags: { section: 'events', action: 'fetch' },
+            extra: { status: response.status, statusText: response.statusText }
+          });
+          throw error;
         }
 
         const data = await response.json();
@@ -102,7 +108,11 @@ export function UserView() {
 
         // ✅ Check if "events" exists and is an array
         if (!data?.events || !Array.isArray(data.events)) {
-          console.error('Expected an array under "events" but got:', data);
+          const error = new Error('Invalid API response format');
+          Sentry.captureException(error, {
+            tags: { section: 'events', action: 'parse' },
+            extra: { receivedData: data }
+          });
           setError('Invalid API response format');
           return;
         }
@@ -139,6 +149,11 @@ export function UserView() {
         console.log('Formatted Data:', formattedData);
         setUsers(formattedData);
         
+      } catch (error) {
+        Sentry.captureException(error, {
+          tags: { section: 'events', action: 'fetch_all' }
+        });
+        setError('Failed to load events');
       } finally {
         setLoading(false);
       }
