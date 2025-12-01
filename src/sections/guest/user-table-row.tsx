@@ -26,6 +26,7 @@ export type UserProps = {
   _id: string;
   phone: string;
   createdAt: string;
+  checkedInAt?: string;
   others:string;
   email: string;
   avatarUrl: string;
@@ -169,7 +170,8 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
 const handleDownloadQRCode = useCallback(async () => {
   try {
     const response = await fetch(
-      `https://download-qr-code.vercel.app/guest/download-qrcode/${row._id}`,
+      // `https://download-qr-code.vercel.app/guest/download-qrcode/${row._id}`,
+       `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/download-qrcode/${row._id}`,
       {
         method: 'GET',
         headers: {
@@ -348,11 +350,9 @@ const handleDownloadQRCode = useCallback(async () => {
         <TableCell>{row.phone}</TableCell>
         <TableCell>{row.email}</TableCell>
         <TableCell> {row.createdAt} </TableCell>
-
-
-
-
-
+        <TableCell>
+          {row.checkedInAt ? new Date(row.checkedInAt).toLocaleString() : '-'}
+        </TableCell>
         {showOthersColumn && <TableCell>{row.others}</TableCell>}
         <TableCell>
           <Label color={(row.status === 'pending' && 'warning') || 'success'}>{row.status}</Label>

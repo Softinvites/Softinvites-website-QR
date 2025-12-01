@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "baseUrl": ".",
+    // "baseUrl": ".",
     "paths": {
       "src/*": ["./src/*"]
     },
@@ -15,11 +15,10 @@
     "noImplicitAny": true,
     "noImplicitThis": true,
     "esModuleInterop": true,
-    
     "isolatedModules": true,
     "strictNullChecks": true,
     "resolveJsonModule": true,
-    "moduleResolution": "Node",
+    "moduleResolution": "bundler",
     "noFallthroughCasesInSwitch": true,
     "useUnknownInCatchVariables": false,
     "allowSyntheticDefaultImports": true,

@@ -339,6 +339,7 @@ const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) =>
           email: guest.email,
           phone: guest.phone,
           createdAt: new Date(guest.createdAt).toLocaleDateString(),
+          checkedInAt: guest.checkedInAt,
           others: guest.others || '',
           status: guest.status,
           qrCode: guest.qrCode,
@@ -533,7 +534,7 @@ const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) =>
                           [''],
                           // Guest List Header
                           ['GUEST LIST'],
-                          ['Name', 'Table No', 'Others', 'Email', 'Phone', 'Status', 'Created At'],
+                          ['Name', 'Table No', 'Others', 'Email', 'Phone', 'Status', 'Created At', 'Checked In At'],
                           // Guest Data
                           ...users.map(user => [
                             user.fullname,
@@ -542,7 +543,8 @@ const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) =>
                             user.email || 'N/A',
                             user.phone || 'N/A',
                             user.status === 'checked-in' ? 'Checked In' : 'Pending',
-                            user.createdAt
+                            user.createdAt,
+                            user.checkedInAt ? new Date(user.checkedInAt).toLocaleString() : 'Not Checked In'
                           ])
                         ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
                         
@@ -677,7 +679,8 @@ const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) =>
                   { id: 'TableNo', label: 'Table No.' },
                   { id: 'phone', label: 'Number' },
                   { id: 'email', label: 'Email' },
-                  { id: 'createdAt', label: 'CreatedAt' },
+                  { id: 'createdAt', label: 'Created At' },
+                  { id: 'checkedInAt', label: 'Checked In At' },
                   ...(showOthersColumn ? [{ id: 'others', label: 'Others' }] : []),
                   { id: 'status', label: 'Status' },
                   ...(isAdmin ? [{ id: 'actions', label: 'Actions' }] : []),
