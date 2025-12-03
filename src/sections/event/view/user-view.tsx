@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import * as Sentry from '@sentry/react';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
@@ -67,10 +66,7 @@ export function UserView() {
       });
       setOpen(false);
     } catch (deleteError) {
-      Sentry.captureException(deleteError, {
-        tags: { section: 'events', action: 'delete_all' },
-        user: { id: localStorage.getItem('token')?.substring(0, 10) }
-      });
+      console.error('Delete error:', deleteError);
       toast.error('Failed to delete events');
     } finally {
       setLoading(false);
@@ -94,10 +90,7 @@ export function UserView() {
 
         if (!response.ok) {
           const fetchError = new Error(`Failed to fetch data (Status: ${response.status})`);
-          Sentry.captureException(fetchError, {
-            tags: { section: 'events', action: 'fetch' },
-            extra: { status: response.status, statusText: response.statusText }
-          });
+          console.error('Fetch error:', fetchError);
           throw fetchError;
         }
 
@@ -109,10 +102,7 @@ export function UserView() {
         // ✅ Check if "events" exists and is an array
         if (!data?.events || !Array.isArray(data.events)) {
           const parseError = new Error('Invalid API response format');
-          Sentry.captureException(parseError, {
-            tags: { section: 'events', action: 'parse' },
-            extra: { receivedData: data }
-          });
+          console.error('Parse error:', parseError);
           setError('Invalid API response format');
           return;
         }
@@ -150,9 +140,7 @@ export function UserView() {
         setUsers(formattedData);
         
       } catch (fetchAllError) {
-        Sentry.captureException(fetchAllError, {
-          tags: { section: 'events', action: 'fetch_all' }
-        });
+        console.error('Fetch all error:', fetchAllError);
         setError('Failed to load events');
       } finally {
         setLoading(false);

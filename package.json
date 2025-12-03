@@ -33,7 +33,7 @@
     "@mui/icons-material": "^5.18.0",
     "@mui/lab": "^5.0.0-alpha.173",
     "@mui/material": "^5.16.7",
-    "@sentry/react": "^7.100.0",
+
     "apexcharts": "^3.52.0",
     "axios": "^1.8.2",
     "dayjs": "^1.11.13",

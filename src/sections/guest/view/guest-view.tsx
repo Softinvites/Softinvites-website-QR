@@ -25,6 +25,7 @@ import type { UserProps } from '../user-table-row';
 import EventModal from './GuestModal';
 import BatchDownloadModal from './BatchDownloadModal'
 import DeleteConfirmModal from './DeleteConfirmModal';
+import BatchDeleteModal from './BatchDeleteModal';
 import { AnalyticsWidgetSummary } from '../../overview/analytics-widget-summary';
 
 export function GuestView() {
@@ -36,6 +37,7 @@ export function GuestView() {
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [deleteModalOpen, setDeleteModalOpen] = useState(false);
+  const [batchDeleteModalOpen, setBatchDeleteModalOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
   const [analytics, setAnalytics] = useState({
@@ -56,6 +58,49 @@ export function GuestView() {
   const [eventName, setEventName] = useState<string>('Event Report');
   const [eventDate, setEventDate] = useState<string>('');
   const [batchModalOpen, setBatchModalOpen] = useState(false);
+
+  const handleBatchDelete = async () => {
+    if (table.selected.length === 0) {
+      toast.error('No guests selected');
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Authentication required');
+        return;
+      }
+
+      await axios.delete(
+        'https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/delete-selected',
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          data: {
+            guestIds: table.selected,
+          },
+        }
+      );
+
+      toast.success(`Successfully deleted ${table.selected.length} guest${table.selected.length > 1 ? 's' : ''}`, {
+        position: 'top-right',
+        autoClose: 2000,
+        onClose: () => window.location.reload(),
+      });
+      
+      table.onSelectAllRows(false, []);
+    } catch (err: any) {
+      console.error('Error deleting selected guests:', err);
+      toast.error(err.response?.data?.message || 'Failed to delete selected guests');
+    } finally {
+      setLoading(false);
+      setBatchDeleteModalOpen(false);
+    }
+  };
 
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
@@ -651,6 +696,7 @@ const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) =>
             table.onResetPage();
           }}
           eventName={eventName}
+          onDeleteSelected={isAdmin ? () => setBatchDeleteModalOpen(true) : undefined}
         />
 
         <Scrollbar>
@@ -732,6 +778,15 @@ const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) =>
           onRowsPerPageChange={table.onChangeRowsPerPage}
         />
       </Card>
+
+      {/* Batch Delete Modal */}
+      <BatchDeleteModal
+        open={batchDeleteModalOpen}
+        handleClose={() => setBatchDeleteModalOpen(false)}
+        handleConfirm={handleBatchDelete}
+        selectedCount={table.selected.length}
+        loading={loading}
+      />
     </DashboardContent>
   );
 }
