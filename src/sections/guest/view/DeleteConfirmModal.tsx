@@ -20,7 +20,7 @@ const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
       <DialogTitle>Confirm Deletion</DialogTitle>
       <DialogContent>
         <DialogContentText>
-          Are you sure you want to delete all events? This action cannot be undone.
+          Are you sure you want to delete all Guests? This action cannot be undone.
         </DialogContentText>
       </DialogContent>
       <DialogActions>
