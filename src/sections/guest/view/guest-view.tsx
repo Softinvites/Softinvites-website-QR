@@ -203,14 +203,15 @@ export function GuestView() {
         `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/download-all-qrcode/${derivedEventId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
-          timeout: 60000,
+          timeout: 300000,
         }
       );
 
       if (response.data?.zipDownloadLink) {
-        window.open(response.data.zipDownloadLink, '_blank');
-        toast.success('QR codes download started!');
-      } else {
+  window.location.href = response.data.zipDownloadLink;
+  toast.success('QR codes download started!');
+}
+else {
         toast.error('Download link not available');
       }
     } catch (err) {
