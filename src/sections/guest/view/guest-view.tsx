@@ -266,6 +266,43 @@ const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) =>
   }
 };
 
+const handleResendEmails = async () => {
+  setLoading(true);
+  try {
+    const token = localStorage.getItem('token');
+    const eventIdArray = localStorage.getItem('allRowIds');
+
+    if (!token || !eventIdArray) {
+      toast.error('Authentication required or no event IDs found');
+      return;
+    }
+
+    const parsedIds = JSON.parse(eventIdArray);
+    const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+
+    if (!derivedEventId) {
+      toast.error('No valid event ID found');
+      return;
+    }
+
+    const response = await axios.post(
+      `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/resend-all-emails/${derivedEventId}`,
+      {},
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 30000,
+      }
+    );
+
+    toast.success(response.data?.message || 'Email resend job started successfully!');
+  } catch (err: any) {
+    console.error('Error resending emails:', err);
+    toast.error(err.response?.data?.message || 'Failed to start email resend job');
+  } finally {
+    setLoading(false);
+  }
+};
+
   function tryDecodeToken(token: string) {
     try {
       const base64Url = token.split('.')[1];
@@ -613,6 +650,30 @@ const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) =>
                       }}
                     >
                       Download Report
+                    </Button>
+                  </Grid>
+
+                  <Grid item xs={6} md={2.4}>
+                    <Button
+                      variant="contained"
+                      color="secondary"
+                      startIcon={<Iconify icon="material-symbols:mail" />}
+                      onClick={handleResendEmails}
+                      disabled={loading}
+                      sx={{
+                        backgroundColor: '#ff5722',
+                        '&:hover': {
+                          backgroundColor: '#e64a19',
+                        },
+                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                        padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                        letterSpacing: '0.2px',
+                        textTransform: 'none',
+                        minWidth: { xs: 'auto', sm: 'auto' },
+                        height: { xs: '52px', sm: '40px', md: '48px' },
+                      }}
+                    >
+                      Resend Emails
                     </Button>
                   </Grid>
 
