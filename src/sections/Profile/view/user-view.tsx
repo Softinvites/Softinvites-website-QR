@@ -13,6 +13,7 @@ import {
 } from "@mui/material";
 import { styled } from "@mui/material/styles";
 import axios from "axios";
+import { API_BASE } from 'src/utils/apiBase';
 import {  toast } from 'react-toastify';
 
 
@@ -41,7 +42,7 @@ export function UserView() {
       if (!adminID) return;
       try {
         const response = await axios.get(
-          `https://292x833w13.execute-api.us-east-2.amazonaws.com/admin/profile/${adminID}`, 
+          `${API_BASE}/admin/profile/${adminID}`, 
           {
             headers: {
               "Content-Type": "application/json", 

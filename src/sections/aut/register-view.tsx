@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import axios from 'axios';
+import { API_BASE } from 'src/utils/apiBase';
 import { useNavigate } from 'react-router-dom';
 
 import Box from '@mui/material/Box';
@@ -36,7 +37,7 @@ export function RegisterPage() {
 
     try {
       await axios.post(
-        'https://292x833w13.execute-api.us-east-2.amazonaws.com/admin/register',
+        `${API_BASE}/admin/register`,
         {
           username: formData.username,
           email: formData.email,

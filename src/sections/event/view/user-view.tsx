@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
+import { API_BASE } from 'src/utils/apiBase';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
@@ -51,7 +52,7 @@ export function UserView() {
   const handleDelete = async () => {
     setLoading(true);
     try {
-      await axios.delete("https://292x833w13.execute-api.us-east-2.amazonaws.com/events/events/", {
+      await axios.delete(`${API_BASE}/events/events/`, {
         headers: {
           Authorization: `Bearer ${localStorage.getItem("token")}`,
         },
@@ -84,7 +85,7 @@ export function UserView() {
         const token = localStorage.getItem('token');
         //    console.log('Token:', token); // Debugging
 
-        const response = await fetch('https://292x833w13.execute-api.us-east-2.amazonaws.com/events/events', {
+        const response = await fetch(`${API_BASE}/events/events`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 

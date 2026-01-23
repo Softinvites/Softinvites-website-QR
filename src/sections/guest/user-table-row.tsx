@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { API_BASE } from 'src/utils/apiBase';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
 import Popover from '@mui/material/Popover';
@@ -85,7 +86,7 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
   const handleSubmitEdit = useCallback(async () => {
   try {
     const response = await fetch(
-      `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/update-guest`,
+      `${API_BASE}/guest/update-guest`,
       {
         method: "PUT",
         headers: {
@@ -129,7 +130,7 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
   const confirmDelete = useCallback(async () => {
     try {
       const response = await fetch(
-        `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/single-guest/${row._id}`,
+        `${API_BASE}/guest/single-guest/${row._id}`,
         {
           method: 'DELETE',
           headers: {
@@ -166,12 +167,50 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
     handleClosePopover();
   }, [handleClosePopover]);
 
+  const handleSendWhatsApp = useCallback(async () => {
+    if (!row.phone) {
+      toast.error('Guest has no phone number');
+      handleClosePopover();
+      return;
+    }
+
+    try {
+      const response = await fetch(
+        `${API_BASE}/whatsapp/send-single`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify({
+            guestId: row._id,
+            templateName: 'hello_world'
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to send WhatsApp message');
+      }
+
+      const result = await response.json();
+      toast.success(`WhatsApp message sent to ${row.fullname}!`);
+    } catch (error: any) {
+      console.error('Error sending WhatsApp:', error);
+      toast.error(error.message || 'Failed to send WhatsApp message');
+    } finally {
+      handleClosePopover();
+    }
+  }, [row._id, row.fullname, row.phone, token, handleClosePopover]);
+
 
 const handleDownloadQRCode = useCallback(async () => {
   try {
     const response = await fetch(
       // `https://download-qr-code.vercel.app/guest/download-qrcode/${row._id}`,
-       `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/download-qrcode/${row._id}`,
+      `${API_BASE}/guest/download-qrcode/${row._id}`,
       {
         method: 'GET',
         headers: {
@@ -404,6 +443,11 @@ const handleDownloadQRCode = useCallback(async () => {
             <MenuItem onClick={handleDownloadQRCode} sx={{ color: 'success.main' }}>
               <Iconify icon="uil:cloud-download" />
               Get QR Code
+            </MenuItem>
+
+            <MenuItem onClick={handleSendWhatsApp} sx={{ color: '#25D366' }}>
+              <Iconify icon="logos:whatsapp-icon" />
+              Send WhatsApp
             </MenuItem>
           </MenuList>
         </Popover>

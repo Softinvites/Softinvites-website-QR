@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { API_BASE } from 'src/utils/apiBase';
 import Grid from '@mui/material/Unstable_Grid2';
 import Typography from '@mui/material/Typography';
 import { useNavigate } from "react-router-dom";
@@ -36,14 +37,14 @@ export function OverviewAnalyticsView() {
     }
 
     Promise.all([
-      fetch("https://292x833w13.execute-api.us-east-2.amazonaws.com/events/events", {
+      fetch(`${API_BASE}/events/events`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,
           "Content-Type": "application/json",
         },
       }).then((res) => res.json()),
-      fetch("https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/get-analytics/", {
+      fetch(`${API_BASE}/guest/get-analytics/`, {
         method: "GET",
         headers: {
           "Authorization": `Bearer ${token}`,

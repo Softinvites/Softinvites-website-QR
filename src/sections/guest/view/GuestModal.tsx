@@ -9,6 +9,7 @@ import {
   CircularProgress,
 } from '@mui/material';
 import { toast } from 'react-toastify';
+import { API_BASE } from 'src/utils/apiBase';
 import { SketchPicker } from 'react-color';
 
 interface GuestModalProps {
@@ -116,7 +117,7 @@ const GuestModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
 
       console.log('Final Payload:', payload);
 
-      const response = await fetch('https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/add-guest', {
+      const response = await fetch(`${API_BASE}/guest/add-guest`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

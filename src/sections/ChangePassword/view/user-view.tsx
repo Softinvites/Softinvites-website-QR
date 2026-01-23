@@ -10,6 +10,7 @@ import {
   InputAdornment,
 } from "@mui/material";
 import axios from "axios";
+import { API_BASE } from 'src/utils/apiBase';
 
 import { Visibility, VisibilityOff } from "@mui/icons-material";
 
@@ -51,7 +52,7 @@ export function UserView() {
       };
 
       const response = await axios.put(
-        `https://292x833w13.execute-api.us-east-2.amazonaws.com/admin/update_password/${adminID}`,
+        `${API_BASE}/admin/update_password/${adminID}`,
         payload,
          {
             headers: {

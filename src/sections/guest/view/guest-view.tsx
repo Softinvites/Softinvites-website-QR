@@ -1,5 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import axios from 'axios';
+import { API_BASE } from 'src/utils/apiBase';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
@@ -26,6 +27,8 @@ import EventModal from './GuestModal';
 import BatchDownloadModal from './BatchDownloadModal'
 import DeleteConfirmModal from './DeleteConfirmModal';
 import BatchDeleteModal from './BatchDeleteModal';
+import WhatsAppStatusDialog from './WhatsAppStatusDialog';
+import WhatsAppSendDialog from './WhatsAppSendDialog';
 import { AnalyticsWidgetSummary } from '../../overview/analytics-widget-summary';
 
 export function GuestView() {
@@ -50,6 +53,14 @@ export function GuestView() {
     },
     checkInTrend: [],
   });
+  const [whatsappStats, setWhatsappStats] = useState({
+    total: 0,
+    sent: 0,
+    delivered: 0,
+    read: 0,
+    failed: 0,
+    not_on_whatsapp: 0
+  });
   const showOthersColumn = users.some((user) => !!user.others?.trim());
 
   // ✅ state for eventId and userEmail
@@ -58,6 +69,8 @@ export function GuestView() {
   const [eventName, setEventName] = useState<string>('Event Report');
   const [eventDate, setEventDate] = useState<string>('');
   const [batchModalOpen, setBatchModalOpen] = useState(false);
+  const [whatsappStatusOpen, setWhatsappStatusOpen] = useState(false);
+  const [whatsappSendOpen, setWhatsappSendOpen] = useState(false);
 
   const handleBatchDelete = async () => {
     if (table.selected.length === 0) {
@@ -74,7 +87,7 @@ export function GuestView() {
       }
 
       await axios.delete(
-        'https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/delete-selected',
+        `${API_BASE}/guest/delete-selected`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -113,7 +126,7 @@ export function GuestView() {
       try {
         const token = localStorage.getItem("token");
         const response = await axios.post(
-          "https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/import-guest-csv",
+          `${API_BASE}/guest/import-guest-csv`,
           formData,
           {
             headers: {
@@ -158,7 +171,7 @@ export function GuestView() {
           }
 
       await axios.delete(
-        `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/event-guest/${derivedEventId}`,
+        `${API_BASE}/guest/event-guest/${derivedEventId}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -200,7 +213,7 @@ export function GuestView() {
         }
 
       const response = await axios.get(
-        `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/download-all-qrcode/${derivedEventId}`,
+        `${API_BASE}/guest/download-all-qrcode/${derivedEventId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
           timeout: 300000,
@@ -243,7 +256,7 @@ const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) =>
     }
 
     const response = await axios.post(
-      `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/batch-qrcode-download/${derivedEventId}/timestamp`,
+      `${API_BASE}/guest/batch-qrcode-download/${derivedEventId}/timestamp`,
       { start: startDate, end: endDate},
       
       {
@@ -286,7 +299,7 @@ const handleResendEmails = async () => {
     }
 
     const response = await axios.post(
-      `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/resend-all-emails/${derivedEventId}`,
+      `${API_BASE}/guest/resend-all-emails/${derivedEventId}`,
       {},
       {
         headers: { Authorization: `Bearer ${token}` },
@@ -300,6 +313,78 @@ const handleResendEmails = async () => {
     toast.error(err.response?.data?.message || 'Failed to start email resend job');
   } finally {
     setLoading(false);
+  }
+};
+
+const handleSendBulkWhatsApp = () => {
+  setWhatsappSendOpen(true);
+};
+
+const handleConfirmBulkWhatsApp = async (templateName: string) => {
+  setLoading(true);
+  setWhatsappSendOpen(false);
+  
+  try {
+    const token = localStorage.getItem('token');
+    const eventIdArray = localStorage.getItem('allRowIds');
+
+    if (!token || !eventIdArray) {
+      toast.error('Authentication required or no event IDs found');
+      return;
+    }
+
+    const parsedIds = JSON.parse(eventIdArray);
+    const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+
+    if (!derivedEventId) {
+      toast.error('No valid event ID found');
+      return;
+    }
+
+    const response = await axios.post(
+      `${API_BASE}/whatsapp/send-bulk`,
+      {
+        eventId: derivedEventId,
+        templateName
+      },
+      {
+        headers: { 
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}` 
+        },
+        timeout: 30000,
+      }
+    );
+
+    toast.success(`WhatsApp bulk send completed! Sent: ${response.data.sent}, Failed: ${response.data.failed}`);
+    
+    // Refresh WhatsApp stats
+    fetchWhatsAppStats(derivedEventId);
+  } catch (err: any) {
+    console.error('Error sending bulk WhatsApp:', err);
+    toast.error(err.response?.data?.message || 'Failed to send WhatsApp messages');
+  } finally {
+    setLoading(false);
+  }
+};
+
+const getGuestsWithPhone = () => users.filter(user => user.phone && user.phone.trim()).length;
+
+const fetchWhatsAppStats = async (currentEventId: string) => {
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    const response = await axios.get(
+      `${API_BASE}/whatsapp/status/${currentEventId}`,
+      {
+        headers: { Authorization: `Bearer ${token}` }
+      }
+    );
+
+    setWhatsappStats(response.data.stats);
+  } catch (err) {
+    console.error('Error fetching WhatsApp stats:', err);
   }
 };
 
@@ -374,7 +459,7 @@ const handleResendEmails = async () => {
         }
 
         const response = await fetch(
-          `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/events-guest/${currentEventId}`,
+          `${API_BASE}/guest/events-guest/${currentEventId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
@@ -391,17 +476,20 @@ const handleResendEmails = async () => {
         }
 
         const analyticsRes = await axios.get(
-          `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/event-analytics/${currentEventId}`,
+          `${API_BASE}/guest/event-analytics/${currentEventId}`,
           {
             headers: { Authorization: `Bearer ${token}` },
           }
         );
         setAnalytics(analyticsRes.data);
         
+        // Fetch WhatsApp statistics
+        fetchWhatsAppStats(currentEventId);
+        
         // Get event details for report
         try {
           const eventRes = await axios.get(
-            `https://292x833w13.execute-api.us-east-2.amazonaws.com/events/events/${currentEventId}`,
+            `${API_BASE}/events/events/${currentEventId}`,
             {
               headers: { Authorization: `Bearer ${token}` },
             }
@@ -677,6 +765,30 @@ const handleResendEmails = async () => {
                     </Button>
                   </Grid>
 
+                  <Grid item xs={6} md={2.4}>
+                    <Button
+                      variant="contained"
+                      startIcon={<Iconify icon="logos:whatsapp-icon" />}
+                      onClick={handleSendBulkWhatsApp}
+                      disabled={loading}
+                      sx={{
+                        backgroundColor: '#25D366',
+                        '&:hover': {
+                          backgroundColor: '#128C7E',
+                        },
+                        color: '#fff',
+                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                        padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                        letterSpacing: '0.2px',
+                        textTransform: 'none',
+                        minWidth: { xs: 'auto', sm: 'auto' },
+                        height: { xs: '52px', sm: '40px', md: '48px' },
+                      }}
+                    >
+                      Send WhatsApp
+                    </Button>
+                  </Grid>
+
               </>
             )}
 
@@ -746,6 +858,20 @@ const handleResendEmails = async () => {
             icon={<img alt="icon" src="/assets/icons/glass/ic-glass-message.svg" />}
             color="error"
           />
+        </Grid>
+        <Grid xs={12} sm={6} md={4}>
+          <Box 
+            onClick={() => setWhatsappStatusOpen(true)}
+            sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 } }}
+          >
+            <AnalyticsWidgetSummary
+              title="WhatsApp Sent"
+              total={whatsappStats.sent}
+              percent={whatsappStats.sent}
+              icon={<Iconify icon="logos:whatsapp-icon" />}
+              color="success"
+            />
+          </Box>
         </Grid>
       </Grid>
 
@@ -847,6 +973,24 @@ const handleResendEmails = async () => {
         handleClose={() => setBatchDeleteModalOpen(false)}
         handleConfirm={handleBatchDelete}
         selectedCount={table.selected.length}
+        loading={loading}
+      />
+
+      {/* WhatsApp Status Dialog */}
+      {eventId && (
+        <WhatsAppStatusDialog
+          open={whatsappStatusOpen}
+          onClose={() => setWhatsappStatusOpen(false)}
+          eventId={eventId}
+        />
+      )}
+
+      {/* WhatsApp Send Dialog */}
+      <WhatsAppSendDialog
+        open={whatsappSendOpen}
+        onClose={() => setWhatsappSendOpen(false)}
+        onConfirm={handleConfirmBulkWhatsApp}
+        guestCount={getGuestsWithPhone()}
         loading={loading}
       />
     </DashboardContent>

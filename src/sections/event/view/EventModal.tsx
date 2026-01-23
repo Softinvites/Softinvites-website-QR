@@ -10,6 +10,7 @@ import {
   Typography,
 } from '@mui/material';
 import { toast } from 'react-toastify';
+import { API_BASE } from 'src/utils/apiBase';
 
 interface EventModalProps {
   open: boolean;
@@ -64,7 +65,7 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
       }
 
       const response = await fetch(
-        'https://292x833w13.execute-api.us-east-2.amazonaws.com/events/create',
+        `${API_BASE}/events/create`,
         {
           method: 'POST',
           headers: {

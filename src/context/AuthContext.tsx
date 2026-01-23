@@ -1,5 +1,6 @@
 import { createContext, useContext, useState, ReactNode, useMemo, useEffect, useCallback } from "react";
 import axios from "axios";
+import { API_BASE } from 'src/utils/apiBase';
 import { useNavigate } from "react-router-dom";
 
 // Define the User type
@@ -53,7 +54,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
   const login = useCallback(async (email: string, password: string) => {
     try {
       const response = await axios.post<{ token: string; user: User }>(
-        "https://292x833w13.execute-api.us-east-2.amazonaws.com/login",
+        `${API_BASE}/login`,
         { email, password }
       );
 

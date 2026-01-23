@@ -354,6 +354,8 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
 
   // ✅ Submit handler with FormData
 // ✅ Submit handler with FormData
+import { API_BASE } from 'src/utils/apiBase';
+
 const handleSubmitEdit = useCallback(async () => {
   try {
     const formData = new FormData();
@@ -368,7 +370,7 @@ const handleSubmitEdit = useCallback(async () => {
     }
 
     const response = await fetch(
-      `https://292x833w13.execute-api.us-east-2.amazonaws.com/events/update`,
+      `${API_BASE}/events/update`,
       {
         method: "PUT", // only PUT, since your backend supports PUT and POST
         headers: {
@@ -400,7 +402,7 @@ const handleSubmitEdit = useCallback(async () => {
   const handleGenerateTempLink = useCallback(async () => {
     try {
       const { data } = await axios.post<{ tempLink: string }>(
-        `https://292x833w13.execute-api.us-east-2.amazonaws.com/guest/generate-temp-link/${row.id}`,
+        `${API_BASE}/guest/generate-temp-link/${row.id}`,
         {},
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -433,7 +435,7 @@ const handleSubmitEdit = useCallback(async () => {
   const confirmDelete = useCallback(async () => {
     try {
       const response = await fetch(
-        `https://292x833w13.execute-api.us-east-2.amazonaws.com/events/events/${row.id}`,
+        `${API_BASE}/events/events/${row.id}`,
         {
           method: "DELETE",
           headers: { Authorization: `Bearer ${token}` },
