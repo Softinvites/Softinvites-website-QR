@@ -183,10 +183,9 @@ export default function RsvpPage() {
     }
   };
 
-  const renderField = (field: RSVPField) => {
+  const renderField = (field: RSVPField, fieldId: string, labelledBy?: string) => {
     const value = responses[field.name];
     const commonProps = {
-      id: field.name,
       name: field.name,
       required: field.required,
       disabled: submitting || formLocked,
@@ -195,6 +194,7 @@ export default function RsvpPage() {
     if (field.type === 'textarea') {
       return (
         <textarea
+          id={fieldId}
           {...commonProps}
           value={value || ''}
           onChange={(e) => handleFieldChange(field, e.target.value)}
@@ -206,6 +206,7 @@ export default function RsvpPage() {
     if (field.type === 'select') {
       return (
         <select
+          id={fieldId}
           {...commonProps}
           value={value || ''}
           onChange={(e) => handleFieldChange(field, e.target.value)}
@@ -222,19 +223,23 @@ export default function RsvpPage() {
 
     if (field.type === 'radio') {
       return (
-        <div className="rsvp-radio-group">
-          {(field.options || []).map((opt) => (
-            <label key={opt} className="rsvp-radio">
-              <input
-                type="radio"
-                {...commonProps}
-                value={opt}
-                checked={value === opt}
-                onChange={() => handleFieldChange(field, opt)}
-              />
-              <span>{opt}</span>
-            </label>
-          ))}
+        <div className="rsvp-radio-group" role="radiogroup" aria-labelledby={labelledBy}>
+          {(field.options || []).map((opt, index) => {
+            const optionId = `${fieldId}-${index}`;
+            return (
+              <label key={opt} className="rsvp-radio" htmlFor={optionId}>
+                <input
+                  id={optionId}
+                  type="radio"
+                  {...commonProps}
+                  value={opt}
+                  checked={value === opt}
+                  onChange={() => handleFieldChange(field, opt)}
+                />
+                <span>{opt}</span>
+              </label>
+            );
+          })}
         </div>
       );
     }
@@ -242,6 +247,7 @@ export default function RsvpPage() {
     if (field.type === 'number') {
       return (
         <input
+          id={fieldId}
           type="number"
           min={0}
           step={1}
@@ -257,24 +263,29 @@ export default function RsvpPage() {
     if (field.type === 'checkbox') {
       const current = Array.isArray(value) ? value : [];
       return (
-        <div className="rsvp-checkbox-group">
-          {(field.options || []).map((opt) => (
-            <label key={opt} className="rsvp-checkbox">
-              <input
-                type="checkbox"
-                {...commonProps}
-                checked={current.includes(opt)}
-                onChange={() => toggleCheckbox(field, opt)}
-              />
-              <span>{opt}</span>
-            </label>
-          ))}
+        <div className="rsvp-checkbox-group" role="group" aria-labelledby={labelledBy}>
+          {(field.options || []).map((opt, index) => {
+            const optionId = `${fieldId}-${index}`;
+            return (
+              <label key={opt} className="rsvp-checkbox" htmlFor={optionId}>
+                <input
+                  id={optionId}
+                  type="checkbox"
+                  {...commonProps}
+                  checked={current.includes(opt)}
+                  onChange={() => toggleCheckbox(field, opt)}
+                />
+                <span>{opt}</span>
+              </label>
+            );
+          })}
         </div>
       );
     }
 
     return (
       <input
+        id={fieldId}
         type="text"
         {...commonProps}
         value={value || ''}
@@ -320,9 +331,10 @@ export default function RsvpPage() {
                 <p className="rsvp-muted">Fill the form to confirm your attendance.</p>
               </div>
 
-              <label className="rsvp-field">
+              <label className="rsvp-field" htmlFor="rsvp-fullname">
                 <span>Guest Name</span>
                 <input
+                  id="rsvp-fullname"
                   type="text"
                   name="fullname"
                   value={fullname}
@@ -352,15 +364,32 @@ export default function RsvpPage() {
                 </div>
               </div>
 
-              {filteredFields.map((field) => (
-                <label key={field.name} className="rsvp-field">
-                  <span>
-                    {field.label}
-                    {field.required ? ' *' : ''}
-                  </span>
-                  {renderField(field)}
-                </label>
-              ))}
+              {filteredFields.map((field) => {
+                const fieldId = `rsvp-${field.name}`;
+                const isGrouped = field.type === 'radio' || field.type === 'checkbox';
+                const labelId = `${fieldId}-label`;
+                if (isGrouped) {
+                  return (
+                    <div key={field.name} className="rsvp-field">
+                      <span id={labelId}>
+                        {field.label}
+                        {field.required ? ' *' : ''}
+                      </span>
+                      {renderField(field, fieldId, labelId)}
+                    </div>
+                  );
+                }
+
+                return (
+                  <label key={field.name} className="rsvp-field" htmlFor={fieldId}>
+                    <span>
+                      {field.label}
+                      {field.required ? ' *' : ''}
+                    </span>
+                    {renderField(field, fieldId)}
+                  </label>
+                );
+              })}
 
               {payload.rsvp.respondedAt && (
                 <p className="rsvp-muted small">

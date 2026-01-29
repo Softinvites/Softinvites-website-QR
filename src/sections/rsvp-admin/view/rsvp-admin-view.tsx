@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -74,7 +74,7 @@ export function RsvpAdminView() {
 
   const token = useMemo(() => localStorage.getItem('token') || '', []);
 
-  const loadData = async (currentEventId: string) => {
+  const loadData = useCallback(async (currentEventId: string) => {
     setLoading(true);
     setError(null);
     try {
@@ -100,9 +100,9 @@ export function RsvpAdminView() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [token]);
 
-  const loadForm = async (currentEventId: string) => {
+  const loadForm = useCallback(async (currentEventId: string) => {
     try {
       const res = await axios.get(`${API_BASE}/admin/rsvp/events/${currentEventId}/form`, {
         headers: { Authorization: `Bearer ${token}` },
@@ -117,7 +117,7 @@ export function RsvpAdminView() {
         console.warn('Could not load RSVP form:', err);
       }
     }
-  };
+  }, [token]);
 
   useEffect(() => {
     const storedIds = localStorage.getItem('allRowIds');
@@ -138,7 +138,7 @@ export function RsvpAdminView() {
     } catch {
       setError('Invalid event selection.');
     }
-  }, []);
+  }, [loadData, loadForm]);
 
   const handleAddGuest = async () => {
     if (!eventId) return;
