@@ -59,6 +59,15 @@ type ApplyFilterProps = {
 };
 
 export function applyFilter({ inputData, comparator, filterName }: ApplyFilterProps) {
+  const seenNames = new Set<string>();
+  inputData = inputData.filter((user) => {
+    const key = (user.fullname || '').trim().toLowerCase();
+    if (!key) return true;
+    if (seenNames.has(key)) return false;
+    seenNames.add(key);
+    return true;
+  });
+
   const stabilizedThis = inputData.map((el, index) => [el, index] as const);
 
   stabilizedThis.sort((a, b) => {

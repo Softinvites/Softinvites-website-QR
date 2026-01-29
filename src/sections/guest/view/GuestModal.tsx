@@ -92,9 +92,17 @@ const GuestModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
         return;
       }
 
+      const trimmedName = guestData.fullname.trim();
+      if (!trimmedName) {
+        toast.error('Full name is required');
+        setLoading(false);
+        return;
+      }
+
       // Create a payload with colors in the required rgb format
       const payload = {
         ...guestData,
+        fullname: trimmedName,
         qrCodeBgColor: hexToRgb(guestData.qrCodeBgColor),
         qrCodeCenterColor: hexToRgb(guestData.qrCodeCenterColor),
         qrCodeEdgeColor: hexToRgb(guestData.qrCodeEdgeColor),
@@ -130,7 +138,11 @@ const GuestModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
 
       if (!response.ok) {
         console.error('Full error response:', result); // 👈 log backend error
-        throw new Error(result.message || 'Failed to add guest');
+        const message = result?.message || 'Failed to add guest';
+        if (response.status === 409 || message.toLowerCase().includes('duplicate')) {
+          throw new Error('A guest with this full name already exists for this event.');
+        }
+        throw new Error(message);
       }
 
       toast.success('Guest added successfully', {
@@ -141,7 +153,7 @@ const GuestModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
       handleClose();
     } catch (error) {
       console.error('Error adding guest:', error);
-      alert('Error adding guest');
+      toast.error(error instanceof Error ? error.message : 'Error adding guest');
     } finally {
       setLoading(false);
     }

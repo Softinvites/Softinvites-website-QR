@@ -2,7 +2,7 @@ import { useState } from 'react';
 import axios from 'axios';
 import { API_BASE } from 'src/utils/apiBase';
 
-import {  toast } from 'react-toastify';
+import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 
 import Box from '@mui/material/Box';
@@ -28,20 +28,21 @@ export function SignInView() {
     setLoading(true);
     setError('');
     try {
-      const response = await axios.post(`${API_BASE}/admin/login`,
-        
-        { email, password },  // Request body should only contain email & password
+      const response = await axios.post(
+        `${API_BASE}/admin/login`,
+
+        { email, password }, // Request body should only contain email & password
         { withCredentials: true } // This should be the third argument
       );
-  
+
       localStorage.setItem('token', response.data.token);
-       localStorage.setItem('adminId', response.data.admin._id);
-       // Show success toast before navigation
-    toast.success('Sign in successful!', {
-      position: 'top-right',
-      autoClose: 3500, // Close after 2 seconds
-      onClose: () => navigate('/home'), // Navigate after the toast disappears
-    });
+      localStorage.setItem('adminId', response.data.admin._id);
+      // Show success toast before navigation
+      toast.success('Sign in successful!', {
+        position: 'top-right',
+        autoClose: 3500, // Close after 2 seconds
+        onClose: () => navigate('/home'), // Navigate after the toast disappears
+      });
       navigate('/home');
     } catch (err) {
       setError('Invalid credentials. Please try again.');
@@ -61,7 +62,11 @@ export function SignInView() {
         </Typography> */}
       </Box>
 
-      {error && <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>}
+      {error && (
+        <Typography color="error" sx={{ mb: 2 }}>
+          {error}
+        </Typography>
+      )}
 
       <Box display="flex" flexDirection="column" alignItems="flex-end">
         <TextField
@@ -110,9 +115,6 @@ export function SignInView() {
           Sign in
         </LoadingButton>
       </Box>
-
-     
-      
     </>
   );
 }

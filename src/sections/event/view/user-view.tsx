@@ -203,9 +203,7 @@ export function UserView() {
           </Button>
          
 
-          <EventModal open={open} handleClose={() => setOpen(false)}>
-            {/* Add form elements inside if needed */}
-          </EventModal>
+          <EventModal open={open} handleClose={() => setOpen(false)} />
 
 
       

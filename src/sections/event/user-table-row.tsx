@@ -269,6 +269,7 @@
 
 
 import { useState, useCallback, useEffect } from 'react';
+import axios from 'axios';
 import {
   Popover,
   TableRow,
@@ -286,10 +287,10 @@ import {
   Button,
 } from '@mui/material';
 import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
-import { useNavigate } from 'react-router-dom';
-import axios from 'axios';
+import { API_BASE } from '../../utils/apiBase';
 
 export type UserProps = {
   id: string;
@@ -353,8 +354,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   }, []);
 
   // ✅ Submit handler with FormData
-// ✅ Submit handler with FormData
-import { API_BASE } from 'src/utils/apiBase';
+  // ✅ Submit handler with FormData
 
 const handleSubmitEdit = useCallback(async () => {
   try {
@@ -454,9 +454,9 @@ const handleSubmitEdit = useCallback(async () => {
     }
   }, [row.id, token]);
 
-  const handleGoToGuest = useCallback(() => {
+  const handleGoToRsvp = useCallback(() => {
     localStorage.setItem("allRowIds", JSON.stringify([row.id]));
-    navigate("/guest");
+    navigate("/rsvp-admin");
   }, [row.id, navigate]);
 
   return (
@@ -512,7 +512,7 @@ const handleSubmitEdit = useCallback(async () => {
       <Popover open={!!openPopover} anchorEl={openPopover} onClose={handleClosePopover}>
         <MenuList sx={{ p: 1 }}>
           <MenuItem onClick={handleOpenEditDialog}>Edit</MenuItem>
-          <MenuItem onClick={handleGoToGuest}>Go to Guest</MenuItem>
+          <MenuItem onClick={handleGoToRsvp}>Go to RSVP</MenuItem>
           <MenuItem onClick={handleDelete} sx={{ color: "error.main" }}>
             Delete
           </MenuItem>

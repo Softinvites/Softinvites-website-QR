@@ -68,7 +68,11 @@ export function RegisterPage() {
         </Typography>
       </Box>
 
-      {error && <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>}
+      {error && (
+        <Typography color="error" sx={{ mb: 2 }}>
+          {error}
+        </Typography>
+      )}
 
       <Box display="flex" flexDirection="column" alignItems="flex-end">
         <TextField
@@ -153,8 +157,6 @@ export function RegisterPage() {
           Register
         </LoadingButton>
       </Box>
-
-     
     </>
   );
 }

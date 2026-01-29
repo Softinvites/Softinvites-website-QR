@@ -15,7 +15,7 @@ import {
   Chip,
   Typography,
   Box,
-  Grid
+  Grid,
 } from '@mui/material';
 import { Iconify } from 'src/components/iconify/iconify';
 import axios from 'axios';
@@ -48,7 +48,11 @@ interface WhatsAppStatusDialogProps {
   eventId: string;
 }
 
-export default function WhatsAppStatusDialog({ open, onClose, eventId }: WhatsAppStatusDialogProps) {
+export default function WhatsAppStatusDialog({
+  open,
+  onClose,
+  eventId,
+}: WhatsAppStatusDialogProps) {
   const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
   const [stats, setStats] = useState<WhatsAppStats>({
     total: 0,
@@ -56,7 +60,7 @@ export default function WhatsAppStatusDialog({ open, onClose, eventId }: WhatsAp
     delivered: 0,
     read: 0,
     failed: 0,
-    not_on_whatsapp: 0
+    not_on_whatsapp: 0,
   });
   const [loading, setLoading] = useState(false);
 
@@ -64,12 +68,9 @@ export default function WhatsAppStatusDialog({ open, onClose, eventId }: WhatsAp
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
-      const response = await axios.get(
-        `${API_BASE}/whatsapp/status/${eventId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` }
-        }
-      );
+      const response = await axios.get(`${API_BASE}/whatsapp/status/${eventId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       setStats(response.data.stats);
       setMessages(response.data.messages);
@@ -88,23 +89,35 @@ export default function WhatsAppStatusDialog({ open, onClose, eventId }: WhatsAp
 
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'sent': return 'info';
-      case 'delivered': return 'warning';
-      case 'read': return 'success';
-      case 'failed': return 'error';
-      case 'not_on_whatsapp': return 'default';
-      default: return 'default';
+      case 'sent':
+        return 'info';
+      case 'delivered':
+        return 'warning';
+      case 'read':
+        return 'success';
+      case 'failed':
+        return 'error';
+      case 'not_on_whatsapp':
+        return 'default';
+      default:
+        return 'default';
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'sent': return 'material-symbols:send';
-      case 'delivered': return 'material-symbols:check';
-      case 'read': return 'material-symbols:done-all';
-      case 'failed': return 'material-symbols:error';
-      case 'not_on_whatsapp': return 'material-symbols:phone-disabled';
-      default: return 'material-symbols:help';
+      case 'sent':
+        return 'material-symbols:send';
+      case 'delivered':
+        return 'material-symbols:check';
+      case 'read':
+        return 'material-symbols:done-all';
+      case 'failed':
+        return 'material-symbols:error';
+      case 'not_on_whatsapp':
+        return 'material-symbols:phone-disabled';
+      default:
+        return 'material-symbols:help';
     }
   };
 
@@ -116,7 +129,7 @@ export default function WhatsAppStatusDialog({ open, onClose, eventId }: WhatsAp
           WhatsApp Message Status
         </Box>
       </DialogTitle>
-      
+
       <DialogContent>
         {/* Statistics Grid */}
         <Grid container spacing={2} sx={{ mb: 3 }}>
@@ -198,9 +211,7 @@ export default function WhatsAppStatusDialog({ open, onClose, eventId }: WhatsAp
                       />
                     </TableCell>
                     <TableCell>{message.templateName}</TableCell>
-                    <TableCell>
-                      {new Date(message.sentAt).toLocaleString()}
-                    </TableCell>
+                    <TableCell>{new Date(message.sentAt).toLocaleString()}</TableCell>
                     <TableCell>
                       {message.errorMessage && (
                         <Typography variant="caption" color="error">
@@ -215,7 +226,7 @@ export default function WhatsAppStatusDialog({ open, onClose, eventId }: WhatsAp
           </Table>
         </TableContainer>
       </DialogContent>
-      
+
       <DialogActions>
         <Button onClick={fetchWhatsAppStatus} disabled={loading}>
           Refresh

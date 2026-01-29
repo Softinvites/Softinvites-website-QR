@@ -21,6 +21,8 @@ export const SignInPage = lazy(() => import('src/pages/sign-in'));
 export const RegisterPage = lazy(() => import('src/pages/register'));
 export const ChangePassword = lazy(() => import('src/pages/change-password'));
 export const Profile = lazy(() => import('src/pages/profile'));
+export const RsvpPage = lazy(() => import('src/pages/rsvp'));
+export const RsvpAdminPage = lazy(() => import('src/pages/rsvp-admin'));
 
 export const Page404 = lazy(() => import('src/pages/page-not-found'));
 
@@ -62,8 +64,8 @@ export function Router() {
             { path: 'home', element: <HomePage /> },
             { path: 'event', element: <EventPage /> },
             
-
             { path: 'guest', element: <GuestPage /> },
+            { path: 'rsvp-admin', element: <RsvpAdminPage /> },
              { path: 'change-password', element: <ChangePassword /> },
               { path: 'profile', element: <Profile /> },
           ],
@@ -86,6 +88,22 @@ export function Router() {
         
         <RegisterPage/>
         </AuthLayout>
+      ),
+    },
+    {
+      path: 'rsvp',
+      element: (
+        <Suspense fallback={renderFallback}>
+          <RsvpPage />
+        </Suspense>
+      ),
+    },
+    {
+      path: 'rsvp/:token',
+      element: (
+        <Suspense fallback={renderFallback}>
+          <RsvpPage />
+        </Suspense>
       ),
     },
     {

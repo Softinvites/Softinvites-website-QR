@@ -61,6 +61,8 @@ export function GuestView() {
     failed: 0,
     not_on_whatsapp: 0
   });
+  const [rsvpSummary, setRsvpSummary] = useState({ yes: 0, no: 0, maybe: 0, pending: 0, total: 0 });
+  const [, setRsvpMapByGuestId] = useState<Record<string, { status: string; respondedAt?: string }>>({});
   const showOthersColumn = users.some((user) => !!user.others?.trim());
 
   // ✅ state for eventId and userEmail
@@ -316,6 +318,46 @@ const handleResendEmails = async () => {
   }
 };
 
+const handleDownloadRsvpCsv = async () => {
+  if (!eventId) {
+    toast.error('No valid event ID found');
+    return;
+  }
+
+  setLoading(true);
+  try {
+    const token = localStorage.getItem('token');
+    if (!token) {
+      toast.error('Authentication required');
+      return;
+    }
+
+    const response = await axios.get(
+      `${API_BASE}/admin/rsvp/events/${eventId}/export`,
+      {
+        headers: { Authorization: `Bearer ${token}` },
+        responseType: 'blob',
+      }
+    );
+
+    const blob = new Blob([response.data], { type: 'text/csv' });
+    const url = window.URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `event-${eventId}-rsvp.csv`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    window.URL.revokeObjectURL(url);
+    toast.success('RSVP CSV download started');
+  } catch (err: any) {
+    console.error('Error exporting RSVP CSV:', err);
+    toast.error(err.response?.data?.message || 'Failed to export RSVP CSV');
+  } finally {
+    setLoading(false);
+  }
+};
+
 const handleSendBulkWhatsApp = () => {
   setWhatsappSendOpen(true);
 };
@@ -453,6 +495,40 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
           return;
         }
 
+        const baseRsvpSummary = { yes: 0, no: 0, maybe: 0, pending: 0, total: 0 };
+        let reportGuestMap: Record<string, { status: string; respondedAt?: string }> = {};
+
+        if (tokenFromStorage) {
+          try {
+            const rsvpRes = await axios.get(
+              `${API_BASE}/admin/rsvp/events/${currentEventId}/report`,
+              {
+                headers: { Authorization: `Bearer ${token}` },
+              }
+            );
+            const summary = rsvpRes.data?.summary || {};
+            setRsvpSummary({ ...baseRsvpSummary, ...summary, total: rsvpRes.data?.total ?? 0 });
+            reportGuestMap = (rsvpRes.data?.guests || []).reduce(
+              (acc: Record<string, { status: string; respondedAt?: string }>, item: any) => {
+                const key = (item.id || item._id || item.guestId || '').toString();
+                if (key) {
+                  acc[key] = { status: item.status, respondedAt: item.respondedAt };
+                }
+                return acc;
+              },
+              {}
+            );
+            setRsvpMapByGuestId(reportGuestMap);
+          } catch (rsvpErr) {
+            console.warn('Could not load RSVP report:', rsvpErr);
+            setRsvpSummary(baseRsvpSummary);
+            setRsvpMapByGuestId({});
+          }
+        } else {
+          setRsvpSummary(baseRsvpSummary);
+          setRsvpMapByGuestId({});
+        }
+
         // If token came from URL and we don't have one in storage, store it
         if (tokenFromUrl && !tokenFromStorage) {
           localStorage.setItem('token', tokenFromUrl);
@@ -502,19 +578,27 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
           console.warn('Could not fetch event details:', eventErr);
         }
 
-        const formattedData: UserProps[] = data.guests.map((guest: any) => ({
-          id: guest._id,
-          _id: guest._id,
-          fullname: guest.fullname,
-          TableNo: guest.TableNo,
-          email: guest.email,
-          phone: guest.phone,
-          createdAt: new Date(guest.createdAt).toLocaleDateString(),
-          checkedInAt: guest.checkedInAt,
-          others: guest.others || '',
-          status: guest.status,
-          qrCode: guest.qrCode,
-        }));
+        const formattedData: UserProps[] = data.guests.map((guest: any) => {
+          const rsvpInfo = reportGuestMap[guest._id];
+          const rsvpStatus = rsvpInfo?.status || guest.rsvpStatus || 'pending';
+          const rsvpRespondedAt = rsvpInfo?.respondedAt || guest.rsvpRespondedAt;
+
+          return {
+            id: guest._id,
+            _id: guest._id,
+            fullname: guest.fullname,
+            TableNo: guest.TableNo,
+            email: guest.email,
+            phone: guest.phone,
+            createdAt: new Date(guest.createdAt).toLocaleDateString(),
+            checkedInAt: guest.checkedInAt,
+            others: guest.others || '',
+            status: guest.status,
+            rsvpStatus,
+            rsvpRespondedAt,
+            qrCode: guest.qrCode,
+          };
+        });
 
         setUsers(formattedData);
       } catch (err: any) {
@@ -705,7 +789,18 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
                           [''],
                           // Guest List Header
                           ['GUEST LIST'],
-                          ['Name', 'Table No', 'Others', 'Email', 'Phone', 'Status', 'Created At', 'Checked In At'],
+                          [
+                            'Name',
+                            'Table No',
+                            'Others',
+                            'Email',
+                            'Phone',
+                            'RSVP Status',
+                            'RSVP Responded At',
+                            'Status',
+                            'Created At',
+                            'Checked In At',
+                          ],
                           // Guest Data
                           ...users.map(user => [
                             user.fullname,
@@ -713,6 +808,8 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
                             user.others || 'N/A',
                             user.email || 'N/A',
                             user.phone || 'N/A',
+                            user.rsvpStatus || 'pending',
+                            user.rsvpRespondedAt ? new Date(user.rsvpRespondedAt).toLocaleString() : 'Not Responded',
                             user.status === 'checked-in' ? 'Checked In' : 'Pending',
                             user.createdAt,
                             user.checkedInAt ? new Date(user.checkedInAt).toLocaleString() : 'Not Checked In'
@@ -738,6 +835,26 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
                       }}
                     >
                       Download Report
+                    </Button>
+                  </Grid>
+
+                  <Grid item xs={6} md={2.4}>
+                    <Button
+                      variant="outlined"
+                      color="secondary"
+                      startIcon={<Iconify icon="mdi:file-download-outline" />}
+                      onClick={handleDownloadRsvpCsv}
+                      disabled={loading}
+                      sx={{
+                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                        padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                        letterSpacing: '0.2px',
+                        textTransform: 'none',
+                        minWidth: { xs: 'auto', sm: 'auto' },
+                        height: { xs: '52px', sm: '40px', md: '48px' },
+                      }}
+                    >
+                      RSVP CSV
                     </Button>
                   </Grid>
 
@@ -875,6 +992,47 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
         </Grid>
       </Grid>
 
+      {isAdmin && (
+        <Grid container spacing={3} sx={{ mb: 4 }}>
+          <Grid xs={12} sm={6} md={3}>
+            <AnalyticsWidgetSummary
+              title="RSVP Yes"
+              total={rsvpSummary.yes}
+              percent={rsvpSummary.yes}
+              icon={<Iconify icon="mdi:checkbox-marked-circle-outline" />}
+              color="success"
+            />
+          </Grid>
+          <Grid xs={12} sm={6} md={3}>
+            <AnalyticsWidgetSummary
+              title="RSVP No"
+              total={rsvpSummary.no}
+              percent={rsvpSummary.no}
+              icon={<Iconify icon="mdi:close-circle-outline" />}
+              color="error"
+            />
+          </Grid>
+          <Grid xs={12} sm={6} md={3}>
+            <AnalyticsWidgetSummary
+              title="RSVP Maybe"
+              total={rsvpSummary.maybe}
+              percent={rsvpSummary.maybe}
+              icon={<Iconify icon="mdi:help-circle-outline" />}
+              color="info"
+            />
+          </Grid>
+          <Grid xs={12} sm={6} md={3}>
+            <AnalyticsWidgetSummary
+              title="RSVP Pending"
+              total={rsvpSummary.pending}
+              percent={rsvpSummary.pending}
+              icon={<Iconify icon="mdi:clock-outline" />}
+              color="warning"
+            />
+          </Grid>
+        </Grid>
+      )}
+
       <Card>
         <UserTableToolbar
           numSelected={table.selected.length}
@@ -913,6 +1071,7 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
                   { id: 'TableNo', label: 'Table No.' },
                   { id: 'phone', label: 'Number' },
                   { id: 'email', label: 'Email' },
+                  { id: 'rsvpStatus', label: 'RSVP Status' },
                   { id: 'createdAt', label: 'Created At' },
                   { id: 'checkedInAt', label: 'Checked In At' },
                   ...(showOthersColumn ? [{ id: 'others', label: 'Others' }] : []),
