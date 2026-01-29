@@ -267,7 +267,6 @@
 //   );
 // }
 
-
 import { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import {
@@ -356,48 +355,44 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   // ✅ Submit handler with FormData
   // ✅ Submit handler with FormData
 
-const handleSubmitEdit = useCallback(async () => {
-  try {
-    const formData = new FormData();
-    formData.append("id", row.id); // 👈 now required
-    formData.append("name", editName);
-    formData.append("date", editDate);
-    formData.append("location", editLocation);
-    formData.append("description", editDescription);
+  const handleSubmitEdit = useCallback(async () => {
+    try {
+      const formData = new FormData();
+      formData.append('id', row.id); // 👈 now required
+      formData.append('name', editName);
+      formData.append('date', editDate);
+      formData.append('location', editLocation);
+      formData.append('description', editDescription);
 
-    if (editIv) {
-      formData.append("iv", editIv); // 👈 send actual file
-    }
+      if (editIv) {
+        formData.append('iv', editIv); // 👈 send actual file
+      }
 
-    const response = await fetch(
-      `${API_BASE}/events/update`,
-      {
-        method: "PUT", // only PUT, since your backend supports PUT and POST
+      const response = await fetch(`${API_BASE}/events/update`, {
+        method: 'PUT', // only PUT, since your backend supports PUT and POST
         headers: {
           Authorization: `Bearer ${token}`,
         },
         body: formData,
-      }
-    );
+      });
 
-    if (!response.ok) throw new Error(`Failed to update event: ${response.statusText}`);
+      if (!response.ok) throw new Error(`Failed to update event: ${response.statusText}`);
 
-    toast.success("Edited successfully!", {
-      position: "top-right",
-      autoClose: 3000,
-      onClose: () => window.location.reload(),
-    });
-  } catch (error) {
-    console.error("Update failed:", error);
-    toast.error("Failed to edit event. Please try again.", {
-      position: "top-right",
-      autoClose: 3000,
-    });
-  } finally {
-    handleCloseDialog();
-  }
-}, [row.id, token, editName, editDate, editLocation, editDescription, editIv, handleCloseDialog]);
-
+      toast.success('Edited successfully!', {
+        position: 'top-right',
+        autoClose: 3000,
+        onClose: () => window.location.reload(),
+      });
+    } catch (error) {
+      console.error('Update failed:', error);
+      toast.error('Failed to edit event. Please try again.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } finally {
+      handleCloseDialog();
+    }
+  }, [row.id, token, editName, editDate, editLocation, editDescription, editIv, handleCloseDialog]);
 
   const handleGenerateTempLink = useCallback(async () => {
     try {
@@ -408,9 +403,9 @@ const handleSubmitEdit = useCallback(async () => {
       );
       setTempLink(data.tempLink);
       setIsLinkDialogOpen(true);
-      toast.success("Link generated!", { position: "top-right", autoClose: 2000 });
+      toast.success('Link generated!', { position: 'top-right', autoClose: 2000 });
     } catch {
-      toast.error("Could not generate link.", { position: "top-right" });
+      toast.error('Could not generate link.', { position: 'top-right' });
     } finally {
       handleClosePopover();
     }
@@ -419,7 +414,7 @@ const handleSubmitEdit = useCallback(async () => {
   const handleCopyLink = () => {
     if (!tempLink) return;
     navigator.clipboard.writeText(tempLink).then(() => {
-      toast.success("Copied to clipboard!", { position: "top-right", autoClose: 1500 });
+      toast.success('Copied to clipboard!', { position: 'top-right', autoClose: 1500 });
     });
   };
 
@@ -434,45 +429,42 @@ const handleSubmitEdit = useCallback(async () => {
 
   const confirmDelete = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${API_BASE}/events/events/${row.id}`,
-        {
-          method: "DELETE",
-          headers: { Authorization: `Bearer ${token}` },
-        }
-      );
+      const response = await fetch(`${API_BASE}/events/events/${row.id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-      if (!response.ok) throw new Error("Failed to delete event");
+      if (!response.ok) throw new Error('Failed to delete event');
 
-      localStorage.removeItem("allRowIds");
-      toast.success("Deleted successfully!", { position: "top-right", autoClose: 2000 });
+      localStorage.removeItem('allRowIds');
+      toast.success('Deleted successfully!', { position: 'top-right', autoClose: 2000 });
       window.location.reload();
     } catch (error) {
-      toast.error("Failed to delete event", { position: "top-right", autoClose: 3000 });
+      toast.error('Failed to delete event', { position: 'top-right', autoClose: 3000 });
     } finally {
       setOpenConfirmDialog(false);
     }
   }, [row.id, token]);
 
   const handleGoToRsvp = useCallback(() => {
-    localStorage.setItem("allRowIds", JSON.stringify([row.id]));
-    navigate("/rsvp-admin");
+    localStorage.setItem('allRowIds', JSON.stringify([row.id]));
+    navigate('/rsvp-admin');
   }, [row.id, navigate]);
 
   return (
     <>
-      <TableRow 
-        hover 
-        tabIndex={-1} 
-        role="checkbox" 
+      <TableRow
+        hover
+        tabIndex={-1}
+        role="checkbox"
         selected={selected}
         sx={{
           ...(row.status === 'Expired' && {
             backgroundColor: 'rgba(255, 0, 0, 0.05)',
             '&:hover': {
               backgroundColor: 'rgba(255, 0, 0, 0.1)',
-            }
-          })
+            },
+          }),
         }}
       >
         <TableCell padding="checkbox">
@@ -483,20 +475,18 @@ const handleSubmitEdit = useCallback(async () => {
         <TableCell>{row.location}</TableCell>
         <TableCell>{row.date}</TableCell>
         <TableCell>{row.createdAt}</TableCell>
-        <TableCell sx={{ whiteSpace: "pre-line" }}>{row.description}</TableCell>
+        <TableCell sx={{ whiteSpace: 'pre-line' }}>{row.description}</TableCell>
         <TableCell>
-          <Label 
+          <Label
             color={
-              row.status === 'Expired' ? 'error' : 
-              row.status === 'Active' ? 'success' : 
-              'warning'
+              row.status === 'Expired' ? 'error' : row.status === 'Active' ? 'success' : 'warning'
             }
             title={
-              row.status === 'Expired' 
-                ? `Event expired 2 days after ${row.date}` 
-                : row.status === 'Active' 
-                ? `Event expires 2 days after ${row.date}` 
-                : 'Event is inactive'
+              row.status === 'Expired'
+                ? `Event expired 2 days after ${row.date}`
+                : row.status === 'Active'
+                  ? `Event expires 2 days after ${row.date}`
+                  : 'Event is inactive'
             }
           >
             {row.status}
@@ -513,10 +503,10 @@ const handleSubmitEdit = useCallback(async () => {
         <MenuList sx={{ p: 1 }}>
           <MenuItem onClick={handleOpenEditDialog}>Edit</MenuItem>
           <MenuItem onClick={handleGoToRsvp}>Go to RSVP</MenuItem>
-          <MenuItem onClick={handleDelete} sx={{ color: "error.main" }}>
+          <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
             Delete
           </MenuItem>
-          <MenuItem onClick={handleGenerateTempLink} sx={{ color: "success.main" }}>
+          <MenuItem onClick={handleGenerateTempLink} sx={{ color: 'success.main' }}>
             Generate Link
           </MenuItem>
         </MenuList>
@@ -572,7 +562,7 @@ const handleSubmitEdit = useCallback(async () => {
             style={{ marginTop: 8, marginBottom: 12 }}
           />
           {editIvPreview && (
-            <img src={editIvPreview} alt="IV Preview" style={{ width: "100%", borderRadius: 8 }} />
+            <img src={editIvPreview} alt="IV Preview" style={{ width: '100%', borderRadius: 8 }} />
           )}
         </DialogContent>
         <DialogActions>
@@ -590,7 +580,7 @@ const handleSubmitEdit = useCallback(async () => {
           <TextField
             fullWidth
             multiline
-            value={tempLink || ""}
+            value={tempLink || ''}
             InputProps={{ readOnly: true }}
             onFocus={(e) => e.currentTarget.select()}
           />
@@ -605,8 +595,7 @@ const handleSubmitEdit = useCallback(async () => {
       <Dialog open={openConfirmDialog} onClose={() => setOpenConfirmDialog(false)}>
         <DialogTitle>Confirm Deletion</DialogTitle>
         <DialogContent>
-          Are you sure you want to delete <strong>{row.name}</strong>? This action cannot be
-          undone.
+          Are you sure you want to delete <strong>{row.name}</strong>? This action cannot be undone.
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setOpenConfirmDialog(false)} color="inherit">

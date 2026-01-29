@@ -30,7 +30,7 @@ export type UserProps = {
   phone: string;
   createdAt: string;
   checkedInAt?: string;
-  others:string;
+  others: string;
   email: string;
   avatarUrl: string;
   isVerified: boolean;
@@ -40,18 +40,21 @@ export type UserProps = {
   rsvpRespondedAt?: string;
 };
 
+type UserTableRowProps = {
+  row: UserProps;
+  selected: boolean;
+  onSelectRow: () => void;
+  showActions: boolean;
+  showOthersColumn?: boolean;
+};
 
-  type UserTableRowProps = {
-    row: UserProps;
-    selected: boolean;
-    onSelectRow: () => void;
-    showActions: boolean;
-    showOthersColumn?: boolean; 
-  };
-  
-
-
-export function UserTableRow({ row, selected, onSelectRow, showActions, showOthersColumn }: UserTableRowProps) {
+export function UserTableRow({
+  row,
+  selected,
+  onSelectRow,
+  showActions,
+  showOthersColumn,
+}: UserTableRowProps) {
   const token = localStorage.getItem('token');
   const [openPopover, setOpenPopover] = useState<HTMLButtonElement | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
@@ -60,7 +63,7 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
   const [email, setEmail] = useState(row.email);
   const [phone, setPhone] = useState(row.phone);
   const [others, setOthers] = useState(row.others);
-   const [eventId, setEventId] = useState(row.eventId);
+  const [eventId, setEventId] = useState(row.eventId);
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
 
   const handleOpenPopover = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
@@ -86,62 +89,54 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
     setOpenDialog(false);
   }, []);
 
-
   const handleSubmitEdit = useCallback(async () => {
-  try {
-    const response = await fetch(
-      `${API_BASE}/guest/update-guest`,
-      {
-        method: "PUT",
+    try {
+      const response = await fetch(`${API_BASE}/guest/update-guest`, {
+        method: 'PUT',
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json',
           Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({
-          id: row.id, 
+          id: row.id,
           fullname,
           TableNo,
           email,
           phone,
           others,
         }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Server responded with:', errorText);
+        throw new Error(`Failed to update guest: ${response.status} - ${errorText}`);
       }
-    );
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("Server responded with:", errorText);
-      throw new Error(`Failed to update guest: ${response.status} - ${errorText}`);
+      toast.success('Edited successfully!', {
+        position: 'top-right',
+        autoClose: 3000,
+        onClose: () => window.location.reload(),
+      });
+    } catch (error: any) {
+      console.error('Error editing guest:', error);
+      toast.error(error.message || 'Failed to edit guest.', {
+        position: 'top-right',
+        autoClose: 3000,
+      });
+    } finally {
+      handleCloseDialog();
     }
-
-    toast.success("Edited successfully!", {
-      position: "top-right",
-      autoClose: 3000,
-      onClose: () => window.location.reload(),
-    });
-  } catch (error: any) {
-    console.error("Error editing guest:", error);
-    toast.error(error.message || "Failed to edit guest.", {
-      position: "top-right",
-      autoClose: 3000,
-    });
-  } finally {
-    handleCloseDialog();
-  }
-}, [row.id, token, fullname, TableNo, email, phone, others, handleCloseDialog]);
-
+  }, [row.id, token, fullname, TableNo, email, phone, others, handleCloseDialog]);
 
   const confirmDelete = useCallback(async () => {
     try {
-      const response = await fetch(
-        `${API_BASE}/guest/single-guest/${row._id}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      const response = await fetch(`${API_BASE}/guest/single-guest/${row._id}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       if (!response.ok) {
         const errorMessage = await response.text(); // Read response body
@@ -176,10 +171,10 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
     rsvpStatus === 'yes'
       ? 'success'
       : rsvpStatus === 'no'
-      ? 'error'
-      : rsvpStatus === 'maybe'
-      ? 'info'
-      : 'warning';
+        ? 'error'
+        : rsvpStatus === 'maybe'
+          ? 'info'
+          : 'warning';
 
   const handleSendWhatsApp = useCallback(async () => {
     if (!row.phone) {
@@ -189,20 +184,17 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
     }
 
     try {
-      const response = await fetch(
-        `${API_BASE}/whatsapp/send-single`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({
-            guestId: row._id,
-            templateName: 'hello_world'
-          }),
-        }
-      );
+      const response = await fetch(`${API_BASE}/whatsapp/send-single`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({
+          guestId: row._id,
+          templateName: 'hello_world',
+        }),
+      });
 
       if (!response.ok) {
         const errorData = await response.json();
@@ -219,170 +211,167 @@ export function UserTableRow({ row, selected, onSelectRow, showActions, showOthe
     }
   }, [row._id, row.fullname, row.phone, token, handleClosePopover]);
 
+  const handleDownloadQRCode = useCallback(async () => {
+    try {
+      const response = await fetch(
+        // `https://download-qr-code.vercel.app/guest/download-qrcode/${row._id}`,
+        `${API_BASE}/guest/download-qrcode/${row._id}`,
+        {
+          method: 'GET',
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
-const handleDownloadQRCode = useCallback(async () => {
-  try {
-    const response = await fetch(
-      // `https://download-qr-code.vercel.app/guest/download-qrcode/${row._id}`,
-      `${API_BASE}/guest/download-qrcode/${row._id}`,
-      {
-        method: 'GET',
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      }
-    );
-
-    if (!response.ok) {
-      throw new Error(`Failed to get QR Code: ${response.statusText}`);
-    }
-
-    // Check if response is JSON (API Gateway format) or direct PNG
-    const contentType = response.headers.get('content-type');
-    
-    if (contentType?.includes('application/json')) {
-      // Handle API Gateway JSON format (like email download)
-      const data = await response.json();
-      
-      // Decode base64 body into binary
-      const binaryString = atob(data.body);
-      const len = binaryString.length;
-      const bytes = new Uint8Array(len);
-      for (let i = 0; i < len; i += 1) {
-        bytes[i] = binaryString.charCodeAt(i);
+      if (!response.ok) {
+        throw new Error(`Failed to get QR Code: ${response.statusText}`);
       }
 
-      const blob = new Blob([bytes], { type: data.headers["Content-Type"] || "image/png" });
+      // Check if response is JSON (API Gateway format) or direct PNG
+      const contentType = response.headers.get('content-type');
 
-      // Create a URL for the blob and trigger the download
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
+      if (contentType?.includes('application/json')) {
+        // Handle API Gateway JSON format (like email download)
+        const data = await response.json();
 
-      // Extract filename from Content-Disposition header
-      const disposition = data.headers["Content-Disposition"];
-      const match = disposition?.match(/filename="(.+)"/);
-      const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
+        // Decode base64 body into binary
+        const binaryString = atob(data.body);
+        const len = binaryString.length;
+        const bytes = new Uint8Array(len);
+        for (let i = 0; i < len; i += 1) {
+          bytes[i] = binaryString.charCodeAt(i);
+        }
 
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-    } else {
-      // Handle direct PNG response (current downloadQRCode behavior)
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      
-      // Extract filename from Content-Disposition header or use default
-      const disposition = response.headers.get('content-disposition');
-      const match = disposition?.match(/filename="(.+)"/);
-      const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
-      
-      link.download = filename;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
+        const blob = new Blob([bytes], { type: data.headers['Content-Type'] || 'image/png' });
+
+        // Create a URL for the blob and trigger the download
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+
+        // Extract filename from Content-Disposition header
+        const disposition = data.headers['Content-Disposition'];
+        const match = disposition?.match(/filename="(.+)"/);
+        const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
+
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      } else {
+        // Handle direct PNG response (current downloadQRCode behavior)
+        const blob = await response.blob();
+        const url = window.URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+
+        // Extract filename from Content-Disposition header or use default
+        const disposition = response.headers.get('content-disposition');
+        const match = disposition?.match(/filename="(.+)"/);
+        const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
+
+        link.download = filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }
+    } catch (error) {
+      console.error('Error downloading QR Code:', error);
+      toast.error('Error downloading QR Code');
+    } finally {
+      handleClosePopover();
     }
-  } catch (error) {
-    console.error('Error downloading QR Code:', error);
-    toast.error('Error downloading QR Code');
-  } finally {
-    handleClosePopover();
-  }
-}, [row._id, row.fullname, token, handleClosePopover]);
+  }, [row._id, row.fullname, token, handleClosePopover]);
 
-// const handleDownloadQRCode = useCallback(async () => {
-//   try {
-//     console.log('🔄 Starting single QR code download for:', row._id);
+  // const handleDownloadQRCode = useCallback(async () => {
+  //   try {
+  //     console.log('🔄 Starting single QR code download for:', row._id);
 
-//     const response = await fetch(
-//       `download-qr-code.vercel.app/guest/download-qrcode/${row._id}`,
-//       {
-//         method: 'GET',
-//         headers: {
-//           Authorization: `Bearer ${token}`,
-//         },
-//       }
-//     );
+  //     const response = await fetch(
+  //       `download-qr-code.vercel.app/guest/download-qrcode/${row._id}`,
+  //       {
+  //         method: 'GET',
+  //         headers: {
+  //           Authorization: `Bearer ${token}`,
+  //         },
+  //       }
+  //     );
 
-//     console.log('📨 Response status:', response.status, response.statusText);
+  //     console.log('📨 Response status:', response.status, response.statusText);
 
-//     if (!response.ok) {
-//       const errorText = await response.text();
-//       console.error('❌ Error response text:', errorText);
+  //     if (!response.ok) {
+  //       const errorText = await response.text();
+  //       console.error('❌ Error response text:', errorText);
 
-//       let errorData;
-//       try {
-//         errorData = JSON.parse(errorText);
-//       } catch {
-//         errorData = { message: 'Invalid JSON error response' };
-//       }
+  //       let errorData;
+  //       try {
+  //         errorData = JSON.parse(errorText);
+  //       } catch {
+  //         errorData = { message: 'Invalid JSON error response' };
+  //       }
 
-//       throw new Error(errorData?.message || `Failed to get QR Code (${response.status})`);
-//     }
+  //       throw new Error(errorData?.message || `Failed to get QR Code (${response.status})`);
+  //     }
 
-//     // ✅ Handle base64 encoded binary data (common for Lambda/API Gateway)
-//     const result = await response.json();
-//     console.log('✅ Parsed JSON response:', result);
+  //     // ✅ Handle base64 encoded binary data (common for Lambda/API Gateway)
+  //     const result = await response.json();
+  //     console.log('✅ Parsed JSON response:', result);
 
-//     // Make sure base64 body is present
-//     if (!result.body) {
-//       throw new Error('No QR code data received from server');
-//     }
+  //     // Make sure base64 body is present
+  //     if (!result.body) {
+  //       throw new Error('No QR code data received from server');
+  //     }
 
-//     // Decode base64 string to binary
-//     const binaryString = atob(result.body);
-//     const len = binaryString.length;
-//     const bytes = new Uint8Array(len);
-//     for (let i = 0; i < len; i += 1) {
-//       bytes[i] = binaryString.charCodeAt(i);
-//     }
+  //     // Decode base64 string to binary
+  //     const binaryString = atob(result.body);
+  //     const len = binaryString.length;
+  //     const bytes = new Uint8Array(len);
+  //     for (let i = 0; i < len; i += 1) {
+  //       bytes[i] = binaryString.charCodeAt(i);
+  //     }
 
-//     // Create Blob for download
-//     const blob = new Blob([bytes], {
-//       type: result.headers?.['Content-Type'] || 'image/png',
-//     });
+  //     // Create Blob for download
+  //     const blob = new Blob([bytes], {
+  //       type: result.headers?.['Content-Type'] || 'image/png',
+  //     });
 
-//     // Create Object URL and trigger browser download
-//     const url = window.URL.createObjectURL(blob);
-//     const link = document.createElement('a');
-//     link.href = url;
+  //     // Create Object URL and trigger browser download
+  //     const url = window.URL.createObjectURL(blob);
+  //     const link = document.createElement('a');
+  //     link.href = url;
 
-//     // Try to extract filename from Content-Disposition
-//     const disposition = result.headers?.['Content-Disposition'];
-//     const match = disposition?.match(/filename="?(.+?)"?$/);
-//     const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
+  //     // Try to extract filename from Content-Disposition
+  //     const disposition = result.headers?.['Content-Disposition'];
+  //     const match = disposition?.match(/filename="?(.+?)"?$/);
+  //     const filename = match ? match[1] : `qr-${row.fullname || 'guest'}.png`;
 
-//     link.download = filename;
-//     document.body.appendChild(link);
-//     link.click();
-//     document.body.removeChild(link);
+  //     link.download = filename;
+  //     document.body.appendChild(link);
+  //     link.click();
+  //     document.body.removeChild(link);
 
-//     // Clean up URL object
-//     window.URL.revokeObjectURL(url);
+  //     // Clean up URL object
+  //     window.URL.revokeObjectURL(url);
 
-//     console.log(`✅ Successfully downloaded: ${filename}`);
-//     toast.success(`QR Code downloaded for ${row.fullname}`, {
-//       position: 'top-right',
-//       autoClose: 3000,
-//     });
+  //     console.log(`✅ Successfully downloaded: ${filename}`);
+  //     toast.success(`QR Code downloaded for ${row.fullname}`, {
+  //       position: 'top-right',
+  //       autoClose: 3000,
+  //     });
 
-//   } catch (error) {
-//     console.error('❌ Error downloading QR Code:', error);
-//     toast.error(`Error downloading QR Code: ${error.message}`, {
-//       position: 'top-right',
-//       autoClose: 5000,
-//     });
-//   } finally {
-//     handleClosePopover();
-//   }
-// }, [row._id, row.fullname, token, handleClosePopover]);
-
-
+  //   } catch (error) {
+  //     console.error('❌ Error downloading QR Code:', error);
+  //     toast.error(`Error downloading QR Code: ${error.message}`, {
+  //       position: 'top-right',
+  //       autoClose: 5000,
+  //     });
+  //   } finally {
+  //     handleClosePopover();
+  //   }
+  // }, [row._id, row.fullname, token, handleClosePopover]);
 
   return (
     <>
@@ -413,9 +402,7 @@ const handleDownloadQRCode = useCallback(async () => {
           </Stack>
         </TableCell>
         <TableCell> {row.createdAt} </TableCell>
-        <TableCell>
-          {row.checkedInAt ? new Date(row.checkedInAt).toLocaleString() : '-'}
-        </TableCell>
+        <TableCell>{row.checkedInAt ? new Date(row.checkedInAt).toLocaleString() : '-'}</TableCell>
         {showOthersColumn && <TableCell>{row.others}</TableCell>}
         <TableCell>
           <Label color={(row.status === 'pending' && 'warning') || 'success'}>{row.status}</Label>

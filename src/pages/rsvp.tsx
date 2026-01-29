@@ -26,7 +26,14 @@ type RSVPForm = {
 
 type RsvpResponse = {
   guest: { id: string; fullname: string };
-  event: { id: string; name: string; date: string; location?: string; iv?: string; description?: string };
+  event: {
+    id: string;
+    name: string;
+    date: string;
+    location?: string;
+    iv?: string;
+    description?: string;
+  };
   rsvp: { status: Status; responses: Record<string, any>; respondedAt?: string };
   form: RSVPForm;
 };
@@ -36,13 +43,18 @@ const STATUS_OPTIONS: Status[] = ['yes', 'no', 'maybe'];
 function formatDate(value?: string) {
   if (!value) return '';
   const d = new Date(value);
-  return Number.isNaN(d.getTime()) ? value : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+  return Number.isNaN(d.getTime())
+    ? value
+    : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
 export default function RsvpPage() {
   const { token: tokenFromPath } = useParams();
   const [searchParams] = useSearchParams();
-  const token = useMemo(() => tokenFromPath || searchParams.get('token') || '', [tokenFromPath, searchParams]);
+  const token = useMemo(
+    () => tokenFromPath || searchParams.get('token') || '',
+    [tokenFromPath, searchParams]
+  );
 
   const [loading, setLoading] = useState(true);
   const [submitting, setSubmitting] = useState(false);
@@ -73,7 +85,8 @@ export default function RsvpPage() {
         setStatus(nextStatus);
         setResponses({
           ...data.rsvp.responses,
-          attendance: data.rsvp.responses?.attendance || (nextStatus !== 'pending' ? nextStatus : ''),
+          attendance:
+            data.rsvp.responses?.attendance || (nextStatus !== 'pending' ? nextStatus : ''),
         });
       } catch (err: any) {
         if (ignore) return;
@@ -105,7 +118,9 @@ export default function RsvpPage() {
   const toggleCheckbox = (field: RSVPField, option: string) => {
     setResponses((prev) => {
       const current = Array.isArray(prev[field.name]) ? (prev[field.name] as string[]) : [];
-      const next = current.includes(option) ? current.filter((v) => v !== option) : [...current, option];
+      const next = current.includes(option)
+        ? current.filter((v) => v !== option)
+        : [...current, option];
       return { ...prev, [field.name]: next };
     });
   };
@@ -348,10 +363,14 @@ export default function RsvpPage() {
               ))}
 
               {payload.rsvp.respondedAt && (
-                <p className="rsvp-muted small">Last response: {formatDate(payload.rsvp.respondedAt)}</p>
+                <p className="rsvp-muted small">
+                  Last response: {formatDate(payload.rsvp.respondedAt)}
+                </p>
               )}
 
-              {formLocked && <p className="rsvp-warning">This RSVP is locked and cannot be updated.</p>}
+              {formLocked && (
+                <p className="rsvp-warning">This RSVP is locked and cannot be updated.</p>
+              )}
 
               <button type="submit" className="rsvp-submit" disabled={submitting || formLocked}>
                 {submitting ? 'Submitting...' : 'Submit'}

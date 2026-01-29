@@ -24,7 +24,7 @@ import { UserTableToolbar } from '../user-table-toolbar';
 import { emptyRows, applyFilter, getComparator } from '../utils';
 import type { UserProps } from '../user-table-row';
 import EventModal from './GuestModal';
-import BatchDownloadModal from './BatchDownloadModal'
+import BatchDownloadModal from './BatchDownloadModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import BatchDeleteModal from './BatchDeleteModal';
 import WhatsAppStatusDialog from './WhatsAppStatusDialog';
@@ -59,10 +59,12 @@ export function GuestView() {
     delivered: 0,
     read: 0,
     failed: 0,
-    not_on_whatsapp: 0
+    not_on_whatsapp: 0,
   });
   const [rsvpSummary, setRsvpSummary] = useState({ yes: 0, no: 0, maybe: 0, pending: 0, total: 0 });
-  const [, setRsvpMapByGuestId] = useState<Record<string, { status: string; respondedAt?: string }>>({});
+  const [, setRsvpMapByGuestId] = useState<
+    Record<string, { status: string; respondedAt?: string }>
+  >({});
   const showOthersColumn = users.some((user) => !!user.others?.trim());
 
   // ✅ state for eventId and userEmail
@@ -88,25 +90,25 @@ export function GuestView() {
         return;
       }
 
-      await axios.delete(
-        `${API_BASE}/guest/delete-selected`,
+      await axios.delete(`${API_BASE}/guest/delete-selected`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        data: {
+          guestIds: table.selected,
+        },
+      });
+
+      toast.success(
+        `Successfully deleted ${table.selected.length} guest${table.selected.length > 1 ? 's' : ''}`,
         {
-          headers: {
-            Authorization: `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          data: {
-            guestIds: table.selected,
-          },
+          position: 'top-right',
+          autoClose: 2000,
+          onClose: () => window.location.reload(),
         }
       );
 
-      toast.success(`Successfully deleted ${table.selected.length} guest${table.selected.length > 1 ? 's' : ''}`, {
-        position: 'top-right',
-        autoClose: 2000,
-        onClose: () => window.location.reload(),
-      });
-      
       table.onSelectAllRows(false, []);
     } catch (err: any) {
       console.error('Error deleting selected guests:', err);
@@ -121,31 +123,26 @@ export function GuestView() {
     const file = event.target.files?.[0];
     if (file) {
       const formData = new FormData();
-      formData.append("file", file);
-      if (eventId) formData.append("eventId", eventId);
-      if (userEmail) formData.append("userEmail", userEmail);
+      formData.append('file', file);
+      if (eventId) formData.append('eventId', eventId);
+      if (userEmail) formData.append('userEmail', userEmail);
 
       try {
-        const token = localStorage.getItem("token");
-        const response = await axios.post(
-          `${API_BASE}/guest/import-guest-csv`,
-          formData,
-          {
-            headers: {
-              "Content-Type": "multipart/form-data",
-              Authorization: `Bearer ${token}`,
-            },
-          }
-        );
+        const token = localStorage.getItem('token');
+        const response = await axios.post(`${API_BASE}/guest/import-guest-csv`, formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+            Authorization: `Bearer ${token}`,
+          },
+        });
 
-        console.log("Response from backend:", response.data);
+        console.log('Response from backend:', response.data);
 
-        toast.success(response.data.message || "CSV imported successfully");
-          } catch (err: any) {
-        console.error("Error importing CSV:", err);
-        toast.error(err.response?.data?.message || "CSV import failed");
+        toast.success(response.data.message || 'CSV imported successfully');
+      } catch (err: any) {
+        console.error('Error importing CSV:', err);
+        toast.error(err.response?.data?.message || 'CSV import failed');
       }
-
     }
   };
 
@@ -165,21 +162,18 @@ export function GuestView() {
       }
 
       const parsedIds = JSON.parse(eventIdArray);
-          const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+      const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
 
-          if (!derivedEventId) {
-            toast.error('No event ID found');
-            return;
-          }
+      if (!derivedEventId) {
+        toast.error('No event ID found');
+        return;
+      }
 
-      await axios.delete(
-        `${API_BASE}/guest/event-guest/${derivedEventId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      await axios.delete(`${API_BASE}/guest/event-guest/${derivedEventId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      });
 
       toast.success('All guests deleted successfully', {
         position: 'top-right',
@@ -195,7 +189,7 @@ export function GuestView() {
     }
   };
 
-    const handleDownloadAllQRCodes = async () => {
+  const handleDownloadAllQRCodes = async () => {
     setLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -207,26 +201,22 @@ export function GuestView() {
       }
 
       const parsedIds = JSON.parse(eventIdArray);
-        const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+      const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
 
-        if (!derivedEventId) {
-          toast.error('No valid event ID found');
-          return;
-        }
+      if (!derivedEventId) {
+        toast.error('No valid event ID found');
+        return;
+      }
 
-      const response = await axios.get(
-        `${API_BASE}/guest/download-all-qrcode/${derivedEventId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-          timeout: 300000,
-        }
-      );
+      const response = await axios.get(`${API_BASE}/guest/download-all-qrcode/${derivedEventId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+        timeout: 300000,
+      });
 
       if (response.data?.zipDownloadLink) {
-  window.location.href = response.data.zipDownloadLink;
-  toast.success('QR codes download started!');
-}
-else {
+        window.location.href = response.data.zipDownloadLink;
+        toast.success('QR codes download started!');
+      } else {
         toast.error('Download link not available');
       }
     } catch (err) {
@@ -237,198 +227,193 @@ else {
     }
   };
 
-const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) => {
-  setLoading(true);
-  try {
-    const token = localStorage.getItem("token");
-    const eventIdArray = localStorage.getItem("allRowIds");
+  const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const eventIdArray = localStorage.getItem('allRowIds');
 
-    if (!token || !eventIdArray) {
-      toast.error("Authentication required or no event IDs found");
-      return;
-    }
-
-    const parsedIds = JSON.parse(eventIdArray);
-    const derivedEventId =
-      Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
-
-    if (!derivedEventId) {
-      toast.error("No valid event ID found");
-      return;
-    }
-
-    const response = await axios.post(
-      `${API_BASE}/guest/batch-qrcode-download/${derivedEventId}/timestamp`,
-      { start: startDate, end: endDate},
-      
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        timeout: 60000,
+      if (!token || !eventIdArray) {
+        toast.error('Authentication required or no event IDs found');
+        return;
       }
-    );
 
-    if (response.data?.zipDownloadLink) {
-      window.open(response.data.zipDownloadLink, "_blank");
-      toast.success("Batch QR codes download started!");
-    } else {
-      toast.error("Download link not available");
+      const parsedIds = JSON.parse(eventIdArray);
+      const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+
+      if (!derivedEventId) {
+        toast.error('No valid event ID found');
+        return;
+      }
+
+      const response = await axios.post(
+        `${API_BASE}/guest/batch-qrcode-download/${derivedEventId}/timestamp`,
+        { start: startDate, end: endDate },
+
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 60000,
+        }
+      );
+
+      if (response.data?.zipDownloadLink) {
+        window.open(response.data.zipDownloadLink, '_blank');
+        toast.success('Batch QR codes download started!');
+      } else {
+        toast.error('Download link not available');
+      }
+    } catch (err) {
+      console.error('Error downloading batch QR codes:', err);
+      toast.error('Failed to download batch QR codes');
+    } finally {
+      setLoading(false);
     }
-  } catch (err) {
-    console.error("Error downloading batch QR codes:", err);
-    toast.error("Failed to download batch QR codes");
-  } finally {
-    setLoading(false);
-  }
-};
+  };
 
-const handleResendEmails = async () => {
-  setLoading(true);
-  try {
-    const token = localStorage.getItem('token');
-    const eventIdArray = localStorage.getItem('allRowIds');
+  const handleResendEmails = async () => {
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const eventIdArray = localStorage.getItem('allRowIds');
 
-    if (!token || !eventIdArray) {
-      toast.error('Authentication required or no event IDs found');
-      return;
+      if (!token || !eventIdArray) {
+        toast.error('Authentication required or no event IDs found');
+        return;
+      }
+
+      const parsedIds = JSON.parse(eventIdArray);
+      const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+
+      if (!derivedEventId) {
+        toast.error('No valid event ID found');
+        return;
+      }
+
+      const response = await axios.post(
+        `${API_BASE}/guest/resend-all-emails/${derivedEventId}`,
+        {},
+        {
+          headers: { Authorization: `Bearer ${token}` },
+          timeout: 30000,
+        }
+      );
+
+      toast.success(response.data?.message || 'Email resend job started successfully!');
+    } catch (err: any) {
+      console.error('Error resending emails:', err);
+      toast.error(err.response?.data?.message || 'Failed to start email resend job');
+    } finally {
+      setLoading(false);
     }
+  };
 
-    const parsedIds = JSON.parse(eventIdArray);
-    const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
-
-    if (!derivedEventId) {
+  const handleDownloadRsvpCsv = async () => {
+    if (!eventId) {
       toast.error('No valid event ID found');
       return;
     }
 
-    const response = await axios.post(
-      `${API_BASE}/guest/resend-all-emails/${derivedEventId}`,
-      {},
-      {
-        headers: { Authorization: `Bearer ${token}` },
-        timeout: 30000,
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) {
+        toast.error('Authentication required');
+        return;
       }
-    );
 
-    toast.success(response.data?.message || 'Email resend job started successfully!');
-  } catch (err: any) {
-    console.error('Error resending emails:', err);
-    toast.error(err.response?.data?.message || 'Failed to start email resend job');
-  } finally {
-    setLoading(false);
-  }
-};
-
-const handleDownloadRsvpCsv = async () => {
-  if (!eventId) {
-    toast.error('No valid event ID found');
-    return;
-  }
-
-  setLoading(true);
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) {
-      toast.error('Authentication required');
-      return;
-    }
-
-    const response = await axios.get(
-      `${API_BASE}/admin/rsvp/events/${eventId}/export`,
-      {
+      const response = await axios.get(`${API_BASE}/admin/rsvp/events/${eventId}/export`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob',
+      });
+
+      const blob = new Blob([response.data], { type: 'text/csv' });
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `event-${eventId}-rsvp.csv`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+      toast.success('RSVP CSV download started');
+    } catch (err: any) {
+      console.error('Error exporting RSVP CSV:', err);
+      toast.error(err.response?.data?.message || 'Failed to export RSVP CSV');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleSendBulkWhatsApp = () => {
+    setWhatsappSendOpen(true);
+  };
+
+  const handleConfirmBulkWhatsApp = async (templateName: string) => {
+    setLoading(true);
+    setWhatsappSendOpen(false);
+
+    try {
+      const token = localStorage.getItem('token');
+      const eventIdArray = localStorage.getItem('allRowIds');
+
+      if (!token || !eventIdArray) {
+        toast.error('Authentication required or no event IDs found');
+        return;
       }
-    );
 
-    const blob = new Blob([response.data], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const link = document.createElement('a');
-    link.href = url;
-    link.download = `event-${eventId}-rsvp.csv`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    window.URL.revokeObjectURL(url);
-    toast.success('RSVP CSV download started');
-  } catch (err: any) {
-    console.error('Error exporting RSVP CSV:', err);
-    toast.error(err.response?.data?.message || 'Failed to export RSVP CSV');
-  } finally {
-    setLoading(false);
-  }
-};
+      const parsedIds = JSON.parse(eventIdArray);
+      const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
 
-const handleSendBulkWhatsApp = () => {
-  setWhatsappSendOpen(true);
-};
+      if (!derivedEventId) {
+        toast.error('No valid event ID found');
+        return;
+      }
 
-const handleConfirmBulkWhatsApp = async (templateName: string) => {
-  setLoading(true);
-  setWhatsappSendOpen(false);
-  
-  try {
-    const token = localStorage.getItem('token');
-    const eventIdArray = localStorage.getItem('allRowIds');
-
-    if (!token || !eventIdArray) {
-      toast.error('Authentication required or no event IDs found');
-      return;
-    }
-
-    const parsedIds = JSON.parse(eventIdArray);
-    const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
-
-    if (!derivedEventId) {
-      toast.error('No valid event ID found');
-      return;
-    }
-
-    const response = await axios.post(
-      `${API_BASE}/whatsapp/send-bulk`,
-      {
-        eventId: derivedEventId,
-        templateName
-      },
-      {
-        headers: { 
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}` 
+      const response = await axios.post(
+        `${API_BASE}/whatsapp/send-bulk`,
+        {
+          eventId: derivedEventId,
+          templateName,
         },
-        timeout: 30000,
-      }
-    );
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${token}`,
+          },
+          timeout: 30000,
+        }
+      );
 
-    toast.success(`WhatsApp bulk send completed! Sent: ${response.data.sent}, Failed: ${response.data.failed}`);
-    
-    // Refresh WhatsApp stats
-    fetchWhatsAppStats(derivedEventId);
-  } catch (err: any) {
-    console.error('Error sending bulk WhatsApp:', err);
-    toast.error(err.response?.data?.message || 'Failed to send WhatsApp messages');
-  } finally {
-    setLoading(false);
-  }
-};
+      toast.success(
+        `WhatsApp bulk send completed! Sent: ${response.data.sent}, Failed: ${response.data.failed}`
+      );
 
-const getGuestsWithPhone = () => users.filter(user => user.phone && user.phone.trim()).length;
+      // Refresh WhatsApp stats
+      fetchWhatsAppStats(derivedEventId);
+    } catch (err: any) {
+      console.error('Error sending bulk WhatsApp:', err);
+      toast.error(err.response?.data?.message || 'Failed to send WhatsApp messages');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-const fetchWhatsAppStats = async (currentEventId: string) => {
-  try {
-    const token = localStorage.getItem('token');
-    if (!token) return;
+  const getGuestsWithPhone = () => users.filter((user) => user.phone && user.phone.trim()).length;
 
-    const response = await axios.get(
-      `${API_BASE}/whatsapp/status/${currentEventId}`,
-      {
-        headers: { Authorization: `Bearer ${token}` }
-      }
-    );
+  const fetchWhatsAppStats = async (currentEventId: string) => {
+    try {
+      const token = localStorage.getItem('token');
+      if (!token) return;
 
-    setWhatsappStats(response.data.stats);
-  } catch (err) {
-    console.error('Error fetching WhatsApp stats:', err);
-  }
-};
+      const response = await axios.get(`${API_BASE}/whatsapp/status/${currentEventId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      setWhatsappStats(response.data.stats);
+    } catch (err) {
+      console.error('Error fetching WhatsApp stats:', err);
+    }
+  };
 
   function tryDecodeToken(token: string) {
     try {
@@ -469,7 +454,8 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
           if (eventIdArray) {
             try {
               const parsedIds = JSON.parse(eventIdArray);
-              currentEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+              currentEventId =
+                Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
             } catch (err) {
               console.error('Error parsing event IDs:', err);
             }
@@ -534,12 +520,9 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
           localStorage.setItem('token', tokenFromUrl);
         }
 
-        const response = await fetch(
-          `${API_BASE}/guest/events-guest/${currentEventId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
+        const response = await fetch(`${API_BASE}/guest/events-guest/${currentEventId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
 
         if (!response.ok) {
           throw new Error(response.statusText);
@@ -558,18 +541,15 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
           }
         );
         setAnalytics(analyticsRes.data);
-        
+
         // Fetch WhatsApp statistics
         fetchWhatsAppStats(currentEventId);
-        
+
         // Get event details for report
         try {
-          const eventRes = await axios.get(
-            `${API_BASE}/events/events/${currentEventId}`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
+          const eventRes = await axios.get(`${API_BASE}/events/events/${currentEventId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
           if (eventRes.data?.event) {
             setEventName(eventRes.data.event.name || 'Event Report');
             setEventDate(eventRes.data.event.date || '');
@@ -628,7 +608,6 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
 
   return (
     <DashboardContent>
-   
       <Box display="flex" alignItems="center" mb={5}>
         <Typography
           variant="h4"
@@ -722,7 +701,7 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
                   />
                 </Grid>
 
-                                <Grid item xs={6} md={2.4}>
+                <Grid item xs={6} md={2.4}>
                   <Button
                     variant="contained"
                     color="primary"
@@ -741,171 +720,178 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
                   </Button>
                 </Grid>
 
-                  <Grid item xs={6} md={2.4}>
-                    <Button
-                      variant="contained"
-                      color="primary"
-                      startIcon={<Iconify icon="uil:cloud-download" />}
-                      onClick={() => setBatchModalOpen(true)}
-                      sx={{
-                        fontSize: { xs: "0.75rem", sm: "0.875rem", md: "1rem" },
-                        padding: { xs: "2px 6px", sm: "6px 8px", md: "8px 10px" },
-                        letterSpacing: "0.2px",
-                        textTransform: "none",
-                        minWidth: { xs: "auto", sm: "auto" },
-                        height: { xs: "52px", sm: "40px", md: "48px" },
-                      }}
-                    >
-                      Batch Download
-                    </Button>
+                <Grid item xs={6} md={2.4}>
+                  <Button
+                    variant="contained"
+                    color="primary"
+                    startIcon={<Iconify icon="uil:cloud-download" />}
+                    onClick={() => setBatchModalOpen(true)}
+                    sx={{
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                      letterSpacing: '0.2px',
+                      textTransform: 'none',
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      height: { xs: '52px', sm: '40px', md: '48px' },
+                    }}
+                  >
+                    Batch Download
+                  </Button>
 
-                    <BatchDownloadModal
-                      open={batchModalOpen}
-                      onClose={() => setBatchModalOpen(false)}
-                      onSubmit={handleBatchDownloadQRCodes}
-                    />
-                  </Grid>
+                  <BatchDownloadModal
+                    open={batchModalOpen}
+                    onClose={() => setBatchModalOpen(false)}
+                    onSubmit={handleBatchDownloadQRCodes}
+                  />
+                </Grid>
 
-                  <Grid item xs={6} md={2.4}>
-                    <Button
-                      variant="contained"
-                      color="info"
-                      startIcon={<Iconify icon="material-symbols:download" />}
-                      onClick={() => {
-                        const reportDate = new Date().toLocaleDateString();
-                        const csvContent = [
-                          // Event Header
-                          [`EVENT REPORT`],
-                          [`Event Name: ${eventName}`],
-                          [`Event Date: ${eventDate}`],
-                          [`Report Generated: ${reportDate}`],
-                          [''],
-                          // Metrics Section
-                          ['METRICS SUMMARY'],
-                          [`Total Guests: ${analytics.totalGuests}`],
-                          [`Checked-in Guests: ${analytics.checkedInGuests}`],
-                          [`Unchecked Guests: ${analytics.unusedCodes}`],
-                          [`Check-in Rate: ${analytics.totalGuests > 0 ? Math.round((analytics.checkedInGuests / analytics.totalGuests) * 100) : 0}%`],
-                          [''],
-                          // Guest List Header
-                          ['GUEST LIST'],
-                          [
-                            'Name',
-                            'Table No',
-                            'Others',
-                            'Email',
-                            'Phone',
-                            'RSVP Status',
-                            'RSVP Responded At',
-                            'Status',
-                            'Created At',
-                            'Checked In At',
-                          ],
-                          // Guest Data
-                          ...users.map(user => [
-                            user.fullname,
-                            user.TableNo || 'N/A',
-                            user.others || 'N/A',
-                            user.email || 'N/A',
-                            user.phone || 'N/A',
-                            user.rsvpStatus || 'pending',
-                            user.rsvpRespondedAt ? new Date(user.rsvpRespondedAt).toLocaleString() : 'Not Responded',
-                            user.status === 'checked-in' ? 'Checked In' : 'Pending',
-                            user.createdAt,
-                            user.checkedInAt ? new Date(user.checkedInAt).toLocaleString() : 'Not Checked In'
-                          ])
-                        ].map(row => row.map(cell => `"${cell}"`).join(',')).join('\n');
-                        
-                        const blob = new Blob([csvContent], { type: 'text/csv' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = `${eventName.replace(/[^a-zA-Z0-9]/g, '_')}_Report_${new Date().toISOString().split('T')[0]}.csv`;
-                        a.click();
-                        URL.revokeObjectURL(url);
-                        toast.success('Event report downloaded successfully!');
-                      }}
-                      sx={{
-                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
-                        padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
-                        letterSpacing: '0.2px',
-                        textTransform: 'none',
-                        minWidth: { xs: 'auto', sm: 'auto' },
-                        height: { xs: '52px', sm: '40px', md: '48px' },
-                      }}
-                    >
-                      Download Report
-                    </Button>
-                  </Grid>
+                <Grid item xs={6} md={2.4}>
+                  <Button
+                    variant="contained"
+                    color="info"
+                    startIcon={<Iconify icon="material-symbols:download" />}
+                    onClick={() => {
+                      const reportDate = new Date().toLocaleDateString();
+                      const csvContent = [
+                        // Event Header
+                        [`EVENT REPORT`],
+                        [`Event Name: ${eventName}`],
+                        [`Event Date: ${eventDate}`],
+                        [`Report Generated: ${reportDate}`],
+                        [''],
+                        // Metrics Section
+                        ['METRICS SUMMARY'],
+                        [`Total Guests: ${analytics.totalGuests}`],
+                        [`Checked-in Guests: ${analytics.checkedInGuests}`],
+                        [`Unchecked Guests: ${analytics.unusedCodes}`],
+                        [
+                          `Check-in Rate: ${analytics.totalGuests > 0 ? Math.round((analytics.checkedInGuests / analytics.totalGuests) * 100) : 0}%`,
+                        ],
+                        [''],
+                        // Guest List Header
+                        ['GUEST LIST'],
+                        [
+                          'Name',
+                          'Table No',
+                          'Others',
+                          'Email',
+                          'Phone',
+                          'RSVP Status',
+                          'RSVP Responded At',
+                          'Status',
+                          'Created At',
+                          'Checked In At',
+                        ],
+                        // Guest Data
+                        ...users.map((user) => [
+                          user.fullname,
+                          user.TableNo || 'N/A',
+                          user.others || 'N/A',
+                          user.email || 'N/A',
+                          user.phone || 'N/A',
+                          user.rsvpStatus || 'pending',
+                          user.rsvpRespondedAt
+                            ? new Date(user.rsvpRespondedAt).toLocaleString()
+                            : 'Not Responded',
+                          user.status === 'checked-in' ? 'Checked In' : 'Pending',
+                          user.createdAt,
+                          user.checkedInAt
+                            ? new Date(user.checkedInAt).toLocaleString()
+                            : 'Not Checked In',
+                        ]),
+                      ]
+                        .map((row) => row.map((cell) => `"${cell}"`).join(','))
+                        .join('\n');
 
-                  <Grid item xs={6} md={2.4}>
-                    <Button
-                      variant="outlined"
-                      color="secondary"
-                      startIcon={<Iconify icon="mdi:file-download-outline" />}
-                      onClick={handleDownloadRsvpCsv}
-                      disabled={loading}
-                      sx={{
-                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
-                        padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
-                        letterSpacing: '0.2px',
-                        textTransform: 'none',
-                        minWidth: { xs: 'auto', sm: 'auto' },
-                        height: { xs: '52px', sm: '40px', md: '48px' },
-                      }}
-                    >
-                      RSVP CSV
-                    </Button>
-                  </Grid>
+                      const blob = new Blob([csvContent], { type: 'text/csv' });
+                      const url = URL.createObjectURL(blob);
+                      const a = document.createElement('a');
+                      a.href = url;
+                      a.download = `${eventName.replace(/[^a-zA-Z0-9]/g, '_')}_Report_${new Date().toISOString().split('T')[0]}.csv`;
+                      a.click();
+                      URL.revokeObjectURL(url);
+                      toast.success('Event report downloaded successfully!');
+                    }}
+                    sx={{
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                      letterSpacing: '0.2px',
+                      textTransform: 'none',
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      height: { xs: '52px', sm: '40px', md: '48px' },
+                    }}
+                  >
+                    Download Report
+                  </Button>
+                </Grid>
 
-                  <Grid item xs={6} md={2.4}>
-                    <Button
-                      variant="contained"
-                      color="secondary"
-                      startIcon={<Iconify icon="material-symbols:mail" />}
-                      onClick={handleResendEmails}
-                      disabled={loading}
-                      sx={{
-                        backgroundColor: '#ff5722',
-                        '&:hover': {
-                          backgroundColor: '#e64a19',
-                        },
-                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
-                        padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
-                        letterSpacing: '0.2px',
-                        textTransform: 'none',
-                        minWidth: { xs: 'auto', sm: 'auto' },
-                        height: { xs: '52px', sm: '40px', md: '48px' },
-                      }}
-                    >
-                      Resend Emails
-                    </Button>
-                  </Grid>
+                <Grid item xs={6} md={2.4}>
+                  <Button
+                    variant="outlined"
+                    color="secondary"
+                    startIcon={<Iconify icon="mdi:file-download-outline" />}
+                    onClick={handleDownloadRsvpCsv}
+                    disabled={loading}
+                    sx={{
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                      letterSpacing: '0.2px',
+                      textTransform: 'none',
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      height: { xs: '52px', sm: '40px', md: '48px' },
+                    }}
+                  >
+                    RSVP CSV
+                  </Button>
+                </Grid>
 
-                  <Grid item xs={6} md={2.4}>
-                    <Button
-                      variant="contained"
-                      startIcon={<Iconify icon="logos:whatsapp-icon" />}
-                      onClick={handleSendBulkWhatsApp}
-                      disabled={loading}
-                      sx={{
-                        backgroundColor: '#25D366',
-                        '&:hover': {
-                          backgroundColor: '#128C7E',
-                        },
-                        color: '#fff',
-                        fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
-                        padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
-                        letterSpacing: '0.2px',
-                        textTransform: 'none',
-                        minWidth: { xs: 'auto', sm: 'auto' },
-                        height: { xs: '52px', sm: '40px', md: '48px' },
-                      }}
-                    >
-                      Send WhatsApp
-                    </Button>
-                  </Grid>
+                <Grid item xs={6} md={2.4}>
+                  <Button
+                    variant="contained"
+                    color="secondary"
+                    startIcon={<Iconify icon="material-symbols:mail" />}
+                    onClick={handleResendEmails}
+                    disabled={loading}
+                    sx={{
+                      backgroundColor: '#ff5722',
+                      '&:hover': {
+                        backgroundColor: '#e64a19',
+                      },
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                      letterSpacing: '0.2px',
+                      textTransform: 'none',
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      height: { xs: '52px', sm: '40px', md: '48px' },
+                    }}
+                  >
+                    Resend Emails
+                  </Button>
+                </Grid>
 
+                <Grid item xs={6} md={2.4}>
+                  <Button
+                    variant="contained"
+                    startIcon={<Iconify icon="logos:whatsapp-icon" />}
+                    onClick={handleSendBulkWhatsApp}
+                    disabled={loading}
+                    sx={{
+                      backgroundColor: '#25D366',
+                      '&:hover': {
+                        backgroundColor: '#128C7E',
+                      },
+                      color: '#fff',
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                      letterSpacing: '0.2px',
+                      textTransform: 'none',
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      height: { xs: '52px', sm: '40px', md: '48px' },
+                    }}
+                  >
+                    Send WhatsApp
+                  </Button>
+                </Grid>
               </>
             )}
 
@@ -977,7 +963,7 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
           />
         </Grid>
         <Grid xs={12} sm={6} md={4}>
-          <Box 
+          <Box
             onClick={() => setWhatsappStatusOpen(true)}
             sx={{ cursor: 'pointer', '&:hover': { opacity: 0.8 } }}
           >
@@ -1063,8 +1049,6 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
                         )
                     : undefined
                 }
-
-                
                 headLabel={[
                   ...(isAdmin ? [{ id: 'checkbox', label: '', align: 'center' }] : []),
                   { id: 'fullname', label: 'Full Name' },
@@ -1099,7 +1083,7 @@ const fetchWhatsAppStats = async (currentEventId: string) => {
                         selected={table.selected.includes(row.id)}
                         onSelectRow={() => table.onSelectRow(row.id)}
                         showActions={isAdmin}
-                        showOthersColumn={showOthersColumn} 
+                        showOthersColumn={showOthersColumn}
                       />
                     ))
                 )}

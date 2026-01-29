@@ -1,4 +1,3 @@
-
 import { lazy, Suspense } from 'react';
 import { Outlet, Navigate, useRoutes } from 'react-router-dom';
 
@@ -10,7 +9,6 @@ import { AuthLayout } from 'src/layouts/auth';
 import { DashboardLayout } from 'src/layouts/dashboard';
 import { useAuth } from 'src/context/AuthContext'; // ✅ Import useAuth
 import ProtectedRoute from 'src/components/ProtectedRoute';
-
 
 // ------------------------------------------c----------------------------
 
@@ -42,12 +40,16 @@ const renderFallback = (
 );
 export function Router() {
   const { isAuthenticated } = useAuth(); // ✅ Get authentication state
-  console.log(isAuthenticated)
+  console.log(isAuthenticated);
 
   return useRoutes([
     {
       path: '/',
-      element: isAuthenticated ? <Navigate to="/home" replace /> : <Navigate to="/sign-in" replace />, // ✅ Redirect to sign-in if not authenticated
+      element: isAuthenticated ? (
+        <Navigate to="/home" replace />
+      ) : (
+        <Navigate to="/sign-in" replace />
+      ), // ✅ Redirect to sign-in if not authenticated
     },
     {
       element: (
@@ -63,11 +65,11 @@ export function Router() {
           children: [
             { path: 'home', element: <HomePage /> },
             { path: 'event', element: <EventPage /> },
-            
+
             { path: 'guest', element: <GuestPage /> },
             { path: 'rsvp-admin', element: <RsvpAdminPage /> },
-             { path: 'change-password', element: <ChangePassword /> },
-              { path: 'profile', element: <Profile /> },
+            { path: 'change-password', element: <ChangePassword /> },
+            { path: 'profile', element: <Profile /> },
           ],
         },
       ],
@@ -76,8 +78,7 @@ export function Router() {
       path: 'sign-in',
       element: (
         <AuthLayout>
-        <SignInPage/>
-          
+          <SignInPage />
         </AuthLayout>
       ),
     },
@@ -85,8 +86,7 @@ export function Router() {
       path: 'sign_up',
       element: (
         <AuthLayout>
-        
-        <RegisterPage/>
+          <RegisterPage />
         </AuthLayout>
       ),
     },
@@ -110,7 +110,7 @@ export function Router() {
       path: '404',
       element: <Page404 />,
     },
-    
+
     {
       path: '*',
       element: <Navigate to="/404" replace />,

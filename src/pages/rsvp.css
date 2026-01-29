@@ -141,7 +141,9 @@
   font-weight: 500;
   color: #0f172a;
   background: #ffffff;
-  transition: border 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    border 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .rsvp-field input:focus,
@@ -215,7 +217,9 @@
   font-size: 16px;
   font-weight: 700;
   cursor: pointer;
-  transition: transform 0.15s ease, box-shadow 0.15s ease;
+  transition:
+    transform 0.15s ease,
+    box-shadow 0.15s ease;
 }
 
 .rsvp-submit:disabled {
