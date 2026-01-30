@@ -90,7 +90,7 @@ export function UserView() {
         }
 
         const data = await response.json();
-        console.log('Fetched Data:', data); // Debugging log
+        // console.log('Fetched Data:', data); // Debugging log
 
         // ✅ Check if "events" exists and is an array
         if (!data?.events || !Array.isArray(data.events)) {
@@ -128,7 +128,8 @@ export function UserView() {
           };
         });
 
-        console.log('Formatted Data:', formattedData);
+        // console.log('Formatted Data:', formattedData);
+
         setUsers(formattedData);
       } catch (fetchAllError) {
         console.error('Fetch all error:', fetchAllError);

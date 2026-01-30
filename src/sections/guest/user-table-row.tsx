@@ -36,8 +36,6 @@ export type UserProps = {
   isVerified: boolean;
   qrCode?: string;
   eventId: string;
-  rsvpStatus?: string;
-  rsvpRespondedAt?: string;
 };
 
 type UserTableRowProps = {
@@ -165,16 +163,6 @@ export function UserTableRow({
     setOpenConfirmDialog(true);
     handleClosePopover();
   }, [handleClosePopover]);
-
-  const rsvpStatus = (row.rsvpStatus || 'pending').toLowerCase();
-  const rsvpColor =
-    rsvpStatus === 'yes'
-      ? 'success'
-      : rsvpStatus === 'no'
-        ? 'error'
-        : rsvpStatus === 'maybe'
-          ? 'info'
-          : 'warning';
 
   const handleSendWhatsApp = useCallback(async () => {
     if (!row.phone) {
@@ -391,16 +379,6 @@ export function UserTableRow({
         <TableCell>{row.TableNo}</TableCell>
         <TableCell>{row.phone}</TableCell>
         <TableCell>{row.email}</TableCell>
-        <TableCell>
-          <Stack spacing={0.25} alignItems="flex-start">
-            <Label color={rsvpColor}>{rsvpStatus}</Label>
-            {row.rsvpRespondedAt && (
-              <Typography variant="caption" color="text.secondary">
-                {new Date(row.rsvpRespondedAt).toLocaleString()}
-              </Typography>
-            )}
-          </Stack>
-        </TableCell>
         <TableCell> {row.createdAt} </TableCell>
         <TableCell>{row.checkedInAt ? new Date(row.checkedInAt).toLocaleString() : '-'}</TableCell>
         {showOthersColumn && <TableCell>{row.others}</TableCell>}

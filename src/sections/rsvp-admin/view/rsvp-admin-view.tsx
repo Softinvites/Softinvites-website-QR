@@ -16,9 +16,10 @@ import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
-import Switch from '@mui/material/Switch';
-import FormControlLabel from '@mui/material/FormControlLabel';
 import Grid from '@mui/material/Grid';
+import Tabs from '@mui/material/Tabs';
+import Tab from '@mui/material/Tab';
+import Divider from '@mui/material/Divider';
 
 import { toast } from 'react-toastify';
 import { API_BASE } from 'src/utils/apiBase';
@@ -27,97 +28,62 @@ import { Iconify } from 'src/components/iconify/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 import { AnalyticsWidgetSummary } from 'src/sections/overview/analytics-widget-summary';
 
-const DEFAULT_FIELDS = [
-  {
-    name: 'attendance',
-    label: 'Will you attend?',
-    type: 'radio',
-    required: true,
-    options: ['yes', 'no', 'maybe'],
-  },
-  {
-    name: 'extraGuestCount',
-    label: 'How many additional guests will you bring?',
-    type: 'number',
-    required: false,
-  },
-  {
-    name: 'comments',
-    label: 'Comments',
-    type: 'textarea',
-    required: false,
-  },
-];
-
-type RsvpGuest = {
+type RsvpRecord = {
   _id: string;
-  fullname: string;
+  guestName: string;
   email?: string;
   phone?: string;
-  rsvpStatus?: string;
-  rsvpRespondedAt?: string;
+  attendanceStatus: 'pending' | 'yes' | 'no';
+  submissionDate?: string;
+  source: 'imported' | 'form_submission';
 };
 
 export function RsvpAdminView() {
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<any | null>(null);
-  const [guests, setGuests] = useState<RsvpGuest[]>([]);
-  const [summary, setSummary] = useState({ yes: 0, no: 0, maybe: 0, pending: 0, total: 0 });
+  const [guests, setGuests] = useState<RsvpRecord[]>([]);
+  const [summary, setSummary] = useState({ yes: 0, no: 0, pending: 0, total: 0 });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const [formFieldsJson, setFormFieldsJson] = useState(JSON.stringify(DEFAULT_FIELDS, null, 2));
-  const [allowUpdates, setAllowUpdates] = useState(true);
-  const [enableNameValidation, setEnableNameValidation] = useState(true);
-
   const [addOpen, setAddOpen] = useState(false);
-  const [newGuest, setNewGuest] = useState({ fullname: '', email: '', phone: '' });
+  const [newGuest, setNewGuest] = useState({ guestName: '', email: '', phone: '' });
+  const [activeTab, setActiveTab] = useState(0);
+  const [formLink, setFormLink] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const token = useMemo(() => localStorage.getItem('token') || '', []);
+  const conversionRate = useMemo(
+    () => (summary.total ? Math.round((summary.yes / summary.total) * 100) : 0),
+    [summary.total, summary.yes]
+  );
+  const formSubmissions = useMemo(
+    () => guests.filter((g) => g.source === 'form_submission'),
+    [guests]
+  );
 
   const loadData = useCallback(async (currentEventId: string) => {
     setLoading(true);
     setError(null);
     try {
-      const [eventRes, guestsRes, reportRes] = await Promise.all([
+      const [eventRes, guestsRes] = await Promise.all([
         axios.get(`${API_BASE}/events/events/${currentEventId}`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
-        axios.get(`${API_BASE}/admin/rsvp/events/${currentEventId}/guests`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`${API_BASE}/admin/rsvp/events/${currentEventId}/report`, {
+        axios.get(`${API_BASE}/events/${currentEventId}/rsvp/guests`, {
           headers: { Authorization: `Bearer ${token}` },
         }),
       ]);
 
       setEvent(eventRes.data?.event || eventRes.data);
-      setGuests(guestsRes.data?.guests || []);
-      const reportSummary = reportRes.data?.summary || {};
-      setSummary({ yes: 0, no: 0, maybe: 0, pending: 0, total: reportRes.data?.total ?? 0, ...reportSummary });
+      setGuests(guestsRes.data?.rsvps || []);
+      const reportSummary = guestsRes.data?.summary || {};
+      setSummary({ yes: 0, no: 0, pending: 0, total: 0, ...reportSummary });
     } catch (err: any) {
       console.error('RSVP admin load error:', err);
       setError(err?.response?.data?.message || 'Failed to load RSVP data');
     } finally {
       setLoading(false);
-    }
-  }, [token]);
-
-  const loadForm = useCallback(async (currentEventId: string) => {
-    try {
-      const res = await axios.get(`${API_BASE}/admin/rsvp/events/${currentEventId}/form`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-      setFormFieldsJson(JSON.stringify(res.data?.fields || DEFAULT_FIELDS, null, 2));
-      setAllowUpdates(res.data?.allowUpdates ?? true);
-      setEnableNameValidation(res.data?.enableNameValidation ?? true);
-    } catch (err: any) {
-      if (err?.response?.status === 404) {
-        setFormFieldsJson(JSON.stringify(DEFAULT_FIELDS, null, 2));
-      } else {
-        console.warn('Could not load RSVP form:', err);
-      }
     }
   }, [token]);
 
@@ -136,28 +102,27 @@ export function RsvpAdminView() {
       }
       setEventId(currentEventId);
       loadData(currentEventId);
-      loadForm(currentEventId);
     } catch {
       setError('Invalid event selection.');
     }
-  }, [loadData, loadForm]);
+  }, [loadData]);
 
   const handleAddGuest = async () => {
     if (!eventId) return;
-    if (!newGuest.fullname.trim()) {
+    if (!newGuest.guestName.trim()) {
       toast.error('Guest name is required');
       return;
     }
 
     try {
       await axios.post(
-        `${API_BASE}/admin/rsvp/events/${eventId}/guests`,
+        `${API_BASE}/events/${eventId}/rsvp/guests`,
         newGuest,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success('RSVP guest added');
       setAddOpen(false);
-      setNewGuest({ fullname: '', email: '', phone: '' });
+      setNewGuest({ guestName: '', email: '', phone: '' });
       loadData(eventId);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to add RSVP guest');
@@ -169,7 +134,7 @@ export function RsvpAdminView() {
     const formData = new FormData();
     formData.append('file', file);
     try {
-      await axios.post(`${API_BASE}/admin/rsvp/events/${eventId}/guests/import`, formData, {
+      await axios.post(`${API_BASE}/events/${eventId}/rsvp/import`, formData, {
         headers: {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'multipart/form-data',
@@ -186,8 +151,8 @@ export function RsvpAdminView() {
     if (!eventId) return;
     try {
       await axios.post(
-        `${API_BASE}/admin/rsvp/events/${eventId}/send`,
-        { publicBaseUrl: window.location.origin },
+        `${API_BASE}/events/${eventId}/rsvp/send`,
+        { publicBaseUrl: API_BASE },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success('RSVP invites sent');
@@ -199,7 +164,7 @@ export function RsvpAdminView() {
   const handleExportCsv = async () => {
     if (!eventId) return;
     try {
-      const response = await axios.get(`${API_BASE}/admin/rsvp/events/${eventId}/export`, {
+      const response = await axios.get(`${API_BASE}/events/${eventId}/rsvp/export`, {
         headers: { Authorization: `Bearer ${token}` },
         responseType: 'blob',
       });
@@ -216,29 +181,29 @@ export function RsvpAdminView() {
     }
   };
 
-  const handleSaveForm = async () => {
+  const handleGenerateFormLink = async () => {
     if (!eventId) return;
     try {
-      const parsedFields = JSON.parse(formFieldsJson);
-      await axios.post(
-        `${API_BASE}/admin/rsvp/events/${eventId}/form`,
-        { fields: parsedFields, allowUpdates, enableNameValidation },
+      const res = await axios.post(
+        `${API_BASE}/events/${eventId}/rsvp/generate-form`,
+        { publicBaseUrl: window.location.origin },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success('RSVP form saved');
+      const nextLink = res.data?.url || '';
+      setFormLink(nextLink);
+      toast.success('RSVP form link generated');
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to save form');
+      toast.error(err?.response?.data?.message || 'Failed to generate RSVP form link');
     }
   };
 
   const handleDeleteGuest = async (guestId: string) => {
-    if (!eventId) return;
     try {
-      await axios.delete(`${API_BASE}/admin/rsvp/events/${eventId}/guests/${guestId}`, {
+      await axios.delete(`${API_BASE}/rsvp/${guestId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       toast.success('RSVP guest removed');
-      loadData(eventId);
+      if (eventId) loadData(eventId);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to delete guest');
     }
@@ -250,7 +215,8 @@ export function RsvpAdminView() {
         <Typography variant="h4" flexGrow={1}>
           RSVP Admin
         </Typography>
-        <Stack direction="row" spacing={1}>
+        {activeTab === 0 && (
+          <Stack direction="row" spacing={1}>
           <Button variant="contained" onClick={() => setAddOpen(true)} startIcon={<Iconify icon="mingcute:add-line" />}>
             Add RSVP Guest
           </Button>
@@ -263,7 +229,8 @@ export function RsvpAdminView() {
           <Button variant="outlined" onClick={handleExportCsv} startIcon={<Iconify icon="mdi:file-download" />}>
             Export CSV
           </Button>
-        </Stack>
+          </Stack>
+        )}
       </Box>
 
       <input
@@ -294,7 +261,7 @@ export function RsvpAdminView() {
       <Grid container spacing={3} sx={{ mb: 3 }}>
         <Grid xs={12} sm={6} md={3}>
           <AnalyticsWidgetSummary
-            title="Total RSVPs"
+            title="Total Invited"
             total={summary.total}
             percent={summary.total}
             icon={<Iconify icon="mdi:account-group-outline" />}
@@ -321,15 +288,6 @@ export function RsvpAdminView() {
         </Grid>
         <Grid xs={12} sm={6} md={3}>
           <AnalyticsWidgetSummary
-            title="RSVP Maybe"
-            total={summary.maybe}
-            percent={summary.maybe}
-            icon={<Iconify icon="mdi:help-circle-outline" />}
-            color="info"
-          />
-        </Grid>
-        <Grid xs={12} sm={6} md={3}>
-          <AnalyticsWidgetSummary
             title="RSVP Pending"
             total={summary.pending}
             percent={summary.pending}
@@ -337,79 +295,150 @@ export function RsvpAdminView() {
             color="warning"
           />
         </Grid>
+        <Grid xs={12} sm={6} md={3}>
+          <AnalyticsWidgetSummary
+            title="Conversion Rate"
+            total={conversionRate}
+            percent={conversionRate}
+            icon={<Iconify icon="mdi:chart-line" />}
+            color="info"
+          />
+        </Grid>
       </Grid>
 
-      <Card sx={{ mb: 3 }}>
-        <Box p={2} borderBottom="1px solid" borderColor="divider">
-          <Typography variant="h6">RSVP Guest List</Typography>
-        </Box>
-        <Scrollbar>
-          <TableContainer sx={{ minWidth: 720 }}>
-            <Table>
-              <TableHead>
-                <TableRow>
-                  <TableCell>Name</TableCell>
-                  <TableCell>Email</TableCell>
-                  <TableCell>Phone</TableCell>
-                  <TableCell>Status</TableCell>
-                  <TableCell>Responded At</TableCell>
-                  <TableCell align="right">Actions</TableCell>
-                </TableRow>
-              </TableHead>
-              <TableBody>
-                {guests.map((guest) => (
-                  <TableRow key={guest._id}>
-                    <TableCell>{guest.fullname}</TableCell>
-                    <TableCell>{guest.email || '—'}</TableCell>
-                    <TableCell>{guest.phone || '—'}</TableCell>
-                    <TableCell>{guest.rsvpStatus || 'pending'}</TableCell>
-                    <TableCell>{guest.rsvpRespondedAt ? new Date(guest.rsvpRespondedAt).toLocaleString() : '—'}</TableCell>
-                    <TableCell align="right">
-                      <Button color="error" onClick={() => handleDeleteGuest(guest._id)}>
-                        Delete
-                      </Button>
-                    </TableCell>
-                  </TableRow>
-                ))}
-                {!loading && guests.length === 0 && (
-                  <TableRow>
-                    <TableCell colSpan={6} align="center">
-                      No RSVP guests yet.
-                    </TableCell>
-                  </TableRow>
-                )}
-              </TableBody>
-            </Table>
-          </TableContainer>
-        </Scrollbar>
-      </Card>
+      <Tabs
+        value={activeTab}
+        onChange={(_, next) => setActiveTab(next)}
+        sx={{ mb: 2 }}
+      >
+        <Tab label="RSVP Guest List" />
+        <Tab label="RSVP Form" />
+      </Tabs>
+      <Divider sx={{ mb: 3 }} />
 
-      <Card sx={{ p: 2 }}>
-        <Typography variant="h6" mb={2}>RSVP Form Settings</Typography>
-        <Stack spacing={2}>
-          <TextField
-            label="Fields (JSON)"
-            value={formFieldsJson}
-            onChange={(e) => setFormFieldsJson(e.target.value)}
-            multiline
-            minRows={6}
-            fullWidth
-          />
-          <Stack direction="row" spacing={2}>
-            <FormControlLabel
-              control={<Switch checked={allowUpdates} onChange={(e) => setAllowUpdates(e.target.checked)} />}
-              label="Allow updates"
-            />
-            <FormControlLabel
-              control={<Switch checked={enableNameValidation} onChange={(e) => setEnableNameValidation(e.target.checked)} />}
-              label="Enable name validation"
-            />
-          </Stack>
-          <Button variant="contained" onClick={handleSaveForm}>
-            Save RSVP Form
-          </Button>
+      {activeTab === 0 && (
+        <Card sx={{ mb: 3 }}>
+          <Box p={2} borderBottom="1px solid" borderColor="divider">
+            <Typography variant="h6">RSVP Guest List</Typography>
+          </Box>
+          <Scrollbar>
+            <TableContainer sx={{ minWidth: 720 }}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>Name</TableCell>
+                    <TableCell>Email</TableCell>
+                    <TableCell>Phone</TableCell>
+                    <TableCell>Status</TableCell>
+                    <TableCell>Source</TableCell>
+                    <TableCell>Submitted At</TableCell>
+                    <TableCell align="right">Actions</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {guests.map((guest) => (
+                    <TableRow key={guest._id}>
+                      <TableCell>{guest.guestName}</TableCell>
+                      <TableCell>{guest.email || '—'}</TableCell>
+                      <TableCell>{guest.phone || '—'}</TableCell>
+                      <TableCell>{guest.attendanceStatus || 'pending'}</TableCell>
+                      <TableCell>{guest.source || 'imported'}</TableCell>
+                      <TableCell>
+                        {guest.submissionDate ? new Date(guest.submissionDate).toLocaleString() : '—'}
+                      </TableCell>
+                      <TableCell align="right">
+                        <Button color="error" onClick={() => handleDeleteGuest(guest._id)}>
+                          Delete
+                        </Button>
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                  {!loading && guests.length === 0 && (
+                    <TableRow>
+                      <TableCell colSpan={7} align="center">
+                        No RSVP guests yet.
+                      </TableCell>
+                    </TableRow>
+                  )}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          </Scrollbar>
+        </Card>
+      )}
+
+      {activeTab === 1 && (
+        <Stack spacing={3}>
+          <Card sx={{ p: 2 }}>
+            <Typography variant="h6" mb={2}>
+              RSVP Form Generator
+            </Typography>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
+              <Button variant="contained" onClick={handleGenerateFormLink}>
+                Generate Form Link
+              </Button>
+              <TextField
+                label="Form Link"
+                value={formLink}
+                fullWidth
+                InputProps={{ readOnly: true }}
+              />
+              <Button
+                variant="outlined"
+                onClick={() => {
+                  if (formLink) {
+                    navigator.clipboard.writeText(formLink);
+                    toast.success('Link copied');
+                  }
+                }}
+              >
+                Copy
+              </Button>
+            </Stack>
+          </Card>
+
+          <Card>
+            <Box p={2} borderBottom="1px solid" borderColor="divider">
+              <Typography variant="h6">Form Submissions</Typography>
+            </Box>
+            <Scrollbar>
+              <TableContainer sx={{ minWidth: 720 }}>
+                <Table>
+                  <TableHead>
+                    <TableRow>
+                      <TableCell>Name</TableCell>
+                      <TableCell>Email</TableCell>
+                      <TableCell>Phone</TableCell>
+                      <TableCell>Status</TableCell>
+                      <TableCell>Submitted At</TableCell>
+                    </TableRow>
+                  </TableHead>
+                  <TableBody>
+                    {formSubmissions.map((guest) => (
+                      <TableRow key={guest._id}>
+                        <TableCell>{guest.guestName}</TableCell>
+                        <TableCell>{guest.email || '—'}</TableCell>
+                        <TableCell>{guest.phone || '—'}</TableCell>
+                        <TableCell>{guest.attendanceStatus || 'pending'}</TableCell>
+                        <TableCell>
+                          {guest.submissionDate ? new Date(guest.submissionDate).toLocaleString() : '—'}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                    {!loading && formSubmissions.length === 0 && (
+                      <TableRow>
+                        <TableCell colSpan={5} align="center">
+                          No form submissions yet.
+                        </TableCell>
+                      </TableRow>
+                    )}
+                  </TableBody>
+                </Table>
+              </TableContainer>
+            </Scrollbar>
+          </Card>
         </Stack>
-      </Card>
+      )}
 
       <Dialog open={addOpen} onClose={() => setAddOpen(false)} maxWidth="sm" fullWidth>
         <DialogTitle>Add RSVP Guest</DialogTitle>
@@ -417,8 +446,8 @@ export function RsvpAdminView() {
           <Stack spacing={2} mt={1}>
             <TextField
               label="Full name"
-              value={newGuest.fullname}
-              onChange={(e) => setNewGuest((prev) => ({ ...prev, fullname: e.target.value }))}
+              value={newGuest.guestName}
+              onChange={(e) => setNewGuest((prev) => ({ ...prev, guestName: e.target.value }))}
               fullWidth
               required
             />

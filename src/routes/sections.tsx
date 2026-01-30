@@ -91,15 +91,7 @@ export function Router() {
       ),
     },
     {
-      path: 'rsvp',
-      element: (
-        <Suspense fallback={renderFallback}>
-          <RsvpPage />
-        </Suspense>
-      ),
-    },
-    {
-      path: 'rsvp/:token',
+      path: 'rsvp/form/:token',
       element: (
         <Suspense fallback={renderFallback}>
           <RsvpPage />

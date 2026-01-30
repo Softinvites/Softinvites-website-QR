@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { API_BASE } from 'src/utils/apiBase';
 import Grid from '@mui/material/Unstable_Grid2';
 import Typography from '@mui/material/Typography';
-import { useNavigate } from "react-router-dom";
+import { useNavigate } from 'react-router-dom';
 import Button from '@mui/material/Button';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { AnalyticsCurrentVisits } from '../analytics-current-visits';
@@ -27,10 +27,10 @@ export function OverviewAnalyticsView() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    const token = localStorage.getItem("token");
+    const token = localStorage.getItem('token');
 
     if (!token) {
-      console.error("No token found in local storage.");
+      console.error('No token found in local storage.');
       navigate('/sign-in');
       setLoading(false);
       return;
@@ -38,17 +38,17 @@ export function OverviewAnalyticsView() {
 
     Promise.all([
       fetch(`${API_BASE}/events/events`, {
-        method: "GET",
+        method: 'GET',
         headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       }).then((res) => res.json()),
       fetch(`${API_BASE}/guest/get-analytics/`, {
-        method: "GET",
+        method: 'GET',
         headers: {
-          "Authorization": `Bearer ${token}`,
-          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
         },
       }).then((res) => res.json()),
     ])
@@ -62,7 +62,7 @@ export function OverviewAnalyticsView() {
         setLoading(false);
       })
       .catch((err) => {
-        console.error("Error fetching data:", err);
+        console.error('Error fetching data:', err);
         navigate('/sign-in');
         setError(err.message);
         setLoading(false);
@@ -76,10 +76,7 @@ export function OverviewAnalyticsView() {
       </Typography>
 
       {error && (
-        <Button
-          onClick={() => navigate("/sign-in")}
-          sx={{ mt: 2, color: "red" }}
-        >
+        <Button onClick={() => navigate('/sign-in')} sx={{ mt: 2, color: 'red' }}>
           Click here to sign in again to view details
         </Button>
       )}
