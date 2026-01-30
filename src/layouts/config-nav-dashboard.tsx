@@ -17,12 +17,6 @@ export const navData = [
     path: '/event',
     icon: icon('ic-user'),
   },
-  {
-    title: 'RSVP',
-    path: '/rsvp-admin',
-    icon: icon('ic-blog'),
-  },
-
 
     {
     title: 'Change Password',

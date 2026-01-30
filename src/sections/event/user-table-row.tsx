@@ -449,7 +449,14 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   const handleGoToRsvp = useCallback(() => {
     localStorage.setItem('allRowIds', JSON.stringify([row.id]));
     navigate('/rsvp-admin');
-  }, [row.id, navigate]);
+    handleClosePopover();
+  }, [row.id, navigate, handleClosePopover]);
+
+  const handleGoToGuest = useCallback(() => {
+    localStorage.setItem('allRowIds', JSON.stringify([row.id]));
+    navigate('/guest');
+    handleClosePopover();
+  }, [row.id, navigate, handleClosePopover]);
 
   return (
     <>
@@ -501,8 +508,9 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
 
       <Popover open={!!openPopover} anchorEl={openPopover} onClose={handleClosePopover}>
         <MenuList sx={{ p: 1 }}>
-          <MenuItem onClick={handleOpenEditDialog}>Edit</MenuItem>
           <MenuItem onClick={handleGoToRsvp}>Go to RSVP</MenuItem>
+          <MenuItem onClick={handleGoToGuest}>Go to Guest</MenuItem>
+          <MenuItem onClick={handleOpenEditDialog}>Edit</MenuItem>
           <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
             Delete
           </MenuItem>

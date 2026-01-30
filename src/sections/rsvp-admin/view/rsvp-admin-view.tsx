@@ -18,12 +18,14 @@ import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
+import Grid from '@mui/material/Grid';
 
 import { toast } from 'react-toastify';
 import { API_BASE } from 'src/utils/apiBase';
 import { DashboardContent } from 'src/layouts/dashboard';
 import { Iconify } from 'src/components/iconify/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
+import { AnalyticsWidgetSummary } from 'src/sections/overview/analytics-widget-summary';
 
 const DEFAULT_FIELDS = [
   {
@@ -278,21 +280,64 @@ export function RsvpAdminView() {
 
       {error && <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>}
 
-      <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} mb={3}>
-        <Card sx={{ p: 2, flex: 1 }}>
-          <Typography variant="subtitle2">Event</Typography>
-          <Typography variant="h6">{event?.name || '—'}</Typography>
-          <Typography variant="body2" color="text.secondary">{event?.date || ''}</Typography>
-          <Typography variant="body2" color="text.secondary">{event?.location || ''}</Typography>
-        </Card>
-        <Card sx={{ p: 2, flex: 1 }}>
-          <Typography variant="subtitle2">RSVP Summary</Typography>
-          <Typography variant="body2">Yes: {summary.yes}</Typography>
-          <Typography variant="body2">No: {summary.no}</Typography>
-          <Typography variant="body2">Maybe: {summary.maybe}</Typography>
-          <Typography variant="body2">Pending: {summary.pending}</Typography>
-        </Card>
-      </Stack>
+      <Card sx={{ p: 2, mb: 3 }}>
+        <Typography variant="subtitle2">Event</Typography>
+        <Typography variant="h6">{event?.name || '—'}</Typography>
+        <Typography variant="body2" color="text.secondary">
+          {event?.date || ''}
+        </Typography>
+        <Typography variant="body2" color="text.secondary">
+          {event?.location || ''}
+        </Typography>
+      </Card>
+
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid xs={12} sm={6} md={3}>
+          <AnalyticsWidgetSummary
+            title="Total RSVPs"
+            total={summary.total}
+            percent={summary.total}
+            icon={<Iconify icon="mdi:account-group-outline" />}
+            color="primary"
+          />
+        </Grid>
+        <Grid xs={12} sm={6} md={3}>
+          <AnalyticsWidgetSummary
+            title="RSVP Yes"
+            total={summary.yes}
+            percent={summary.yes}
+            icon={<Iconify icon="mdi:checkbox-marked-circle-outline" />}
+            color="success"
+          />
+        </Grid>
+        <Grid xs={12} sm={6} md={3}>
+          <AnalyticsWidgetSummary
+            title="RSVP No"
+            total={summary.no}
+            percent={summary.no}
+            icon={<Iconify icon="mdi:close-circle-outline" />}
+            color="error"
+          />
+        </Grid>
+        <Grid xs={12} sm={6} md={3}>
+          <AnalyticsWidgetSummary
+            title="RSVP Maybe"
+            total={summary.maybe}
+            percent={summary.maybe}
+            icon={<Iconify icon="mdi:help-circle-outline" />}
+            color="info"
+          />
+        </Grid>
+        <Grid xs={12} sm={6} md={3}>
+          <AnalyticsWidgetSummary
+            title="RSVP Pending"
+            total={summary.pending}
+            percent={summary.pending}
+            icon={<Iconify icon="mdi:clock-outline" />}
+            color="warning"
+          />
+        </Grid>
+      </Grid>
 
       <Card sx={{ mb: 3 }}>
         <Box p={2} borderBottom="1px solid" borderColor="divider">
