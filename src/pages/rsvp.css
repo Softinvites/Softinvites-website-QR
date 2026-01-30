@@ -105,7 +105,7 @@
 
 .rsvp-pill {
   display: inline-block;
-  background: var(--rsvp-accent, #111827);
+  background: var(--rsvp-bg, #111827);
   color: #f8fafc;
   padding: 6px 12px;
   border-radius: 12px;
@@ -150,8 +150,8 @@
 .rsvp-field textarea:focus,
 .rsvp-field select:focus {
   outline: none;
-  border-color: #ffffff;
-  box-shadow: 0 0 0 3px rgba(255, 255, 255, 0.2);
+  border-color: var(--rsvp-accent, #ffffff);
+  box-shadow: 0 0 0 3px rgba(17, 24, 39, 0.25);
 }
 
 .rsvp-statuses {
@@ -178,12 +178,12 @@
 }
 
 .rsvp-chip.yes {
-  background: linear-gradient(135deg, var(--rsvp-accent, #34d399), #22c55e);
+  background: linear-gradient(135deg, var(--rsvp-bg, #34d399), #22c55e);
   color: #0f172a;
 }
 
 .rsvp-chip.no {
-  background: linear-gradient(135deg, var(--rsvp-accent-2, #fca5a5), #f97316);
+  background: linear-gradient(135deg, var(--rsvp-accent, #fca5a5), #f97316);
   color: #0f172a;
 }
 
@@ -205,7 +205,7 @@
 
 .rsvp-submit {
   border: none;
-  background: var(--rsvp-accent, #ffffff);
+  background: var(--rsvp-bg, #ffffff);
   color: #ffffff;
   padding: 14px 18px;
   border-radius: 8px;

@@ -20,6 +20,8 @@ type RsvpFormResponse = {
     location?: string;
     iv?: string;
     description?: string;
+    rsvpBgColor?: string;
+    rsvpAccentColor?: string;
     qrCodeBgColor?: string;
     qrCodeCenterColor?: string;
     qrCodeEdgeColor?: string;
@@ -88,6 +90,10 @@ export default function RsvpPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!payload || !token) return;
+    if (typeof navigator !== 'undefined' && !navigator.onLine) {
+      toast.error('No internet connection. Please try again when you are online.');
+      return;
+    }
     if (!guestName.trim()) {
       toast.error('Please enter your name');
       return;
@@ -121,7 +127,11 @@ export default function RsvpPage() {
       toast.success('RSVP submitted. Thank you!');
       setPayload((prev) => (prev ? { ...prev, submitted: true } : prev));
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to submit RSVP');
+      if (typeof navigator !== 'undefined' && !navigator.onLine) {
+        toast.error('No internet connection. Please try again when you are online.');
+      } else {
+        toast.error(err?.response?.data?.message || 'Failed to submit RSVP');
+      }
     } finally {
       setSubmitting(false);
     }
@@ -143,16 +153,19 @@ export default function RsvpPage() {
     );
   }, [payload]);
 
-  const accent = rgbString(payload?.event?.qrCodeCenterColor, '#111827');
-  const accentAlt = rgbString(payload?.event?.qrCodeEdgeColor, '#0f172a');
+  const rsvpBg = rgbString(payload?.event?.rsvpBgColor, '#111827');
+  const rsvpAccent = rgbString(
+    payload?.event?.rsvpAccentColor || payload?.event?.qrCodeCenterColor,
+    '#1f2937'
+  );
 
   return (
     <div
       className="rsvp-page"
       style={
         {
-          '--rsvp-accent': accent,
-          '--rsvp-accent-2': accentAlt,
+          '--rsvp-bg': rsvpBg,
+          '--rsvp-accent': rsvpAccent,
         } as React.CSSProperties
       }
     >

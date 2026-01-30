@@ -20,6 +20,7 @@ import Grid from '@mui/material/Grid';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Divider from '@mui/material/Divider';
+import { SketchPicker } from 'react-color';
 
 import { toast } from 'react-toastify';
 import { API_BASE } from 'src/utils/apiBase';
@@ -50,6 +51,9 @@ export function RsvpAdminView() {
   const [newGuest, setNewGuest] = useState({ guestName: '', email: '', phone: '' });
   const [activeTab, setActiveTab] = useState(0);
   const [formLink, setFormLink] = useState('');
+  const [rsvpMessage, setRsvpMessage] = useState('');
+  const [rsvpBgColor, setRsvpBgColor] = useState('#111827');
+  const [rsvpAccentColor, setRsvpAccentColor] = useState('#1f2937');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const token = useMemo(() => localStorage.getItem('token') || '', []);
@@ -61,6 +65,22 @@ export function RsvpAdminView() {
     () => guests.filter((g) => g.source === 'form_submission'),
     [guests]
   );
+
+  const hexToRgb = (hex: string): string => {
+    const cleanedHex = hex.replace('#', '');
+    const r = parseInt(cleanedHex.substring(0, 2), 16);
+    const g = parseInt(cleanedHex.substring(2, 4), 16);
+    const b = parseInt(cleanedHex.substring(4, 6), 16);
+    return `${r},${g},${b}`;
+  };
+
+  const rgbToHex = (rgb: string): string => {
+    const parts = rgb.split(',').map((v) => parseInt(v.trim(), 10));
+    if (parts.length !== 3 || parts.some((v) => Number.isNaN(v))) {
+      return '#111827';
+    }
+    return `#${parts.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
+  };
 
   const loadData = useCallback(async (currentEventId: string) => {
     setLoading(true);
@@ -75,7 +95,17 @@ export function RsvpAdminView() {
         }),
       ]);
 
-      setEvent(eventRes.data?.event || eventRes.data);
+      const nextEvent = eventRes.data?.event || eventRes.data;
+      setEvent(nextEvent);
+      if (nextEvent?.rsvpMessage !== undefined) {
+        setRsvpMessage(nextEvent.rsvpMessage || '');
+      }
+      if (nextEvent?.rsvpBgColor) {
+        setRsvpBgColor(rgbToHex(nextEvent.rsvpBgColor));
+      }
+      if (nextEvent?.rsvpAccentColor) {
+        setRsvpAccentColor(rgbToHex(nextEvent.rsvpAccentColor));
+      }
       setGuests(guestsRes.data?.rsvps || []);
       const reportSummary = guestsRes.data?.summary || {};
       setSummary({ yes: 0, no: 0, pending: 0, total: 0, ...reportSummary });
@@ -197,6 +227,25 @@ export function RsvpAdminView() {
     }
   };
 
+  const handleSaveRsvpSettings = async () => {
+    if (!eventId) return;
+    try {
+      await axios.put(
+        `${API_BASE}/events/${eventId}/rsvp-settings`,
+        {
+          rsvpMessage,
+          rsvpBgColor: hexToRgb(rsvpBgColor),
+          rsvpAccentColor: hexToRgb(rsvpAccentColor),
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success('RSVP settings saved');
+      loadData(eventId);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to save RSVP settings');
+    }
+  };
+
   const handleDeleteGuest = async (guestId: string) => {
     try {
       await axios.delete(`${API_BASE}/rsvp/${guestId}`, {
@@ -313,6 +362,7 @@ export function RsvpAdminView() {
       >
         <Tab label="RSVP Guest List" />
         <Tab label="RSVP Form" />
+        <Tab label="Settings" />
       </Tabs>
       <Divider sx={{ mb: 3 }} />
 
@@ -438,6 +488,49 @@ export function RsvpAdminView() {
             </Scrollbar>
           </Card>
         </Stack>
+      )}
+
+      {activeTab === 2 && (
+        <Card sx={{ p: 3 }}>
+          <Typography variant="h6" mb={2}>
+            RSVP Settings
+          </Typography>
+          <Stack spacing={3}>
+            <TextField
+              label="RSVP Message (HTML supported)"
+              value={rsvpMessage}
+              onChange={(e) => setRsvpMessage(e.target.value)}
+              multiline
+              minRows={6}
+              fullWidth
+            />
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+              <Box>
+                <Typography variant="subtitle2" mb={1}>
+                  RSVP Background Color
+                </Typography>
+                <SketchPicker
+                  color={rsvpBgColor}
+                  onChangeComplete={(color) => setRsvpBgColor(color.hex)}
+                />
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" mb={1}>
+                  RSVP Accent Color
+                </Typography>
+                <SketchPicker
+                  color={rsvpAccentColor}
+                  onChangeComplete={(color) => setRsvpAccentColor(color.hex)}
+                />
+              </Box>
+            </Stack>
+            <Box>
+              <Button variant="contained" onClick={handleSaveRsvpSettings}>
+                Save RSVP Settings
+              </Button>
+            </Box>
+          </Stack>
+        </Card>
       )}
 
       <Dialog open={addOpen} onClose={() => setAddOpen(false)} maxWidth="sm" fullWidth>
