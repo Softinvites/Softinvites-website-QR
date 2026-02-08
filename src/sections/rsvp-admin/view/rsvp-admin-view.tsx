@@ -55,6 +55,8 @@ export function RsvpAdminView() {
   const [rsvpBgColor, setRsvpBgColor] = useState('#111827');
   const [rsvpAccentColor, setRsvpAccentColor] = useState('#1f2937');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [deleteTarget, setDeleteTarget] = useState<RsvpRecord | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   const token = useMemo(() => localStorage.getItem('token') || '', []);
   const conversionRate = useMemo(
@@ -231,7 +233,7 @@ export function RsvpAdminView() {
     if (!eventId) return;
     try {
       await axios.put(
-        `${API_BASE}/events/${eventId}/rsvp-settings`,
+        `${API_BASE}/events/events/${eventId}/rsvp-settings`,
         {
           rsvpMessage,
           rsvpBgColor: hexToRgb(rsvpBgColor),
@@ -246,15 +248,20 @@ export function RsvpAdminView() {
     }
   };
 
-  const handleDeleteGuest = async (guestId: string) => {
+  const handleDeleteGuest = async () => {
+    if (!deleteTarget) return;
     try {
-      await axios.delete(`${API_BASE}/rsvp/${guestId}`, {
+      setDeleteLoading(true);
+      await axios.delete(`${API_BASE}/rsvp/${deleteTarget._id}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
       toast.success('RSVP guest removed');
       if (eventId) loadData(eventId);
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to delete guest');
+    } finally {
+      setDeleteLoading(false);
+      setDeleteTarget(null);
     }
   };
 
@@ -397,7 +404,7 @@ export function RsvpAdminView() {
                         {guest.submissionDate ? new Date(guest.submissionDate).toLocaleString() : '—'}
                       </TableCell>
                       <TableCell align="right">
-                        <Button color="error" onClick={() => handleDeleteGuest(guest._id)}>
+                        <Button color="error" onClick={() => setDeleteTarget(guest)}>
                           Delete
                         </Button>
                       </TableCell>
@@ -561,6 +568,35 @@ export function RsvpAdminView() {
         <DialogActions>
           <Button onClick={() => setAddOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleAddGuest}>Add</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog
+        open={Boolean(deleteTarget)}
+        onClose={() => (deleteLoading ? null : setDeleteTarget(null))}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Delete RSVP guest?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary">
+            {deleteTarget
+              ? `This will permanently delete ${deleteTarget.guestName} from the RSVP list.`
+              : 'This will permanently delete this RSVP guest.'}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setDeleteTarget(null)} disabled={deleteLoading}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            onClick={handleDeleteGuest}
+            disabled={deleteLoading}
+          >
+            {deleteLoading ? 'Deleting...' : 'Delete'}
+          </Button>
         </DialogActions>
       </Dialog>
     </DashboardContent>
