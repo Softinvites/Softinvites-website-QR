@@ -20,6 +20,7 @@ export const RegisterPage = lazy(() => import('src/pages/register'));
 export const ChangePassword = lazy(() => import('src/pages/change-password'));
 export const Profile = lazy(() => import('src/pages/profile'));
 export const RsvpPage = lazy(() => import('src/pages/rsvp'));
+export const RsvpRespondPage = lazy(() => import('src/pages/rsvp-respond'));
 export const RsvpAdminPage = lazy(() => import('src/pages/rsvp-admin'));
 
 export const Page404 = lazy(() => import('src/pages/page-not-found'));
@@ -95,6 +96,14 @@ export function Router() {
       element: (
         <Suspense fallback={renderFallback}>
           <RsvpPage />
+        </Suspense>
+      ),
+    },
+    {
+      path: 'rsvp/respond/:rsvpId',
+      element: (
+        <Suspense fallback={renderFallback}>
+          <RsvpRespondPage />
         </Suspense>
       ),
     },
