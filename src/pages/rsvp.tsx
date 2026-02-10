@@ -25,10 +25,24 @@ type RsvpFormResponse = {
     qrCodeBgColor?: string;
     qrCodeCenterColor?: string;
     qrCodeEdgeColor?: string;
+    rsvpFormSettings?: Record<string, any>;
   };
   form: {
     isEditable: boolean;
   };
+};
+
+const defaultFormSettings = {
+  guestNameLabel: 'Guest Name',
+  guestNamePlaceholder: '',
+  emailLabel: 'Email',
+  emailPlaceholder: '',
+  phoneLabel: 'Phone Number',
+  phonePlaceholder: '',
+  attendanceLabel: 'Will you attend?',
+  commentsLabel: 'Additional Comments',
+  commentsPlaceholder: '',
+  submitLabel: 'Submit RSVP',
 };
 
 function formatDate(value?: string) {
@@ -86,6 +100,10 @@ export default function RsvpPage() {
   }, [token]);
 
   const formLocked = useMemo(() => payload?.submitted === true, [payload]);
+  const formSettings = useMemo(
+    () => ({ ...defaultFormSettings, ...(payload?.event?.rsvpFormSettings || {}) }),
+    [payload]
+  );
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -189,46 +207,49 @@ export default function RsvpPage() {
               </div>
 
               <label className="rsvp-field" htmlFor="rsvp-guest-name">
-                <span>Guest Name</span>
+                <span>{formSettings.guestNameLabel}</span>
                 <input
                   id="rsvp-guest-name"
                   type="text"
                   name="guestName"
                   value={guestName}
                   disabled={submitting || formLocked}
+                  placeholder={formSettings.guestNamePlaceholder}
                   onChange={(e) => setGuestName(e.target.value)}
                   required
                 />
               </label>
 
               <label className="rsvp-field" htmlFor="rsvp-email">
-                <span>Email</span>
+                <span>{formSettings.emailLabel}</span>
                 <input
                   id="rsvp-email"
                   type="email"
                   name="email"
                   value={email}
                   disabled={submitting || formLocked}
+                  placeholder={formSettings.emailPlaceholder}
                   onChange={(e) => setEmail(e.target.value)}
                   required
                 />
               </label>
 
               <label className="rsvp-field" htmlFor="rsvp-phone">
-                <span>Phone Number</span>
+                <span>{formSettings.phoneLabel}</span>
                 <input
                   id="rsvp-phone"
                   type="tel"
                   name="phone"
                   value={phone}
                   disabled={submitting || formLocked}
+                  placeholder={formSettings.phonePlaceholder}
                   onChange={(e) => setPhone(e.target.value)}
                   required
                 />
               </label>
 
               <div className="rsvp-field">
-                <span>Will you attend?</span>
+                <span>{formSettings.attendanceLabel}</span>
                 <div className="rsvp-statuses">
                   {(['yes', 'no'] as AttendanceStatus[]).map((opt) => (
                     <button
@@ -245,12 +266,13 @@ export default function RsvpPage() {
               </div>
 
               <label className="rsvp-field" htmlFor="rsvp-comments">
-                <span>Additional Comments</span>
+                <span>{formSettings.commentsLabel}</span>
                 <textarea
                   id="rsvp-comments"
                   name="comments"
                   value={comments}
                   disabled={submitting || formLocked}
+                  placeholder={formSettings.commentsPlaceholder}
                   onChange={(e) => setComments(e.target.value)}
                   rows={4}
                 />
@@ -261,7 +283,7 @@ export default function RsvpPage() {
               )}
 
               <button type="submit" className="rsvp-submit" disabled={submitting || formLocked}>
-                {submitting ? 'Submitting...' : 'Submit RSVP'}
+                {submitting ? 'Submitting...' : formSettings.submitLabel}
               </button>
             </form>
           )}

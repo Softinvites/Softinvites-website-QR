@@ -39,6 +39,32 @@ type RsvpRecord = {
   source: 'imported' | 'form_submission';
 };
 
+type RsvpFormSettings = {
+  guestNameLabel: string;
+  guestNamePlaceholder: string;
+  emailLabel: string;
+  emailPlaceholder: string;
+  phoneLabel: string;
+  phonePlaceholder: string;
+  attendanceLabel: string;
+  commentsLabel: string;
+  commentsPlaceholder: string;
+  submitLabel: string;
+};
+
+const defaultRsvpFormSettings: RsvpFormSettings = {
+  guestNameLabel: 'Guest Name',
+  guestNamePlaceholder: '',
+  emailLabel: 'Email',
+  emailPlaceholder: '',
+  phoneLabel: 'Phone Number',
+  phonePlaceholder: '',
+  attendanceLabel: 'Will you attend?',
+  commentsLabel: 'Additional Comments',
+  commentsPlaceholder: '',
+  submitLabel: 'Submit RSVP',
+};
+
 export function RsvpAdminView() {
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<any | null>(null);
@@ -54,6 +80,8 @@ export function RsvpAdminView() {
   const [rsvpMessage, setRsvpMessage] = useState('');
   const [rsvpBgColor, setRsvpBgColor] = useState('#111827');
   const [rsvpAccentColor, setRsvpAccentColor] = useState('#1f2937');
+  const [rsvpFormSettings, setRsvpFormSettings] =
+    useState<RsvpFormSettings>(defaultRsvpFormSettings);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [deleteTarget, setDeleteTarget] = useState<RsvpRecord | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
@@ -107,6 +135,11 @@ export function RsvpAdminView() {
       }
       if (nextEvent?.rsvpAccentColor) {
         setRsvpAccentColor(rgbToHex(nextEvent.rsvpAccentColor));
+      }
+      if (nextEvent?.rsvpFormSettings) {
+        setRsvpFormSettings({ ...defaultRsvpFormSettings, ...nextEvent.rsvpFormSettings });
+      } else {
+        setRsvpFormSettings(defaultRsvpFormSettings);
       }
       setGuests(guestsRes.data?.rsvps || []);
       const reportSummary = guestsRes.data?.summary || {};
@@ -248,6 +281,21 @@ export function RsvpAdminView() {
     }
   };
 
+  const handleRsvpFormSettings = async () => {
+    if (!eventId) return;
+    try {
+      await axios.put(
+        `${API_BASE}/events/events/${eventId}/rsvp-form-settings`,
+        { rsvpFormSettings },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success('RSVP form settings saved');
+      loadData(eventId);
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to save RSVP form settings');
+    }
+  };
+
   const handleDeleteGuest = async () => {
     if (!deleteTarget) return;
     try {
@@ -370,6 +418,7 @@ export function RsvpAdminView() {
         <Tab label="RSVP Guest List" />
         <Tab label="RSVP Form" />
         <Tab label="Settings" />
+        <Tab label="Form Settings" />
       </Tabs>
       <Divider sx={{ mb: 3 }} />
 
@@ -534,6 +583,153 @@ export function RsvpAdminView() {
             <Box>
               <Button variant="contained" onClick={handleSaveRsvpSettings}>
                 Save RSVP Settings
+              </Button>
+            </Box>
+          </Stack>
+        </Card>
+      )}
+
+      {activeTab === 3 && (
+        <Card sx={{ p: 3 }}>
+          <Typography variant="h6" mb={2}>
+            RSVP Form Settings
+          </Typography>
+          <Stack spacing={3}>
+            <Grid container spacing={2}>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Guest Name Label"
+                  value={rsvpFormSettings.guestNameLabel}
+                  onChange={(e) =>
+                    setRsvpFormSettings((prev) => ({
+                      ...prev,
+                      guestNameLabel: e.target.value,
+                    }))
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Guest Name Placeholder"
+                  value={rsvpFormSettings.guestNamePlaceholder}
+                  onChange={(e) =>
+                    setRsvpFormSettings((prev) => ({
+                      ...prev,
+                      guestNamePlaceholder: e.target.value,
+                    }))
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Email Label"
+                  value={rsvpFormSettings.emailLabel}
+                  onChange={(e) =>
+                    setRsvpFormSettings((prev) => ({
+                      ...prev,
+                      emailLabel: e.target.value,
+                    }))
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Email Placeholder"
+                  value={rsvpFormSettings.emailPlaceholder}
+                  onChange={(e) =>
+                    setRsvpFormSettings((prev) => ({
+                      ...prev,
+                      emailPlaceholder: e.target.value,
+                    }))
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Phone Label"
+                  value={rsvpFormSettings.phoneLabel}
+                  onChange={(e) =>
+                    setRsvpFormSettings((prev) => ({
+                      ...prev,
+                      phoneLabel: e.target.value,
+                    }))
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Phone Placeholder"
+                  value={rsvpFormSettings.phonePlaceholder}
+                  onChange={(e) =>
+                    setRsvpFormSettings((prev) => ({
+                      ...prev,
+                      phonePlaceholder: e.target.value,
+                    }))
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Attendance Label"
+                  value={rsvpFormSettings.attendanceLabel}
+                  onChange={(e) =>
+                    setRsvpFormSettings((prev) => ({
+                      ...prev,
+                      attendanceLabel: e.target.value,
+                    }))
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Comments Label"
+                  value={rsvpFormSettings.commentsLabel}
+                  onChange={(e) =>
+                    setRsvpFormSettings((prev) => ({
+                      ...prev,
+                      commentsLabel: e.target.value,
+                    }))
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Comments Placeholder"
+                  value={rsvpFormSettings.commentsPlaceholder}
+                  onChange={(e) =>
+                    setRsvpFormSettings((prev) => ({
+                      ...prev,
+                      commentsPlaceholder: e.target.value,
+                    }))
+                  }
+                  fullWidth
+                />
+              </Grid>
+              <Grid item xs={12} md={6}>
+                <TextField
+                  label="Submit Button Label"
+                  value={rsvpFormSettings.submitLabel}
+                  onChange={(e) =>
+                    setRsvpFormSettings((prev) => ({
+                      ...prev,
+                      submitLabel: e.target.value,
+                    }))
+                  }
+                  fullWidth
+                />
+              </Grid>
+            </Grid>
+            <Box>
+              <Button variant="contained" onClick={handleRsvpFormSettings}>
+                Save RSVP Form Settings
               </Button>
             </Box>
           </Stack>
