@@ -194,6 +194,20 @@
   gap: 10px 16px;
 }
 
+.rsvp-checkboxes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px 16px;
+}
+
+.rsvp-checkboxes label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 500;
+  color: #0f172a;
+}
+
 .rsvp-radio,
 .rsvp-checkbox {
   display: inline-flex;

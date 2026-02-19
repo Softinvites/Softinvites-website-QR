@@ -284,6 +284,7 @@ import {
   DialogActions,
   TextField,
   Button,
+  FormControlLabel,
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
@@ -302,6 +303,12 @@ export type UserProps = {
   isVerified?: boolean;
   description: string;
   iv?: string;
+  servicePackage?: string;
+  channelConfig?: any;
+  messageCycle?: number;
+  rsvpDeadline?: string;
+  eventEndDate?: string;
+  customMessageSequence?: any;
 };
 
 type UserTableRowProps = {
@@ -326,6 +333,11 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   const [editDescription, setEditDescription] = useState(row.description);
   const [editIv, setEditIv] = useState<File | null>(null); // 👈 File object
   const [editIvPreview, setEditIvPreview] = useState<string | null>(row.iv || null); // 👈 preview
+  const [editServicePackage, setEditServicePackage] = useState(row.servicePackage || 'standard-rsvp');
+  const [editEnableWhatsApp, setEditEnableWhatsApp] = useState(
+    !!row.channelConfig?.whatsapp?.enabled
+  );
+  const [editEnableSms, setEditEnableSms] = useState(!!row.channelConfig?.bulkSms?.enabled);
 
   useEffect(() => {
     const storedIds = JSON.parse(localStorage.getItem('allRowIds') || '[]');
@@ -334,6 +346,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       localStorage.setItem('allRowIds', JSON.stringify(storedIds));
     }
   }, [row.id]);
+
 
   const handleOpenPopover = useCallback((event: React.MouseEvent<HTMLButtonElement>) => {
     setOpenPopover(event.currentTarget);
@@ -363,6 +376,22 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       formData.append('date', editDate);
       formData.append('location', editLocation);
       formData.append('description', editDescription);
+      formData.append('servicePackage', editServicePackage);
+
+      const messageCycleMap: Record<string, number> = {
+        'invitation-only': 0,
+        'one-time-rsvp': 1,
+        'standard-rsvp': 3,
+        'full-rsvp': 6,
+      };
+      formData.append('messageCycle', String(messageCycleMap[editServicePackage] ?? 3));
+
+      const channelConfig = {
+        email: { enabled: true, required: true, trackingEnabled: true },
+        whatsapp: { enabled: editServicePackage === 'full-rsvp' ? editEnableWhatsApp : false, optInRequired: true },
+        bulkSms: { enabled: editServicePackage === 'full-rsvp' ? editEnableSms : false, optInRequired: true },
+      };
+      formData.append('channelConfig', JSON.stringify(channelConfig));
 
       if (editIv) {
         formData.append('iv', editIv); // 👈 send actual file
@@ -392,7 +421,19 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     } finally {
       handleCloseDialog();
     }
-  }, [row.id, token, editName, editDate, editLocation, editDescription, editIv, handleCloseDialog]);
+  }, [
+    row.id,
+    token,
+    editName,
+    editDate,
+    editLocation,
+    editDescription,
+    editIv,
+    editServicePackage,
+    editEnableWhatsApp,
+    editEnableSms,
+    handleCloseDialog,
+  ]);
 
   const handleGenerateTempLink = useCallback(async () => {
     try {
@@ -553,6 +594,44 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
             value={editDescription}
             onChange={(e) => setEditDescription(e.target.value)}
           />
+          <TextField
+            margin="dense"
+            label="Service Package"
+            select
+            fullWidth
+            value={editServicePackage}
+            onChange={(e) => setEditServicePackage(e.target.value)}
+          >
+            <MenuItem value="invitation-only">Invitation Only</MenuItem>
+            <MenuItem value="one-time-rsvp">One-Time RSVP</MenuItem>
+            <MenuItem value="standard-rsvp">Standard RSVP</MenuItem>
+            <MenuItem value="full-rsvp">Full RSVP</MenuItem>
+          </TextField>
+          {editServicePackage === 'full-rsvp' && (
+            <>
+              <Typography variant="subtitle2" sx={{ mt: 1 }}>
+                Optional Channels (email is always included)
+              </Typography>
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={editEnableWhatsApp}
+                    onChange={(e) => setEditEnableWhatsApp(e.target.checked)}
+                  />
+                }
+                label="Enable WhatsApp"
+              />
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={editEnableSms}
+                    onChange={(e) => setEditEnableSms(e.target.checked)}
+                  />
+                }
+                label="Enable SMS"
+              />
+            </>
+          )}
           <Typography variant="subtitle1" sx={{ mt: 2 }}>
             Replace IV Image (PNG/JPG):
           </Typography>

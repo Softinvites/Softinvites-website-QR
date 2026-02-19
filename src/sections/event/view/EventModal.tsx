@@ -8,6 +8,14 @@ import {
   TextField,
   CircularProgress,
   Typography,
+  MenuItem,
+  FormControlLabel,
+  Checkbox,
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableRow,
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { API_BASE } from 'src/utils/apiBase';
@@ -24,7 +32,9 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
     location: '',
     description: '',
   });
-
+  const [servicePackage, setServicePackage] = React.useState('standard-rsvp');
+  const [enableWhatsApp, setEnableWhatsApp] = React.useState(false);
+  const [enableSms, setEnableSms] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
   const [previewImage, setPreviewImage] = React.useState<string | null>(null);
   const [file, setFile] = React.useState<File | null>(null);
@@ -59,6 +69,22 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
       formData.append('date', eventData.date);
       formData.append('location', eventData.location);
       formData.append('description', eventData.description);
+      formData.append('servicePackage', servicePackage);
+
+      const messageCycleMap: Record<string, number> = {
+        'invitation-only': 0,
+        'one-time-rsvp': 1,
+        'standard-rsvp': 3,
+        'full-rsvp': 6,
+      };
+      formData.append('messageCycle', String(messageCycleMap[servicePackage] ?? 3));
+
+      const channelConfig = {
+        email: { enabled: true, required: true, trackingEnabled: true },
+        whatsapp: { enabled: servicePackage === 'full-rsvp' ? enableWhatsApp : false, optInRequired: true },
+        bulkSms: { enabled: servicePackage === 'full-rsvp' ? enableSms : false, optInRequired: true },
+      };
+      formData.append('channelConfig', JSON.stringify(channelConfig));
 
       if (file) {
         formData.append('iv', file); // optional
@@ -136,6 +162,91 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
           minRows={4}
         />
 
+        <TextField
+          fullWidth
+          select
+          label="Service Package"
+          value={servicePackage}
+          onChange={(e) => setServicePackage(e.target.value)}
+          margin="dense"
+        >
+          <MenuItem value="invitation-only">Invitation Only</MenuItem>
+          <MenuItem value="one-time-rsvp">One-Time RSVP</MenuItem>
+          <MenuItem value="standard-rsvp">Standard RSVP</MenuItem>
+          <MenuItem value="full-rsvp">Full RSVP</MenuItem>
+        </TextField>
+
+        <Typography variant="subtitle2" sx={{ mt: 2 }}>
+          Package Comparison (Email always included)
+        </Typography>
+        <Table size="small">
+          <TableHead>
+            <TableRow>
+              <TableCell>Package</TableCell>
+              <TableCell>RSVP Tracking</TableCell>
+              <TableCell>Reminders</TableCell>
+              <TableCell>Thank You</TableCell>
+              <TableCell>WhatsApp/SMS</TableCell>
+            </TableRow>
+          </TableHead>
+          <TableBody>
+            <TableRow>
+              <TableCell>Invitation Only</TableCell>
+              <TableCell>No</TableCell>
+              <TableCell>No</TableCell>
+              <TableCell>No</TableCell>
+              <TableCell>No</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>One-Time RSVP</TableCell>
+              <TableCell>Yes</TableCell>
+              <TableCell>No</TableCell>
+              <TableCell>No</TableCell>
+              <TableCell>No</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>Standard RSVP</TableCell>
+              <TableCell>Yes</TableCell>
+              <TableCell>Yes</TableCell>
+              <TableCell>Yes</TableCell>
+              <TableCell>No</TableCell>
+            </TableRow>
+            <TableRow>
+              <TableCell>Full RSVP</TableCell>
+              <TableCell>Yes</TableCell>
+              <TableCell>Yes</TableCell>
+              <TableCell>Yes</TableCell>
+              <TableCell>Optional</TableCell>
+            </TableRow>
+          </TableBody>
+        </Table>
+
+        {servicePackage === 'full-rsvp' && (
+          <>
+            <Typography variant="subtitle2" sx={{ mt: 1 }}>
+              Optional Channels (email is always included)
+            </Typography>
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={enableWhatsApp}
+                  onChange={(e) => setEnableWhatsApp(e.target.checked)}
+                />
+              }
+              label="Enable WhatsApp"
+            />
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={enableSms}
+                  onChange={(e) => setEnableSms(e.target.checked)}
+                />
+              }
+              label="Enable SMS"
+            />
+          </>
+        )}
+
         <Typography variant="subtitle1" sx={{ mt: 2 }}>
           Upload IV Image (PNG, optional):
         </Typography>
@@ -172,4 +283,3 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
 };
 
 export default EventModal;
-

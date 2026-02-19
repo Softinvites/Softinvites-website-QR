@@ -125,6 +125,12 @@ export function UserView() {
             location: event.location,
             createdAt: new Date(event.createdAt).toLocaleDateString(),
             status,
+            servicePackage: event.servicePackage,
+            channelConfig: event.channelConfig,
+            messageCycle: event.messageCycle,
+            rsvpDeadline: event.rsvpDeadline,
+            eventEndDate: event.eventEndDate,
+            customMessageSequence: event.customMessageSequence,
           };
         });
 
