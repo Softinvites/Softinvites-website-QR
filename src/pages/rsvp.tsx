@@ -41,10 +41,13 @@ const defaultFormSettings = {
   emailPlaceholder: '',
   phoneLabel: 'Phone Number',
   phonePlaceholder: '',
+  attendanceEnabled: true,
   attendanceLabel: 'Will you attend?',
+  attendanceYesLabel: 'YES, I WILL ATTEND',
+  attendanceNoLabel: 'UNABLE TO ATTEND',
   commentsLabel: 'Additional Comments',
   commentsPlaceholder: '',
-  submitLabel: 'Submit RSVP',
+  submitLabel: 'Submit',
 };
 
 function formatDate(value?: string) {
@@ -73,11 +76,6 @@ export default function RsvpPage() {
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState<AttendanceStatus | ''>('');
   const [comments, setComments] = useState('');
-  const [preferredChannels, setPreferredChannels] = useState<string[]>(['email']);
-  const [whatsappOptIn, setWhatsappOptIn] = useState(false);
-  const [smsOptIn, setSmsOptIn] = useState(false);
-  const [whatsappNumber, setWhatsappNumber] = useState('');
-  const [mobileNumber, setMobileNumber] = useState('');
 
   useEffect(() => {
     let ignore = false;
@@ -111,8 +109,7 @@ export default function RsvpPage() {
     () => ({ ...defaultFormSettings, ...(payload?.event?.rsvpFormSettings || {}) }),
     [payload]
   );
-  const servicePackage = payload?.event?.servicePackage || 'standard-rsvp';
-  const showPreferences = servicePackage === 'full-rsvp';
+  const attendanceEnabled = formSettings.attendanceEnabled !== false;
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -133,7 +130,7 @@ export default function RsvpPage() {
       toast.error('Please enter your phone number');
       return;
     }
-    if (!status) {
+    if (attendanceEnabled && !status) {
       toast.error('Please select an option');
       return;
     }
@@ -148,13 +145,8 @@ export default function RsvpPage() {
         guestName,
         email,
         phone,
-        attendanceStatus: status,
+        attendanceStatus: attendanceEnabled ? status : undefined,
         comments,
-        preferredChannels,
-        whatsappOptIn,
-        smsOptIn,
-        whatsappNumber,
-        mobileNumber,
       });
       toast.success('RSVP submitted. Thank you!');
       setPayload((prev) => (prev ? { ...prev, submitted: true } : prev));
@@ -217,7 +209,11 @@ export default function RsvpPage() {
               <div className="rsvp-header">
                 <div className="rsvp-pill">RSVP</div>
                 <h1>{payload.event.name}</h1>
-                <p className="rsvp-muted">Fill the form to confirm your attendance.</p>
+                <p className="rsvp-muted">
+                  {attendanceEnabled
+                    ? 'Fill the form to confirm your attendance.'
+                    : 'Fill the form and submit your response.'}
+                </p>
               </div>
 
               <label className="rsvp-field" htmlFor="rsvp-guest-name">
@@ -262,22 +258,27 @@ export default function RsvpPage() {
                 />
               </label>
 
-              <div className="rsvp-field">
-                <span>{formSettings.attendanceLabel}</span>
-                <div className="rsvp-statuses">
-                  {(['yes', 'no'] as AttendanceStatus[]).map((opt) => (
-                    <button
-                      key={opt}
-                      type="button"
-                      className={`rsvp-chip ${status === opt ? 'active' : ''} ${opt}`}
-                      onClick={() => setStatus(opt)}
-                      disabled={submitting || formLocked}
-                    >
-                      {opt.toUpperCase()}
-                    </button>
-                  ))}
+              {attendanceEnabled && (
+                <div className="rsvp-field">
+                  <span>{formSettings.attendanceLabel}</span>
+                  <div className="rsvp-statuses">
+                    {([
+                      ['yes', formSettings.attendanceYesLabel],
+                      ['no', formSettings.attendanceNoLabel],
+                    ] as const).map(([opt, label]) => (
+                      <button
+                        key={opt}
+                        type="button"
+                        className={`rsvp-chip ${status === opt ? 'active' : ''} ${opt}`}
+                        onClick={() => setStatus(opt)}
+                        disabled={submitting || formLocked}
+                      >
+                        {label}
+                      </button>
+                    ))}
+                  </div>
                 </div>
-              </div>
+              )}
 
               <label className="rsvp-field" htmlFor="rsvp-comments">
                 <span>{formSettings.commentsLabel}</span>
@@ -291,111 +292,6 @@ export default function RsvpPage() {
                   rows={4}
                 />
               </label>
-
-              {showPreferences && (
-                <div className="rsvp-field">
-                  <span>Preferred Contact Channels</span>
-                  <div className="rsvp-checkboxes">
-                    <div className="rsvp-checkbox">
-                      <input
-                        id="pref-email-required"
-                        type="checkbox"
-                        checked
-                        disabled
-                        aria-label="Email (required)"
-                      />
-                      <span>Email (required)</span>
-                    </div>
-                    <div className="rsvp-checkbox">
-                      <input
-                        id="pref-whatsapp"
-                        type="checkbox"
-                        checked={preferredChannels.includes('whatsapp')}
-                        aria-label="WhatsApp"
-                        onChange={(e) => {
-                          const next = e.target.checked
-                            ? [...preferredChannels, 'whatsapp']
-                            : preferredChannels.filter((c) => c !== 'whatsapp');
-                          setPreferredChannels(next);
-                        }}
-                      />
-                      <span>WhatsApp</span>
-                    </div>
-                    <div className="rsvp-checkbox">
-                      <input
-                        id="pref-sms"
-                        type="checkbox"
-                        checked={preferredChannels.includes('sms')}
-                        aria-label="SMS"
-                        onChange={(e) => {
-                          const next = e.target.checked
-                            ? [...preferredChannels, 'sms']
-                            : preferredChannels.filter((c) => c !== 'sms');
-                          setPreferredChannels(next);
-                        }}
-                      />
-                      <span>SMS</span>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {showPreferences && (
-                <>
-                  <div className="rsvp-field">
-                    <span>WhatsApp Opt-In</span>
-                    <div className="rsvp-checkboxes">
-                      <div className="rsvp-checkbox">
-                        <input
-                          id="rsvp-whatsapp-opt"
-                          type="checkbox"
-                          checked={whatsappOptIn}
-                          aria-label="I agree to receive WhatsApp updates"
-                          onChange={(e) => setWhatsappOptIn(e.target.checked)}
-                        />
-                        <span>I agree to receive WhatsApp updates</span>
-                      </div>
-                    </div>
-                  </div>
-                  <label className="rsvp-field" htmlFor="rsvp-whatsapp-number">
-                    <span>WhatsApp Number</span>
-                    <input
-                      id="rsvp-whatsapp-number"
-                      type="tel"
-                      value={whatsappNumber}
-                      disabled={submitting || formLocked}
-                      placeholder="WhatsApp number"
-                      onChange={(e) => setWhatsappNumber(e.target.value)}
-                    />
-                  </label>
-                  <div className="rsvp-field">
-                    <span>SMS Opt-In</span>
-                    <div className="rsvp-checkboxes">
-                      <div className="rsvp-checkbox">
-                        <input
-                          id="rsvp-sms-opt"
-                          type="checkbox"
-                          checked={smsOptIn}
-                          aria-label="I agree to receive SMS updates"
-                          onChange={(e) => setSmsOptIn(e.target.checked)}
-                        />
-                        <span>I agree to receive SMS updates</span>
-                      </div>
-                    </div>
-                  </div>
-                  <label className="rsvp-field" htmlFor="rsvp-mobile-number">
-                    <span>Mobile Number</span>
-                    <input
-                      id="rsvp-mobile-number"
-                      type="tel"
-                      value={mobileNumber}
-                      disabled={submitting || formLocked}
-                      placeholder="Mobile number for SMS"
-                      onChange={(e) => setMobileNumber(e.target.value)}
-                    />
-                  </label>
-                </>
-              )}
 
               {formLocked && (
                 <p className="rsvp-warning">This form has already been submitted.</p>

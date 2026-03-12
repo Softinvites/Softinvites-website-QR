@@ -4,6 +4,12 @@ import {
   Button,
   Card,
   Divider,
+  Dialog,
+  DialogActions,
+  DialogContent,
+  DialogContentText,
+  DialogTitle,
+  Grid,
   IconButton,
   MenuItem,
   Stack,
@@ -20,10 +26,20 @@ export type MessageChannelConfig = {
   templateId?: string;
 };
 
+export type MessageAttachmentConfig = {
+  url?: string;
+  filename?: string;
+  contentType?: string;
+  file?: File | null;
+};
+
 export type MessageSequenceItem = {
   trackingId: string;
   messageName: string;
-  dayOffset: number;
+  messageTitle: string;
+  messageBody: string;
+  scheduledDate: string; // datetime-local format
+  attachment: MessageAttachmentConfig;
   channels: {
     email: MessageChannelConfig;
     whatsapp: MessageChannelConfig;
@@ -56,6 +72,50 @@ const createTrackingId = () =>
     ? globalThis.crypto.randomUUID()
     : `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
 
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+const toDateTimeLocalValue = (value: string | Date | null | undefined): string => {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const pad = (num: number) => String(num).padStart(2, '0');
+  return `${parsed.getFullYear()}-${pad(parsed.getMonth() + 1)}-${pad(parsed.getDate())}T${pad(parsed.getHours())}:${pad(parsed.getMinutes())}`;
+};
+
+const toIsoDate = (value: string): string | null => {
+  if (!value) return null;
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return null;
+  return parsed.toISOString();
+};
+
+const addDaysToDateTimeLocal = (value: string, days: number) => {
+  const base = value ? new Date(value) : new Date();
+  if (Number.isNaN(base.getTime())) {
+    return toDateTimeLocalValue(new Date(Date.now() + days * DAY_MS));
+  }
+  base.setTime(base.getTime() + days * DAY_MS);
+  return toDateTimeLocalValue(base);
+};
+
+const defaultScheduledDate = (offsetDays: number) =>
+  toDateTimeLocalValue(new Date(Date.now() + offsetDays * DAY_MS));
+
+const getAttachmentDisplayName = (attachment: MessageAttachmentConfig) => {
+  if (attachment.file?.name) return attachment.file.name;
+  if (attachment.filename) return attachment.filename;
+  if (attachment.url) {
+    try {
+      const parsed = new URL(attachment.url);
+      const tail = parsed.pathname.split('/').pop() || '';
+      return tail ? decodeURIComponent(tail) : attachment.url;
+    } catch {
+      return attachment.url;
+    }
+  }
+  return '';
+};
+
 const normalizeChannel = (channel: any, fallbackEnabled = false): MessageChannelConfig => ({
   enabled: typeof channel?.enabled === 'boolean' ? channel.enabled : fallbackEnabled,
   templateId: channel?.templateId || undefined,
@@ -73,10 +133,28 @@ export const normalizeMessageSequence = (input: any): MessageSequenceItem[] => {
   if (!Array.isArray(payload)) return [];
   return payload.map((item) => {
     const raw = item || {};
+    const legacyOffset = Number(raw.dayOffset ?? Number.NaN);
+    const fallbackDate =
+      !Number.isNaN(legacyOffset) && Number.isFinite(legacyOffset)
+        ? new Date(Date.now() + legacyOffset * DAY_MS)
+        : null;
+    const normalizedTitle = raw.messageTitle || raw.messageName || raw.messageType || 'Message';
+    const attachment: MessageAttachmentConfig = {
+      url: typeof raw.attachment?.url === 'string' ? raw.attachment.url : '',
+      filename: typeof raw.attachment?.filename === 'string' ? raw.attachment.filename : '',
+      contentType:
+        typeof raw.attachment?.contentType === 'string'
+          ? raw.attachment.contentType
+          : '',
+      file: null,
+    };
     return {
       trackingId: raw.trackingId || raw.id || createTrackingId(),
-      messageName: raw.messageName || raw.messageType || 'Message',
-      dayOffset: Number(raw.dayOffset ?? 0),
+      messageName: raw.messageName || raw.messageType || normalizedTitle,
+      messageTitle: normalizedTitle,
+      messageBody: typeof raw.messageBody === 'string' ? raw.messageBody : '',
+      scheduledDate: toDateTimeLocalValue(raw.scheduledDate || fallbackDate),
+      attachment,
       channels: {
         email: normalizeChannel(raw.channels?.email, true),
         whatsapp: normalizeChannel(raw.channels?.whatsapp, false),
@@ -95,126 +173,55 @@ export const getDefaultMessageSequence = (
   allowWhatsApp: boolean,
   allowSms: boolean
 ): MessageSequenceItem[] => {
+  const buildItem = (
+    messageName: string,
+    offsetDays: number,
+    audienceType: MessageAudience,
+    channelOverrides?: Partial<MessageSequenceItem['channels']>
+  ): MessageSequenceItem => ({
+    trackingId: createTrackingId(),
+    messageName,
+    messageTitle: messageName,
+    messageBody: '',
+    scheduledDate: defaultScheduledDate(offsetDays),
+    attachment: {
+      url: '',
+      filename: '',
+      contentType: '',
+      file: null,
+    },
+    channels: {
+      email: { enabled: true, ...(channelOverrides?.email || {}) },
+      whatsapp: {
+        enabled:
+          channelOverrides?.whatsapp?.enabled !== undefined
+            ? !!channelOverrides.whatsapp.enabled
+            : allowWhatsApp,
+        ...(channelOverrides?.whatsapp || {}),
+      },
+      bulkSms: {
+        enabled:
+          channelOverrides?.bulkSms?.enabled !== undefined
+            ? !!channelOverrides.bulkSms.enabled
+            : allowSms,
+        ...(channelOverrides?.bulkSms || {}),
+      },
+    },
+    conditions: { audienceType },
+  });
+
   if (servicePackage === 'invitation-only') return [];
-  if (servicePackage === 'one-time-rsvp') {
-    return [
-      {
-        trackingId: createTrackingId(),
-        messageName: 'Initial RSVP Request',
-        dayOffset: 1,
-        channels: {
-          email: { enabled: true },
-          whatsapp: { enabled: false },
-          bulkSms: { enabled: false },
-        },
-        conditions: { audienceType: 'all' },
-      },
-    ];
-  }
-  if (servicePackage === 'standard-rsvp') {
-    return [
-      {
-        trackingId: createTrackingId(),
-        messageName: 'Initial RSVP Request',
-        dayOffset: 1,
-        channels: {
-          email: { enabled: true },
-          whatsapp: { enabled: false },
-          bulkSms: { enabled: false },
-        },
-        conditions: { audienceType: 'all' },
-      },
-      {
-        trackingId: createTrackingId(),
-        messageName: 'Reminder',
-        dayOffset: 7,
-        channels: {
-          email: { enabled: true },
-          whatsapp: { enabled: false },
-          bulkSms: { enabled: false },
-        },
-        conditions: { audienceType: 'pending' },
-      },
-      {
-        trackingId: createTrackingId(),
-        messageName: 'Thank You',
-        dayOffset: 30,
-        channels: {
-          email: { enabled: true },
-          whatsapp: { enabled: false },
-          bulkSms: { enabled: false },
-        },
-        conditions: { audienceType: 'responders' },
-      },
-    ];
-  }
   return [
-    {
-      trackingId: createTrackingId(),
-      messageName: 'Initial Invitation',
-      dayOffset: 1,
-      channels: {
-        email: { enabled: true },
-        whatsapp: { enabled: allowWhatsApp },
-        bulkSms: { enabled: allowSms },
-      },
-      conditions: { audienceType: 'all' },
-    },
-    {
-      trackingId: createTrackingId(),
-      messageName: 'Event Details',
-      dayOffset: 4,
-      channels: {
-        email: { enabled: true },
-        whatsapp: { enabled: allowWhatsApp },
-        bulkSms: { enabled: false },
-      },
-      conditions: { audienceType: 'all' },
-    },
-    {
-      trackingId: createTrackingId(),
-      messageName: 'RSVP Reminder',
-      dayOffset: 7,
-      channels: {
-        email: { enabled: true },
-        whatsapp: { enabled: allowWhatsApp },
-        bulkSms: { enabled: false },
-      },
-      conditions: { audienceType: 'pending' },
-    },
-    {
-      trackingId: createTrackingId(),
-      messageName: 'Personal Follow-up',
-      dayOffset: 14,
-      channels: {
-        email: { enabled: true },
-        whatsapp: { enabled: allowWhatsApp },
-        bulkSms: { enabled: false },
-      },
-      conditions: { audienceType: 'pending' },
-    },
-    {
-      trackingId: createTrackingId(),
-      messageName: 'Last Call',
-      dayOffset: 21,
-      channels: {
-        email: { enabled: true },
-        whatsapp: { enabled: false },
-        bulkSms: { enabled: allowSms },
-      },
-      conditions: { audienceType: 'pending' },
-    },
-    {
-      trackingId: createTrackingId(),
-      messageName: 'Final Logistics',
-      dayOffset: 28,
-      channels: {
-        email: { enabled: true },
-        whatsapp: { enabled: allowWhatsApp },
-        bulkSms: { enabled: false },
-      },
-      conditions: { audienceType: 'all' },
-    },
+    buildItem('Initial Invitation', 1, 'all'),
+    buildItem('Event Details', 4, 'all', { bulkSms: { enabled: false } }),
+    buildItem('Reminder', 7, 'pending', { bulkSms: { enabled: false } }),
+    buildItem('Follow Up', 14, 'pending', { bulkSms: { enabled: false } }),
+    buildItem('Last Call', 21, 'pending', { whatsapp: { enabled: false } }),
+    buildItem('Final Logistics', 28, 'all', { bulkSms: { enabled: false } }),
+    buildItem('Post Event Thanks', 31, 'responders', {
+      whatsapp: { enabled: false },
+      bulkSms: { enabled: false },
+    }),
   ];
 };
 
@@ -225,11 +232,37 @@ export const serializeMessageSequence = (
 ) =>
   items.map((item) => {
     const raw = item.raw && typeof item.raw === 'object' ? { ...item.raw } : {};
+    const attachmentFile = item.attachment?.file || null;
+    const uploadKey = attachmentFile ? `sequenceAttachment_${item.trackingId}` : '';
+    const attachmentUrl =
+      typeof item.attachment?.url === 'string' ? item.attachment.url.trim() : '';
+    const attachment =
+      attachmentFile
+        ? {
+            uploadKey,
+            filename: attachmentFile.name,
+            ...(attachmentFile.type ? { contentType: attachmentFile.type } : {}),
+          }
+        : attachmentUrl.length > 0
+        ? {
+            url: attachmentUrl,
+            ...(item.attachment.filename?.trim()
+              ? { filename: item.attachment.filename.trim() }
+              : {}),
+            ...(item.attachment.contentType?.trim()
+              ? { contentType: item.attachment.contentType.trim() }
+              : {}),
+          }
+        : null;
+
     return {
       ...raw,
       trackingId: item.trackingId || raw.trackingId,
       messageName: item.messageName,
-      dayOffset: item.dayOffset,
+      messageTitle: item.messageTitle,
+      messageBody: item.messageBody,
+      scheduledDate: toIsoDate(item.scheduledDate),
+      attachment,
       channels: {
         email: {
           ...(raw.channels?.email || {}),
@@ -254,6 +287,18 @@ export const serializeMessageSequence = (
     };
   });
 
+export const collectSequenceAttachmentFiles = (items: MessageSequenceItem[]) =>
+  items
+    .map((item) => {
+      const file = item.attachment?.file || null;
+      if (!file) return null;
+      return {
+        fieldName: `sequenceAttachment_${item.trackingId}`,
+        file,
+      };
+    })
+    .filter(Boolean) as Array<{ fieldName: string; file: File }>;
+
 export function MessageSequenceBuilder({
   value,
   onChange,
@@ -262,12 +307,27 @@ export function MessageSequenceBuilder({
   disabled,
 }: BuilderProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
+  const [confirmAction, setConfirmAction] = useState<{
+    type: 'delete-step' | 'clear-attachment';
+    trackingId: string;
+  } | null>(null);
 
   const handleAdd = () => {
+    const nextScheduledDate = value.length
+      ? addDaysToDateTimeLocal(value[value.length - 1].scheduledDate, 3)
+      : defaultScheduledDate(1);
     const nextItem: MessageSequenceItem = {
       trackingId: createTrackingId(),
       messageName: `Message ${value.length + 1}`,
-      dayOffset: value.length ? value[value.length - 1].dayOffset + 3 : 1,
+      messageTitle: `Message ${value.length + 1}`,
+      messageBody: '',
+      scheduledDate: nextScheduledDate,
+      attachment: {
+        url: '',
+        filename: '',
+        contentType: '',
+        file: null,
+      },
       channels: {
         email: { enabled: true },
         whatsapp: { enabled: allowWhatsApp },
@@ -282,6 +342,49 @@ export function MessageSequenceBuilder({
   const handleRemove = (index: number) => {
     const next = value.filter((_, idx) => idx !== index);
     onChange(next);
+  };
+
+  const requestDeleteStep = (trackingId: string) => {
+    setConfirmAction({ type: 'delete-step', trackingId });
+  };
+
+  const requestClearAttachment = (trackingId: string) => {
+    setConfirmAction({ type: 'clear-attachment', trackingId });
+  };
+
+  const closeConfirmDialog = () => {
+    setConfirmAction(null);
+  };
+
+  const handleConfirmAction = () => {
+    if (!confirmAction) return;
+    const targetIndex = value.findIndex((item) => item.trackingId === confirmAction.trackingId);
+    if (targetIndex < 0) {
+      setConfirmAction(null);
+      return;
+    }
+
+    if (confirmAction.type === 'delete-step') {
+      handleRemove(targetIndex);
+      setConfirmAction(null);
+      return;
+    }
+
+    const next = value.map((entry, idx) =>
+      idx === targetIndex
+        ? {
+            ...entry,
+            attachment: {
+              url: '',
+              filename: '',
+              contentType: '',
+              file: null,
+            },
+          }
+        : entry
+    );
+    onChange(next);
+    setConfirmAction(null);
   };
 
   const handleDragStart = (index: number) => (event: DragEvent<HTMLDivElement>) => {
@@ -314,8 +417,8 @@ export function MessageSequenceBuilder({
   const helperText = useMemo(
     () =>
       allowWhatsApp || allowSms
-        ? 'Email is always enabled. Toggle WhatsApp/SMS per message.'
-        : 'Email is always enabled for every message.',
+        ? 'Set per-step date, title, and body. Attachment is optional (PNG/JPG/PDF). Email is always enabled; toggle WhatsApp/SMS per step.'
+        : 'Set per-step date, title, and body. Attachment is optional (PNG/JPG/PDF). Email is always enabled.',
     [allowWhatsApp, allowSms]
   );
 
@@ -373,60 +476,156 @@ export function MessageSequenceBuilder({
                   size="small"
                   color="error"
                   disabled={disabled}
-                  onClick={() => handleRemove(index)}
+                  onClick={() => requestDeleteStep(item.trackingId)}
                 >
                   <Iconify icon="mdi:trash-can-outline" />
                 </IconButton>
               </Stack>
 
-              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    label="Message Name"
+                    value={item.messageName}
+                    onChange={(event) => {
+                      const next = value.map((entry, idx) =>
+                        idx === index ? { ...entry, messageName: event.target.value } : entry
+                      );
+                      onChange(next);
+                    }}
+                    fullWidth
+                    disabled={disabled}
+                  />
+                </Grid>
+                <Grid item xs={12} md={4}>
+                  <TextField
+                    label="Message Title"
+                    value={item.messageTitle}
+                    onChange={(event) => {
+                      const next = value.map((entry, idx) =>
+                        idx === index ? { ...entry, messageTitle: event.target.value } : entry
+                      );
+                      onChange(next);
+                    }}
+                    fullWidth
+                    disabled={disabled}
+                  />
+                </Grid>
+                <Grid item xs={12} md={3}>
+                  <TextField
+                    label="Scheduled Date & Time"
+                    type="datetime-local"
+                    value={item.scheduledDate}
+                    onChange={(event) => {
+                      const next = value.map((entry, idx) =>
+                        idx === index ? { ...entry, scheduledDate: event.target.value } : entry
+                      );
+                      onChange(next);
+                    }}
+                    InputLabelProps={{ shrink: true }}
+                    error={!item.scheduledDate}
+                    helperText={!item.scheduledDate ? 'Required' : ''}
+                    fullWidth
+                    disabled={disabled}
+                  />
+                </Grid>
+                <Grid item xs={12} md={2}>
+                  <TextField
+                    select
+                    label="Audience"
+                    value={item.conditions.audienceType}
+                    onChange={(event) => {
+                      const next = value.map((entry, idx) =>
+                        idx === index
+                          ? {
+                              ...entry,
+                              conditions: {
+                                ...entry.conditions,
+                                audienceType: event.target.value as MessageAudience,
+                              },
+                            }
+                          : entry
+                      );
+                      onChange(next);
+                    }}
+                    fullWidth
+                    disabled={disabled}
+                  >
+                    {AUDIENCE_OPTIONS.map((option) => (
+                      <MenuItem key={option.value} value={option.value}>
+                        {option.label}
+                      </MenuItem>
+                    ))}
+                  </TextField>
+                </Grid>
+              </Grid>
+
+              <TextField
+                label="Message Body"
+                value={item.messageBody}
+                onChange={(event) => {
+                  const next = value.map((entry, idx) =>
+                    idx === index ? { ...entry, messageBody: event.target.value } : entry
+                  );
+                  onChange(next);
+                }}
+                multiline
+                minRows={3}
+                fullWidth
+                disabled={disabled}
+              />
+
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
+                <Button component="label" variant="outlined" disabled={disabled}>
+                  Attach File
+                  <input
+                    hidden
+                    type="file"
+                    accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf"
+                    onChange={(event) => {
+                      const selectedFile = event.target.files?.[0] || null;
+                      if (!selectedFile) return;
+                      const next = value.map((entry, idx) =>
+                        idx === index
+                          ? {
+                              ...entry,
+                              attachment: {
+                                ...entry.attachment,
+                                file: selectedFile,
+                                filename: selectedFile.name,
+                                contentType: selectedFile.type || '',
+                                url: '',
+                              },
+                            }
+                          : entry
+                      );
+                      onChange(next);
+                    }}
+                  />
+                </Button>
                 <TextField
-                  label="Message Name"
-                  value={item.messageName}
-                  onChange={(event) => {
-                    const next = value.map((entry, idx) =>
-                      idx === index ? { ...entry, messageName: event.target.value } : entry
-                    );
-                    onChange(next);
-                  }}
+                  label="Attached File"
+                  value={getAttachmentDisplayName(item.attachment)}
                   fullWidth
-                  disabled={disabled}
+                  InputProps={{ readOnly: true }}
+                  placeholder="No file selected"
                 />
-                <TextField
-                  label="Day Offset"
-                  type="number"
-                  value={item.dayOffset}
-                  onChange={(event) => {
-                    const nextValue = Number(event.target.value);
-                    const next = value.map((entry, idx) =>
-                      idx === index ? { ...entry, dayOffset: Number.isNaN(nextValue) ? 0 : nextValue } : entry
-                    );
-                    onChange(next);
-                  }}
-                  sx={{ width: { xs: '100%', md: 160 } }}
+                {item.attachment.url && !item.attachment.file && (
+                  <Button
+                    variant="text"
+                    onClick={() => window.open(item.attachment.url, '_blank')}
+                  >
+                    View Current
+                  </Button>
+                )}
+                <Button
+                  color="warning"
+                  variant="text"
                   disabled={disabled}
-                />
-                <TextField
-                  select
-                  label="Audience"
-                  value={item.conditions.audienceType}
-                  onChange={(event) => {
-                    const next = value.map((entry, idx) =>
-                      idx === index
-                        ? { ...entry, conditions: { ...entry.conditions, audienceType: event.target.value as MessageAudience } }
-                        : entry
-                    );
-                    onChange(next);
-                  }}
-                  sx={{ width: { xs: '100%', md: 200 } }}
-                  disabled={disabled}
+                  onClick={() => requestClearAttachment(item.trackingId)}
                 >
-                  {AUDIENCE_OPTIONS.map((option) => (
-                    <MenuItem key={option.value} value={option.value}>
-                      {option.label}
-                    </MenuItem>
-                  ))}
-                </TextField>
+                  Clear
+                </Button>
               </Stack>
 
               <Stack direction="row" spacing={2}>
@@ -509,6 +708,29 @@ export function MessageSequenceBuilder({
           </Button>
         </Stack>
       </Stack>
+
+      <Dialog open={Boolean(confirmAction)} onClose={closeConfirmDialog}>
+        <DialogTitle>
+          {confirmAction?.type === 'delete-step' ? 'Delete this step?' : 'Clear attachment?'}
+        </DialogTitle>
+        <DialogContent>
+          <DialogContentText>
+            {confirmAction?.type === 'delete-step'
+              ? 'This will permanently remove this step from the sequence.'
+              : 'This will remove the attached file from this step.'}
+          </DialogContentText>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeConfirmDialog}>Cancel</Button>
+          <Button
+            color={confirmAction?.type === 'delete-step' ? 'error' : 'warning'}
+            variant="contained"
+            onClick={handleConfirmAction}
+          >
+            {confirmAction?.type === 'delete-step' ? 'Delete' : 'Clear'}
+          </Button>
+        </DialogActions>
+      </Dialog>
     </Card>
   );
 }

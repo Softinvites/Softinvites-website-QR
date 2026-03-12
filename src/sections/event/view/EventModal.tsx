@@ -11,11 +11,6 @@ import {
   MenuItem,
   FormControlLabel,
   Checkbox,
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableRow,
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { API_BASE } from 'src/utils/apiBase';
@@ -32,7 +27,7 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
     location: '',
     description: '',
   });
-  const [servicePackage, setServicePackage] = React.useState('standard-rsvp');
+  const [eventMode, setEventMode] = React.useState<'full-rsvp' | 'invitation-only'>('full-rsvp');
   const [enableWhatsApp, setEnableWhatsApp] = React.useState(false);
   const [enableSms, setEnableSms] = React.useState(false);
   const [loading, setLoading] = React.useState(false);
@@ -69,20 +64,12 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
       formData.append('date', eventData.date);
       formData.append('location', eventData.location);
       formData.append('description', eventData.description);
-      formData.append('servicePackage', servicePackage);
-
-      const messageCycleMap: Record<string, number> = {
-        'invitation-only': 0,
-        'one-time-rsvp': 1,
-        'standard-rsvp': 3,
-        'full-rsvp': 6,
-      };
-      formData.append('messageCycle', String(messageCycleMap[servicePackage] ?? 3));
+      formData.append('servicePackage', eventMode);
 
       const channelConfig = {
         email: { enabled: true, required: true, trackingEnabled: true },
-        whatsapp: { enabled: servicePackage === 'full-rsvp' ? enableWhatsApp : false, optInRequired: true },
-        bulkSms: { enabled: servicePackage === 'full-rsvp' ? enableSms : false, optInRequired: true },
+        whatsapp: { enabled: eventMode === 'full-rsvp' ? enableWhatsApp : false, optInRequired: true },
+        bulkSms: { enabled: eventMode === 'full-rsvp' ? enableSms : false, optInRequired: true },
       };
       formData.append('channelConfig', JSON.stringify(channelConfig));
 
@@ -153,6 +140,18 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
         />
         <TextField
           fullWidth
+          select
+          label="RSVP Mode"
+          value={eventMode}
+          onChange={(e) => setEventMode(e.target.value as 'full-rsvp' | 'invitation-only')}
+          margin="dense"
+        >
+          <MenuItem value="full-rsvp">RSVP With Scheduler</MenuItem>
+          <MenuItem value="invitation-only">Invitation Only</MenuItem>
+        </TextField>
+
+        <TextField
+          fullWidth
           label="Description"
           name="description"
           value={eventData.description}
@@ -162,68 +161,9 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
           minRows={4}
         />
 
-        <TextField
-          fullWidth
-          select
-          label="Service Package"
-          value={servicePackage}
-          onChange={(e) => setServicePackage(e.target.value)}
-          margin="dense"
-        >
-          <MenuItem value="invitation-only">Invitation Only</MenuItem>
-          <MenuItem value="one-time-rsvp">One-Time RSVP</MenuItem>
-          <MenuItem value="standard-rsvp">Standard RSVP</MenuItem>
-          <MenuItem value="full-rsvp">Full RSVP</MenuItem>
-        </TextField>
-
-        <Typography variant="subtitle2" sx={{ mt: 2 }}>
-          Package Comparison (Email always included)
-        </Typography>
-        <Table size="small">
-          <TableHead>
-            <TableRow>
-              <TableCell>Package</TableCell>
-              <TableCell>RSVP Tracking</TableCell>
-              <TableCell>Reminders</TableCell>
-              <TableCell>Thank You</TableCell>
-              <TableCell>WhatsApp/SMS</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            <TableRow>
-              <TableCell>Invitation Only</TableCell>
-              <TableCell>No</TableCell>
-              <TableCell>No</TableCell>
-              <TableCell>No</TableCell>
-              <TableCell>No</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>One-Time RSVP</TableCell>
-              <TableCell>Yes</TableCell>
-              <TableCell>No</TableCell>
-              <TableCell>No</TableCell>
-              <TableCell>No</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Standard RSVP</TableCell>
-              <TableCell>Yes</TableCell>
-              <TableCell>Yes</TableCell>
-              <TableCell>Yes</TableCell>
-              <TableCell>No</TableCell>
-            </TableRow>
-            <TableRow>
-              <TableCell>Full RSVP</TableCell>
-              <TableCell>Yes</TableCell>
-              <TableCell>Yes</TableCell>
-              <TableCell>Yes</TableCell>
-              <TableCell>Optional</TableCell>
-            </TableRow>
-          </TableBody>
-        </Table>
-
-        {servicePackage === 'full-rsvp' && (
+        {eventMode === 'full-rsvp' && (
           <>
-            <Typography variant="subtitle2" sx={{ mt: 1 }}>
+            <Typography variant="subtitle2" sx={{ mt: 2 }}>
               Optional Channels (email is always included)
             </Typography>
             <FormControlLabel

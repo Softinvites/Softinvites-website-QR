@@ -333,7 +333,9 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   const [editDescription, setEditDescription] = useState(row.description);
   const [editIv, setEditIv] = useState<File | null>(null); // 👈 File object
   const [editIvPreview, setEditIvPreview] = useState<string | null>(row.iv || null); // 👈 preview
-  const [editServicePackage, setEditServicePackage] = useState(row.servicePackage || 'standard-rsvp');
+  const [editEventMode, setEditEventMode] = useState<'full-rsvp' | 'invitation-only'>(
+    row.servicePackage === 'invitation-only' ? 'invitation-only' : 'full-rsvp'
+  );
   const [editEnableWhatsApp, setEditEnableWhatsApp] = useState(
     !!row.channelConfig?.whatsapp?.enabled
   );
@@ -376,20 +378,18 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       formData.append('date', editDate);
       formData.append('location', editLocation);
       formData.append('description', editDescription);
-      formData.append('servicePackage', editServicePackage);
-
-      const messageCycleMap: Record<string, number> = {
-        'invitation-only': 0,
-        'one-time-rsvp': 1,
-        'standard-rsvp': 3,
-        'full-rsvp': 6,
-      };
-      formData.append('messageCycle', String(messageCycleMap[editServicePackage] ?? 3));
+      formData.append('servicePackage', editEventMode);
 
       const channelConfig = {
         email: { enabled: true, required: true, trackingEnabled: true },
-        whatsapp: { enabled: editServicePackage === 'full-rsvp' ? editEnableWhatsApp : false, optInRequired: true },
-        bulkSms: { enabled: editServicePackage === 'full-rsvp' ? editEnableSms : false, optInRequired: true },
+        whatsapp: {
+          enabled: editEventMode === 'full-rsvp' ? editEnableWhatsApp : false,
+          optInRequired: true,
+        },
+        bulkSms: {
+          enabled: editEventMode === 'full-rsvp' ? editEnableSms : false,
+          optInRequired: true,
+        },
       };
       formData.append('channelConfig', JSON.stringify(channelConfig));
 
@@ -429,7 +429,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     editLocation,
     editDescription,
     editIv,
-    editServicePackage,
+    editEventMode,
     editEnableWhatsApp,
     editEnableSms,
     handleCloseDialog,
@@ -596,18 +596,16 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           />
           <TextField
             margin="dense"
-            label="Service Package"
+            label="RSVP Mode"
             select
             fullWidth
-            value={editServicePackage}
-            onChange={(e) => setEditServicePackage(e.target.value)}
+            value={editEventMode}
+            onChange={(e) => setEditEventMode(e.target.value as 'full-rsvp' | 'invitation-only')}
           >
+            <MenuItem value="full-rsvp">RSVP With Scheduler</MenuItem>
             <MenuItem value="invitation-only">Invitation Only</MenuItem>
-            <MenuItem value="one-time-rsvp">One-Time RSVP</MenuItem>
-            <MenuItem value="standard-rsvp">Standard RSVP</MenuItem>
-            <MenuItem value="full-rsvp">Full RSVP</MenuItem>
           </TextField>
-          {editServicePackage === 'full-rsvp' && (
+          {editEventMode === 'full-rsvp' && (
             <>
               <Typography variant="subtitle2" sx={{ mt: 1 }}>
                 Optional Channels (email is always included)

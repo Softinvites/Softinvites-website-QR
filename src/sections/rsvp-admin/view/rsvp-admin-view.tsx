@@ -10,6 +10,7 @@ import TableCell from '@mui/material/TableCell';
 import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
 import TableRow from '@mui/material/TableRow';
+import TablePagination from '@mui/material/TablePagination';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
 import Dialog from '@mui/material/Dialog';
@@ -21,6 +22,8 @@ import Grid from '@mui/material/Grid';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Divider from '@mui/material/Divider';
+import FormControlLabel from '@mui/material/FormControlLabel';
+import Switch from '@mui/material/Switch';
 import { SketchPicker } from 'react-color';
 
 import { toast } from 'react-toastify';
@@ -33,6 +36,7 @@ import { AnalyticsWidgetSummary } from 'src/sections/overview/analytics-widget-s
 import { AnalyticsCurrentVisits } from 'src/sections/overview/analytics-current-visits';
 import { AnalyticsConversionRates } from 'src/sections/overview/analytics-conversion-rates';
 import {
+  collectSequenceAttachmentFiles,
   MessageSequenceBuilder,
   getDefaultMessageSequence,
   normalizeMessageSequence,
@@ -60,7 +64,10 @@ type RsvpFormSettings = {
   emailPlaceholder: string;
   phoneLabel: string;
   phonePlaceholder: string;
+  attendanceEnabled: boolean;
   attendanceLabel: string;
+  attendanceYesLabel: string;
+  attendanceNoLabel: string;
   commentsLabel: string;
   commentsPlaceholder: string;
   submitLabel: string;
@@ -73,10 +80,13 @@ const defaultRsvpFormSettings: RsvpFormSettings = {
   emailPlaceholder: '',
   phoneLabel: 'Phone Number',
   phonePlaceholder: '',
+  attendanceEnabled: true,
   attendanceLabel: 'Will you attend?',
+  attendanceYesLabel: 'YES, I WILL ATTEND',
+  attendanceNoLabel: 'UNABLE TO ATTEND',
   commentsLabel: 'Additional Comments',
   commentsPlaceholder: '',
-  submitLabel: 'Submit RSVP',
+  submitLabel: 'Submit',
 };
 
 export function RsvpAdminView() {
@@ -92,11 +102,8 @@ export function RsvpAdminView() {
   const [newGuest, setNewGuest] = useState({ guestName: '', email: '', phone: '' });
   const [activeTab, setActiveTab] = useState(0);
   const [formLink, setFormLink] = useState('');
-  const [rsvpMessage, setRsvpMessage] = useState('');
   const [rsvpBgColor, setRsvpBgColor] = useState('#111827');
   const [rsvpAccentColor, setRsvpAccentColor] = useState('#1f2937');
-  const [rsvpDeadline, setRsvpDeadline] = useState('');
-  const [eventEndDate, setEventEndDate] = useState('');
   const [rsvpFormSettings, setRsvpFormSettings] =
     useState<RsvpFormSettings>(defaultRsvpFormSettings);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -109,6 +116,8 @@ export function RsvpAdminView() {
   const [sequenceSaving, setSequenceSaving] = useState(false);
   const [analyticsStart, setAnalyticsStart] = useState('');
   const [analyticsEnd, setAnalyticsEnd] = useState('');
+  const [schedulePage, setSchedulePage] = useState(0);
+  const [scheduleRowsPerPage, setScheduleRowsPerPage] = useState(10);
 
   const token = useMemo(() => localStorage.getItem('token') || '', []);
   const conversionRate = useMemo(
@@ -127,7 +136,7 @@ export function RsvpAdminView() {
     () => !!event?.channelConfig?.bulkSms?.enabled,
     [event?.channelConfig?.bulkSms?.enabled]
   );
-  const canEditSequence = event?.servicePackage === 'full-rsvp';
+  const canEditSequence = mode !== 'invitation-only';
   const sequencePayload = useMemo(
     () =>
       canEditSequence ? serializeMessageSequence(messageSequence, allowWhatsApp, allowSms) : [],
@@ -159,6 +168,14 @@ export function RsvpAdminView() {
     analytics?.channels?.whatsapp?.delivered ?? 0,
     analytics?.channels?.sms?.delivered ?? 0,
   ];
+  const paginatedSchedules = useMemo(
+    () =>
+      schedules.slice(
+        schedulePage * scheduleRowsPerPage,
+        schedulePage * scheduleRowsPerPage + scheduleRowsPerPage
+      ),
+    [schedules, schedulePage, scheduleRowsPerPage]
+  );
 
   const timelineChartOptions = useChart({
     xaxis: { categories: timelineCategories },
@@ -223,7 +240,7 @@ export function RsvpAdminView() {
 
       const nextEvent = eventRes.data?.event || eventRes.data;
       setEvent(nextEvent);
-      if (nextEvent?.servicePackage === 'full-rsvp') {
+      if (nextEvent?.servicePackage !== 'invitation-only') {
         const allowWa = !!nextEvent?.channelConfig?.whatsapp?.enabled;
         const allowSmsLocal = !!nextEvent?.channelConfig?.bulkSms?.enabled;
         const normalizedSequence = normalizeMessageSequence(nextEvent?.customMessageSequence);
@@ -235,17 +252,12 @@ export function RsvpAdminView() {
       } else {
         setMessageSequence([]);
       }
-      if (nextEvent?.rsvpMessage !== undefined) {
-        setRsvpMessage(nextEvent.rsvpMessage || '');
-      }
       if (nextEvent?.rsvpBgColor) {
         setRsvpBgColor(rgbToHex(nextEvent.rsvpBgColor));
       }
       if (nextEvent?.rsvpAccentColor) {
         setRsvpAccentColor(rgbToHex(nextEvent.rsvpAccentColor));
       }
-      setRsvpDeadline(nextEvent?.rsvpDeadline || '');
-      setEventEndDate(nextEvent?.eventEndDate || '');
       if (nextEvent?.rsvpFormSettings) {
         setRsvpFormSettings({ ...defaultRsvpFormSettings, ...nextEvent.rsvpFormSettings });
       } else {
@@ -266,8 +278,10 @@ export function RsvpAdminView() {
           { headers: { Authorization: `Bearer ${token}` } }
         );
         setSchedules(schedulesRes.data?.schedules || []);
+        setSchedulePage(0);
       } catch {
         setSchedules([]);
+        setSchedulePage(0);
       }
       try {
         const reportsRes = await axios.get(
@@ -360,6 +374,13 @@ export function RsvpAdminView() {
       setError('Invalid event selection.');
     }
   }, [loadData]);
+
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(schedules.length / scheduleRowsPerPage) - 1);
+    if (schedulePage > maxPage) {
+      setSchedulePage(maxPage);
+    }
+  }, [schedules.length, schedulePage, scheduleRowsPerPage]);
 
   const reloadData = useCallback(() => {
     if (!eventId) return;
@@ -483,11 +504,18 @@ export function RsvpAdminView() {
     }
   };
 
-  const handleCopyShareLink = (tokenValue?: string) => {
+  const handleCopyShareLink = async (tokenValue?: string) => {
     if (!eventId || !tokenValue) return;
     const shareUrl = `${API_BASE}/events/${eventId}/rsvp/shareable-report/${tokenValue}`;
-    navigator.clipboard.writeText(shareUrl);
-    toast.success('Shareable report link copied');
+    try {
+      const res = await axios.get(shareUrl);
+      const downloadUrl = res.data?.fileUrl || shareUrl;
+      await navigator.clipboard.writeText(downloadUrl);
+      toast.success('Report download link copied');
+    } catch {
+      await navigator.clipboard.writeText(shareUrl);
+      toast.success('Shareable report endpoint copied');
+    }
   };
 
   const handleCancelSchedule = async (scheduleId: string) => {
@@ -511,11 +539,8 @@ export function RsvpAdminView() {
       await axios.put(
         `${API_BASE}/events/events/${eventId}/rsvp-settings`,
         {
-          rsvpMessage,
           rsvpBgColor: hexToRgb(rsvpBgColor),
           rsvpAccentColor: hexToRgb(rsvpAccentColor),
-          rsvpDeadline,
-          eventEndDate,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -543,15 +568,28 @@ export function RsvpAdminView() {
 
   const handleSaveMessageSequence = async () => {
     if (!eventId || !canEditSequence) return;
+    const invalidStep = messageSequence.find(
+      (item) =>
+        !item.scheduledDate ||
+        !item.messageTitle?.trim() ||
+        !item.messageBody?.trim()
+    );
+    if (invalidStep) {
+      toast.error(
+        'Each step must include Scheduled Date, Message Title, and Message Body. Attachment is optional.'
+      );
+      return;
+    }
     try {
       setSequenceSaving(true);
       const formData = new FormData();
       formData.append('id', eventId);
       formData.append('customMessageSequence', sequenceJson || '[]');
-      formData.append(
-        'messageCycle',
-        String(sequencePayload.length ? Math.min(7, sequencePayload.length) : event?.messageCycle || 3)
-      );
+      const attachmentFiles = collectSequenceAttachmentFiles(messageSequence);
+      attachmentFiles.forEach(({ fieldName, file }) => {
+        formData.append(fieldName, file, file.name);
+      });
+      formData.append('servicePackage', 'full-rsvp');
 
       const response = await fetch(`${API_BASE}/events/update`, {
         method: 'PUT',
@@ -721,7 +759,7 @@ export function RsvpAdminView() {
           {event?.location || ''}
         </Typography>
         <Typography variant="body2" color="text.secondary">
-          Package: {event?.servicePackage || 'standard-rsvp'}
+          RSVP Mode: {mode === 'invitation-only' ? 'Invitation Only' : 'Scheduler Driven'}
         </Typography>
       </Card>
 
@@ -812,8 +850,8 @@ export function RsvpAdminView() {
       >
         <Tab label="RSVP Guest List" />
         <Tab label="RSVP Form" />
-        <Tab label="Settings" />
         <Tab label="Form Settings" />
+        <Tab label="Settings" />
         <Tab label="Message Builder" />
         <Tab label="Email Schedule" />
         <Tab label="Reports" />
@@ -1003,71 +1041,6 @@ export function RsvpAdminView() {
       {activeTab === 2 && (
         <Card sx={{ p: 3 }}>
           <Typography variant="h6" mb={2}>
-            RSVP Settings
-          </Typography>
-          <Stack spacing={3}>
-            <TextField
-              label="RSVP Message (HTML supported)"
-              value={rsvpMessage}
-              onChange={(e) => setRsvpMessage(e.target.value)}
-              multiline
-              minRows={6}
-              fullWidth
-            />
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
-              <Box>
-                <Typography variant="subtitle2" mb={1}>
-                  RSVP Background Color
-                </Typography>
-                <SketchPicker
-                  color={rsvpBgColor}
-                  onChangeComplete={(color) => setRsvpBgColor(color.hex)}
-                />
-              </Box>
-              <Box>
-                <Typography variant="subtitle2" mb={1}>
-                  RSVP Accent Color
-                </Typography>
-                <SketchPicker
-                  color={rsvpAccentColor}
-                  onChangeComplete={(color) => setRsvpAccentColor(color.hex)}
-                />
-              </Box>
-            </Stack>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="RSVP Deadline"
-                  type="date"
-                  value={rsvpDeadline}
-                  onChange={(e) => setRsvpDeadline(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Event End Date"
-                  type="date"
-                  value={eventEndDate}
-                  onChange={(e) => setEventEndDate(e.target.value)}
-                  InputLabelProps={{ shrink: true }}
-                  fullWidth
-                />
-              </Grid>
-            </Grid>
-            <Box>
-              <Button variant="contained" onClick={handleSaveRsvpSettings}>
-                Save RSVP Settings
-              </Button>
-            </Box>
-          </Stack>
-        </Card>
-      )}
-
-      {activeTab === 3 && (
-        <Card sx={{ p: 3 }}>
-          <Typography variant="h6" mb={2}>
             RSVP Form Settings
           </Typography>
           <Stack spacing={3}>
@@ -1150,19 +1123,65 @@ export function RsvpAdminView() {
                   fullWidth
                 />
               </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Attendance Label"
-                  value={rsvpFormSettings.attendanceLabel}
-                  onChange={(e) =>
-                    setRsvpFormSettings((prev) => ({
-                      ...prev,
-                      attendanceLabel: e.target.value,
-                    }))
+              <Grid item xs={12}>
+                <FormControlLabel
+                  control={
+                    <Switch
+                      checked={rsvpFormSettings.attendanceEnabled}
+                      onChange={(toggleEvent) =>
+                        setRsvpFormSettings((prev) => ({
+                          ...prev,
+                          attendanceEnabled: toggleEvent.target.checked,
+                        }))
+                      }
+                    />
                   }
-                  fullWidth
+                  label="Enable attendance question"
                 />
               </Grid>
+              {rsvpFormSettings.attendanceEnabled && (
+                <>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Attendance Label"
+                      value={rsvpFormSettings.attendanceLabel}
+                      onChange={(e) =>
+                        setRsvpFormSettings((prev) => ({
+                          ...prev,
+                          attendanceLabel: e.target.value,
+                        }))
+                      }
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Attend Button Text"
+                      value={rsvpFormSettings.attendanceYesLabel}
+                      onChange={(e) =>
+                        setRsvpFormSettings((prev) => ({
+                          ...prev,
+                          attendanceYesLabel: e.target.value,
+                        }))
+                      }
+                      fullWidth
+                    />
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <TextField
+                      label="Unable To Attend Button Text"
+                      value={rsvpFormSettings.attendanceNoLabel}
+                      onChange={(e) =>
+                        setRsvpFormSettings((prev) => ({
+                          ...prev,
+                          attendanceNoLabel: e.target.value,
+                        }))
+                      }
+                      fullWidth
+                    />
+                  </Grid>
+                </>
+              )}
               <Grid item xs={12} md={6}>
                 <TextField
                   label="Comments Label"
@@ -1212,6 +1231,41 @@ export function RsvpAdminView() {
         </Card>
       )}
 
+      {activeTab === 3 && (
+        <Card sx={{ p: 3 }}>
+          <Typography variant="h6" mb={2}>
+            RSVP Settings
+          </Typography>
+          <Stack spacing={3}>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+              <Box>
+                <Typography variant="subtitle2" mb={1}>
+                  RSVP Background Color
+                </Typography>
+                <SketchPicker
+                  color={rsvpBgColor}
+                  onChangeComplete={(color) => setRsvpBgColor(color.hex)}
+                />
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" mb={1}>
+                  RSVP Accent Color
+                </Typography>
+                <SketchPicker
+                  color={rsvpAccentColor}
+                  onChangeComplete={(color) => setRsvpAccentColor(color.hex)}
+                />
+              </Box>
+            </Stack>
+            <Box>
+              <Button variant="contained" onClick={handleSaveRsvpSettings}>
+                Save RSVP Settings
+              </Button>
+            </Box>
+          </Stack>
+        </Card>
+      )}
+
       {activeTab === 4 && (
         <Card sx={{ p: 3 }}>
           <Typography variant="h6" mb={2}>
@@ -1219,7 +1273,7 @@ export function RsvpAdminView() {
           </Typography>
           {!canEditSequence ? (
             <Typography variant="body2" color="text.secondary">
-              Message sequencing is available for Full RSVP packages only.
+              Message sequencing is disabled for invitation-only events.
             </Typography>
           ) : (
             <Stack spacing={2}>
@@ -1271,6 +1325,7 @@ export function RsvpAdminView() {
                 <TableHead>
                   <TableRow>
                     <TableCell>Message</TableCell>
+                    <TableCell>Attachment</TableCell>
                     <TableCell>Channel</TableCell>
                     <TableCell>Audience</TableCell>
                     <TableCell>Scheduled</TableCell>
@@ -1279,9 +1334,24 @@ export function RsvpAdminView() {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {schedules.map((schedule) => (
+                  {paginatedSchedules.map((schedule) => (
                     <TableRow key={schedule._id}>
-                      <TableCell>{schedule.messageName || schedule.messageType}</TableCell>
+                      <TableCell>
+                        {schedule.messageTitle || schedule.messageName || schedule.messageType}
+                      </TableCell>
+                      <TableCell>
+                        {schedule.attachment?.url ? (
+                          <a
+                            href={schedule.attachment.url}
+                            target="_blank"
+                            rel="noreferrer"
+                          >
+                            {schedule.attachment?.filename || 'View Attachment'}
+                          </a>
+                        ) : (
+                          '—'
+                        )}
+                      </TableCell>
                       <TableCell>{schedule.channel}</TableCell>
                       <TableCell>{schedule.targetAudience}</TableCell>
                       <TableCell>
@@ -1307,7 +1377,7 @@ export function RsvpAdminView() {
                   ))}
                   {!loading && schedules.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={6} align="center">
+                      <TableCell colSpan={7} align="center">
                         No schedules yet.
                       </TableCell>
                     </TableRow>
@@ -1316,6 +1386,18 @@ export function RsvpAdminView() {
               </Table>
             </TableContainer>
           </Scrollbar>
+          <TablePagination
+            component="div"
+            count={schedules.length}
+            page={schedulePage}
+            onPageChange={(_, nextPage) => setSchedulePage(nextPage)}
+            rowsPerPage={scheduleRowsPerPage}
+            onRowsPerPageChange={(changeEvent) => {
+              setScheduleRowsPerPage(parseInt(changeEvent.target.value, 10));
+              setSchedulePage(0);
+            }}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+          />
         </Card>
       )}
 
