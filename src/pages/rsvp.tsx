@@ -9,6 +9,32 @@ import { API_BASE } from 'src/utils/apiBase';
 import './rsvp.css';
 
 type AttendanceStatus = 'yes' | 'no';
+type RsvpCustomFieldType = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'number';
+type RsvpCustomField = {
+  id: string;
+  label: string;
+  type: RsvpCustomFieldType;
+  required: boolean;
+  placeholder: string;
+  options: string[];
+};
+type CustomResponseValue = string | string[];
+type RsvpFormSettings = {
+  guestNameLabel: string;
+  guestNamePlaceholder: string;
+  emailLabel: string;
+  emailPlaceholder: string;
+  phoneLabel: string;
+  phonePlaceholder: string;
+  attendanceEnabled: boolean;
+  attendanceLabel: string;
+  attendanceYesLabel: string;
+  attendanceNoLabel: string;
+  commentsLabel: string;
+  commentsPlaceholder: string;
+  submitLabel: string;
+  customFields: RsvpCustomField[];
+};
 
 type RsvpFormResponse = {
   token: string;
@@ -34,7 +60,16 @@ type RsvpFormResponse = {
   };
 };
 
-const defaultFormSettings = {
+const SUPPORTED_CUSTOM_FIELD_TYPES = new Set<RsvpCustomFieldType>([
+  'text',
+  'textarea',
+  'select',
+  'radio',
+  'checkbox',
+  'number',
+]);
+
+const defaultFormSettings: RsvpFormSettings = {
   guestNameLabel: 'Guest Name',
   guestNamePlaceholder: '',
   emailLabel: 'Email',
@@ -48,7 +83,42 @@ const defaultFormSettings = {
   commentsLabel: 'Additional Comments',
   commentsPlaceholder: '',
   submitLabel: 'Submit',
+  customFields: [],
 };
+
+const customFieldNeedsOptions = (type: RsvpCustomFieldType) =>
+  type === 'select' || type === 'radio' || type === 'checkbox';
+
+const normalizeCustomFields = (value: any): RsvpCustomField[] => {
+  if (!Array.isArray(value)) return [];
+  return value.map((field, index) => {
+    const type = SUPPORTED_CUSTOM_FIELD_TYPES.has(field?.type) ? field.type : 'text';
+    return {
+      id:
+        typeof field?.id === 'string' && field.id.trim()
+          ? field.id.trim()
+          : `custom_field_${index + 1}`,
+      label:
+        typeof field?.label === 'string' && field.label.trim()
+          ? field.label.trim()
+          : `Question ${index + 1}`,
+      type,
+      required: field?.required === true,
+      placeholder: typeof field?.placeholder === 'string' ? field.placeholder : '',
+      options: customFieldNeedsOptions(type)
+        ? Array.isArray(field?.options)
+            ? field.options.map((option: any) => String(option || '').trim()).filter(Boolean)
+            : []
+        : [],
+    };
+  });
+};
+
+const createInitialResponses = (fields: RsvpCustomField[]) =>
+  fields.reduce<Record<string, CustomResponseValue>>((acc, field) => {
+    acc[field.id] = field.type === 'checkbox' ? [] : '';
+    return acc;
+  }, {});
 
 function formatDate(value?: string) {
   if (!value) return '';
@@ -76,6 +146,7 @@ export default function RsvpPage() {
   const [phone, setPhone] = useState('');
   const [status, setStatus] = useState<AttendanceStatus | ''>('');
   const [comments, setComments] = useState('');
+  const [responses, setResponses] = useState<Record<string, CustomResponseValue>>({});
 
   useEffect(() => {
     let ignore = false;
@@ -105,11 +176,20 @@ export default function RsvpPage() {
   }, [token]);
 
   const formLocked = useMemo(() => payload?.submitted === true, [payload]);
-  const formSettings = useMemo(
-    () => ({ ...defaultFormSettings, ...(payload?.event?.rsvpFormSettings || {}) }),
-    [payload]
-  );
+  const formSettings = useMemo(() => {
+    const savedSettings = payload?.event?.rsvpFormSettings || {};
+    return {
+      ...defaultFormSettings,
+      ...savedSettings,
+      submitLabel: 'Submit',
+      customFields: normalizeCustomFields(savedSettings.customFields),
+    };
+  }, [payload]);
   const attendanceEnabled = formSettings.attendanceEnabled !== false;
+
+  useEffect(() => {
+    setResponses(createInitialResponses(formSettings.customFields));
+  }, [formSettings.customFields]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -134,6 +214,18 @@ export default function RsvpPage() {
       toast.error('Please select an option');
       return;
     }
+    const missingRequiredField = formSettings.customFields.find((field) => {
+      if (!field.required) return false;
+      const value = responses[field.id];
+      if (field.type === 'checkbox') {
+        return !Array.isArray(value) || value.length === 0;
+      }
+      return typeof value !== 'string' || !value.trim();
+    });
+    if (missingRequiredField) {
+      toast.error(`Please complete "${missingRequiredField.label}"`);
+      return;
+    }
     if (formLocked) {
       toast.error('This RSVP form is already submitted.');
       return;
@@ -141,12 +233,21 @@ export default function RsvpPage() {
 
     setSubmitting(true);
     try {
+      const responsePayload = formSettings.customFields.reduce<Record<string, CustomResponseValue>>(
+        (acc, field) => {
+          const value = responses[field.id];
+          acc[field.id] = field.type === 'checkbox' ? (Array.isArray(value) ? value : []) : typeof value === 'string' ? value : '';
+          return acc;
+        },
+        {}
+      );
       await axios.post(`${API_BASE}/rsvp/form/${token}/submit`, {
         guestName,
         email,
         phone,
         attendanceStatus: attendanceEnabled ? status : undefined,
         comments,
+        responses: responsePayload,
       });
       toast.success('RSVP submitted. Thank you!');
       setPayload((prev) => (prev ? { ...prev, submitted: true } : prev));
@@ -258,6 +359,138 @@ export default function RsvpPage() {
                 />
               </label>
 
+              {formSettings.customFields.map((field) => {
+                const value = responses[field.id];
+                const inputId = `rsvp-custom-${field.id}`;
+
+                if (field.type === 'textarea') {
+                  return (
+                    <label className="rsvp-field" htmlFor={inputId} key={field.id}>
+                      <span>{field.label}</span>
+                      <textarea
+                        id={inputId}
+                        name={field.id}
+                        value={typeof value === 'string' ? value : ''}
+                        disabled={submitting || formLocked}
+                        placeholder={field.placeholder}
+                        onChange={(e) =>
+                          setResponses((prev) => ({ ...prev, [field.id]: e.target.value }))
+                        }
+                        rows={4}
+                      />
+                    </label>
+                  );
+                }
+
+                if (field.type === 'select') {
+                  return (
+                    <label className="rsvp-field" htmlFor={inputId} key={field.id}>
+                      <span>{field.label}</span>
+                      <select
+                        id={inputId}
+                        name={field.id}
+                        value={typeof value === 'string' ? value : ''}
+                        disabled={submitting || formLocked}
+                        onChange={(e) =>
+                          setResponses((prev) => ({ ...prev, [field.id]: e.target.value }))
+                        }
+                      >
+                        <option value="">{field.placeholder || `Select ${field.label}`}</option>
+                        {field.options.map((option) => (
+                          <option key={option} value={option}>
+                            {option}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                  );
+                }
+
+                if (field.type === 'radio') {
+                  return (
+                    <div className="rsvp-field" key={field.id}>
+                      <span>{field.label}</span>
+                      <div className="rsvp-radio-group">
+                        {field.options.map((option) => (
+                          <label className="rsvp-radio" key={option} htmlFor={`${inputId}-${option}`}>
+                            <input
+                              id={`${inputId}-${option}`}
+                              type="radio"
+                              name={field.id}
+                              value={option}
+                              checked={value === option}
+                              disabled={submitting || formLocked}
+                              onChange={(e) =>
+                                setResponses((prev) => ({ ...prev, [field.id]: e.target.value }))
+                              }
+                            />
+                            <span>{option}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                if (field.type === 'checkbox') {
+                  const selectedValues = Array.isArray(value) ? value : [];
+                  return (
+                    <div className="rsvp-field" key={field.id}>
+                      <span>{field.label}</span>
+                      <div className="rsvp-checkbox-group">
+                        {field.options.map((option) => (
+                          <label
+                            className="rsvp-checkbox"
+                            key={option}
+                            htmlFor={`${inputId}-${option}`}
+                          >
+                            <input
+                              id={`${inputId}-${option}`}
+                              type="checkbox"
+                              name={`${field.id}[]`}
+                              value={option}
+                              checked={selectedValues.includes(option)}
+                              disabled={submitting || formLocked}
+                              onChange={(e) =>
+                                setResponses((prev) => {
+                                  const current = Array.isArray(prev[field.id])
+                                    ? (prev[field.id] as string[])
+                                    : [];
+                                  return {
+                                    ...prev,
+                                    [field.id]: e.target.checked
+                                      ? [...current, option]
+                                      : current.filter((entry: string) => entry !== option),
+                                  };
+                                })
+                              }
+                            />
+                            <span>{option}</span>
+                          </label>
+                        ))}
+                      </div>
+                    </div>
+                  );
+                }
+
+                return (
+                  <label className="rsvp-field" htmlFor={inputId} key={field.id}>
+                    <span>{field.label}</span>
+                    <input
+                      id={inputId}
+                      type={field.type === 'number' ? 'number' : 'text'}
+                      name={field.id}
+                      value={typeof value === 'string' ? value : ''}
+                      disabled={submitting || formLocked}
+                      placeholder={field.placeholder}
+                      onChange={(e) =>
+                        setResponses((prev) => ({ ...prev, [field.id]: e.target.value }))
+                      }
+                    />
+                  </label>
+                );
+              })}
+
               {attendanceEnabled && (
                 <div className="rsvp-field">
                   <span>{formSettings.attendanceLabel}</span>
@@ -298,7 +531,7 @@ export default function RsvpPage() {
               )}
 
               <button type="submit" className="rsvp-submit" disabled={submitting || formLocked}>
-                {submitting ? 'Submitting...' : formSettings.submitLabel}
+                {submitting ? 'Submitting...' : 'Submit'}
               </button>
             </form>
           )}

@@ -12,7 +12,9 @@ import {
   Grid,
   IconButton,
   MenuItem,
+  FormControlLabel,
   Stack,
+  Switch,
   TextField,
   Tooltip,
   Typography,
@@ -39,6 +41,7 @@ export type MessageSequenceItem = {
   messageTitle: string;
   messageBody: string;
   scheduledDate: string; // datetime-local format
+  includeResponseButtons: boolean;
   attachment: MessageAttachmentConfig;
   channels: {
     email: MessageChannelConfig;
@@ -154,6 +157,7 @@ export const normalizeMessageSequence = (input: any): MessageSequenceItem[] => {
       messageTitle: normalizedTitle,
       messageBody: typeof raw.messageBody === 'string' ? raw.messageBody : '',
       scheduledDate: toDateTimeLocalValue(raw.scheduledDate || fallbackDate),
+      includeResponseButtons: raw.includeResponseButtons !== false,
       attachment,
       channels: {
         email: normalizeChannel(raw.channels?.email, true),
@@ -177,13 +181,15 @@ export const getDefaultMessageSequence = (
     messageName: string,
     offsetDays: number,
     audienceType: MessageAudience,
-    channelOverrides?: Partial<MessageSequenceItem['channels']>
+    channelOverrides?: Partial<MessageSequenceItem['channels']>,
+    includeResponseButtons = true
   ): MessageSequenceItem => ({
     trackingId: createTrackingId(),
     messageName,
     messageTitle: messageName,
     messageBody: '',
     scheduledDate: defaultScheduledDate(offsetDays),
+    includeResponseButtons,
     attachment: {
       url: '',
       filename: '',
@@ -221,7 +227,7 @@ export const getDefaultMessageSequence = (
     buildItem('Post Event Thanks', 31, 'responders', {
       whatsapp: { enabled: false },
       bulkSms: { enabled: false },
-    }),
+    }, false),
   ];
 };
 
@@ -262,6 +268,7 @@ export const serializeMessageSequence = (
       messageTitle: item.messageTitle,
       messageBody: item.messageBody,
       scheduledDate: toIsoDate(item.scheduledDate),
+      includeResponseButtons: item.includeResponseButtons,
       attachment,
       channels: {
         email: {
@@ -322,6 +329,7 @@ export function MessageSequenceBuilder({
       messageTitle: `Message ${value.length + 1}`,
       messageBody: '',
       scheduledDate: nextScheduledDate,
+      includeResponseButtons: true,
       attachment: {
         url: '',
         filename: '',
@@ -698,6 +706,24 @@ export function MessageSequenceBuilder({
                   SMS {item.channels.bulkSms.enabled ? 'On' : 'Off'}
                 </Button>
               </Stack>
+
+              <FormControlLabel
+                control={
+                  <Switch
+                    checked={item.includeResponseButtons}
+                    disabled={disabled}
+                    onChange={(event) => {
+                      const next = value.map((entry, idx) =>
+                        idx === index
+                          ? { ...entry, includeResponseButtons: event.target.checked }
+                          : entry
+                      );
+                      onChange(next);
+                    }}
+                  />
+                }
+                label="Include 'Will you attend?' buttons in this message"
+              />
             </Stack>
           </Box>
         ))}

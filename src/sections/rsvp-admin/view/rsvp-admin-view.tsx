@@ -19,6 +19,7 @@ import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TextField from '@mui/material/TextField';
 import Grid from '@mui/material/Grid';
+import MenuItem from '@mui/material/MenuItem';
 import Tabs from '@mui/material/Tabs';
 import Tab from '@mui/material/Tab';
 import Divider from '@mui/material/Divider';
@@ -49,12 +50,21 @@ type RsvpRecord = {
   guestName: string;
   email?: string;
   phone?: string;
-  attendanceStatus?: 'pending' | 'yes' | 'no';
+  attendanceStatus?: RsvpAttendanceStatus;
   submissionDate?: string;
   source?: 'imported' | 'form_submission' | 'manual';
   invitationSent?: boolean;
   sentCount?: number;
   lastSentAt?: string;
+};
+
+type RsvpAttendanceStatus = 'pending' | 'yes' | 'no';
+
+type EditGuestFormState = {
+  guestName: string;
+  email: string;
+  phone: string;
+  attendanceStatus: RsvpAttendanceStatus;
 };
 
 type RsvpFormSettings = {
@@ -71,6 +81,18 @@ type RsvpFormSettings = {
   commentsLabel: string;
   commentsPlaceholder: string;
   submitLabel: string;
+  customFields: RsvpCustomField[];
+};
+
+type RsvpCustomFieldType = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'number';
+
+type RsvpCustomField = {
+  id: string;
+  label: string;
+  type: RsvpCustomFieldType;
+  required: boolean;
+  placeholder: string;
+  options: string[];
 };
 
 const defaultRsvpFormSettings: RsvpFormSettings = {
@@ -87,7 +109,63 @@ const defaultRsvpFormSettings: RsvpFormSettings = {
   commentsLabel: 'Additional Comments',
   commentsPlaceholder: '',
   submitLabel: 'Submit',
+  customFields: [],
 };
+
+const CUSTOM_FIELD_TYPES: RsvpCustomFieldType[] = [
+  'text',
+  'textarea',
+  'select',
+  'radio',
+  'checkbox',
+  'number',
+];
+
+const createCustomFieldId = () =>
+  (globalThis.crypto && 'randomUUID' in globalThis.crypto
+    ? globalThis.crypto.randomUUID()
+    : `form_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+
+const createEmptyCustomField = (): RsvpCustomField => ({
+  id: createCustomFieldId(),
+  label: '',
+  type: 'text',
+  required: false,
+  placeholder: '',
+  options: [],
+});
+
+const normalizeCustomField = (field: any, index: number): RsvpCustomField => ({
+  id:
+    typeof field?.id === 'string' && field.id.trim()
+      ? field.id.trim()
+      : `custom_field_${index + 1}`,
+  label:
+    typeof field?.label === 'string' && field.label.trim()
+      ? field.label.trim()
+      : `Question ${index + 1}`,
+  type: CUSTOM_FIELD_TYPES.includes(field?.type) ? field.type : 'text',
+  required: field?.required === true,
+  placeholder: typeof field?.placeholder === 'string' ? field.placeholder : '',
+  options: Array.isArray(field?.options)
+    ? field.options.map((option: any) => String(option || '').trim()).filter(Boolean)
+    : [],
+});
+
+const normalizeRsvpFormSettings = (settings: any): RsvpFormSettings => ({
+  ...defaultRsvpFormSettings,
+  ...(settings || {}),
+  submitLabel: 'Submit',
+  customFields: Array.isArray(settings?.customFields)
+    ? settings.customFields.map((field: any, index: number) => normalizeCustomField(field, index))
+    : [],
+});
+
+const customFieldNeedsOptions = (type: RsvpCustomFieldType) =>
+  type === 'select' || type === 'radio' || type === 'checkbox';
+
+const formatCustomFieldType = (type: RsvpCustomFieldType) =>
+  type === 'textarea' ? 'Textarea' : type.charAt(0).toUpperCase() + type.slice(1);
 
 export function RsvpAdminView() {
   const [eventId, setEventId] = useState<string | null>(null);
@@ -100,6 +178,14 @@ export function RsvpAdminView() {
 
   const [addOpen, setAddOpen] = useState(false);
   const [newGuest, setNewGuest] = useState({ guestName: '', email: '', phone: '' });
+  const [editTarget, setEditTarget] = useState<RsvpRecord | null>(null);
+  const [editGuest, setEditGuest] = useState<EditGuestFormState>({
+    guestName: '',
+    email: '',
+    phone: '',
+    attendanceStatus: 'pending',
+  });
+  const [editLoading, setEditLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [formLink, setFormLink] = useState('');
   const [rsvpBgColor, setRsvpBgColor] = useState('#111827');
@@ -146,6 +232,29 @@ export function RsvpAdminView() {
     () => (sequencePayload.length ? JSON.stringify(sequencePayload, null, 2) : ''),
     [sequencePayload]
   );
+  const updateCustomField = useCallback(
+    (fieldId: string, updates: Partial<RsvpCustomField>) => {
+      setRsvpFormSettings((prev) => ({
+        ...prev,
+        customFields: prev.customFields.map((field) =>
+          field.id === fieldId ? { ...field, ...updates } : field
+        ),
+      }));
+    },
+    []
+  );
+  const addCustomField = useCallback(() => {
+    setRsvpFormSettings((prev) => ({
+      ...prev,
+      customFields: [...prev.customFields, createEmptyCustomField()],
+    }));
+  }, []);
+  const removeCustomField = useCallback((fieldId: string) => {
+    setRsvpFormSettings((prev) => ({
+      ...prev,
+      customFields: prev.customFields.filter((field) => field.id !== fieldId),
+    }));
+  }, []);
 
   const timelinePoints = analytics?.timeline || [];
   const timelineCategories = timelinePoints.map((point: any) => point.date);
@@ -259,7 +368,7 @@ export function RsvpAdminView() {
         setRsvpAccentColor(rgbToHex(nextEvent.rsvpAccentColor));
       }
       if (nextEvent?.rsvpFormSettings) {
-        setRsvpFormSettings({ ...defaultRsvpFormSettings, ...nextEvent.rsvpFormSettings });
+        setRsvpFormSettings(normalizeRsvpFormSettings(nextEvent.rsvpFormSettings));
       } else {
         setRsvpFormSettings(defaultRsvpFormSettings);
       }
@@ -430,6 +539,60 @@ export function RsvpAdminView() {
     }
   };
 
+  const openEditGuestDialog = useCallback((guest: RsvpRecord) => {
+    setEditTarget(guest);
+    setEditGuest({
+      guestName: guest.guestName || '',
+      email: guest.email || '',
+      phone: guest.phone || '',
+      attendanceStatus: guest.attendanceStatus || 'pending',
+    });
+  }, []);
+
+  const closeEditGuestDialog = useCallback(() => {
+    if (editLoading) return;
+    setEditTarget(null);
+    setEditGuest({
+      guestName: '',
+      email: '',
+      phone: '',
+      attendanceStatus: 'pending',
+    });
+  }, [editLoading]);
+
+  const handleEditGuest = async () => {
+    if (!editTarget) return;
+    if (!editGuest.guestName.trim()) {
+      toast.error('Guest name is required');
+      return;
+    }
+
+    try {
+      setEditLoading(true);
+      await axios.put(
+        `${API_BASE}/rsvp/${editTarget._id}`,
+        {
+          guestName: editGuest.guestName,
+          email: editGuest.email,
+          phone: editGuest.phone,
+          ...(mode === 'invitation-only'
+            ? {}
+            : { attendanceStatus: editGuest.attendanceStatus }),
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success(
+        mode === 'invitation-only' ? 'Invitation guest updated' : 'RSVP guest updated'
+      );
+      closeEditGuestDialog();
+      reloadData();
+    } catch (err: any) {
+      toast.error(err?.response?.data?.message || 'Failed to update guest');
+    } finally {
+      setEditLoading(false);
+    }
+  };
+
   const handleSendInvites = async (ids?: string[]) => {
     if (!eventId) return;
     try {
@@ -553,10 +716,30 @@ export function RsvpAdminView() {
 
   const handleRsvpFormSettings = async () => {
     if (!eventId) return;
+    const sanitizedCustomFields = rsvpFormSettings.customFields.map((field, index) => {
+      const normalized = normalizeCustomField(field, index);
+      return {
+        ...normalized,
+        options: customFieldNeedsOptions(normalized.type) ? normalized.options : [],
+      };
+    });
+    const invalidOptionsField = sanitizedCustomFields.find(
+      (field) => customFieldNeedsOptions(field.type) && field.options.length === 0
+    );
+    if (invalidOptionsField) {
+      toast.error(`Add at least one option for "${invalidOptionsField.label}"`);
+      return;
+    }
     try {
       await axios.put(
         `${API_BASE}/events/events/${eventId}/rsvp-form-settings`,
-        { rsvpFormSettings },
+        {
+          rsvpFormSettings: {
+            ...rsvpFormSettings,
+            submitLabel: 'Submit',
+            customFields: sanitizedCustomFields,
+          },
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       toast.success('RSVP form settings saved');
@@ -725,9 +908,11 @@ export function RsvpAdminView() {
           <Button variant="outlined" onClick={() => fileInputRef.current?.click()} startIcon={<Iconify icon="mdi:file-upload" />}>
             Import CSV
           </Button>
-          <Button variant="outlined" onClick={() => handleSendInvites()} startIcon={<Iconify icon="mdi:email-fast" />}>
-            {mode === 'invitation-only' ? 'Send Invitations' : 'Send RSVP Emails'}
-          </Button>
+          {mode === 'invitation-only' && (
+            <Button variant="outlined" onClick={() => handleSendInvites()} startIcon={<Iconify icon="mdi:email-fast" />}>
+              Send Invitations
+            </Button>
+          )}
           <Button variant="outlined" onClick={handleExportCsv} startIcon={<Iconify icon="mdi:file-download" />}>
             Export CSV
           </Button>
@@ -910,6 +1095,9 @@ export function RsvpAdminView() {
                             >
                               Resend Invitation
                             </Button>
+                            <Button variant="outlined" onClick={() => openEditGuestDialog(guest)}>
+                              Edit
+                            </Button>
                             <Button color="error" onClick={() => setDeleteTarget(guest)}>
                               Delete
                             </Button>
@@ -927,9 +1115,14 @@ export function RsvpAdminView() {
                           {guest.submissionDate ? new Date(guest.submissionDate).toLocaleString() : '—'}
                         </TableCell>
                         <TableCell align="right">
-                          <Button color="error" onClick={() => setDeleteTarget(guest)}>
-                            Delete
-                          </Button>
+                          <Stack direction="row" spacing={1} justifyContent="flex-end">
+                            <Button variant="outlined" onClick={() => openEditGuestDialog(guest)}>
+                              Edit
+                            </Button>
+                            <Button color="error" onClick={() => setDeleteTarget(guest)}>
+                              Delete
+                            </Button>
+                          </Stack>
                         </TableCell>
                       </TableRow>
                     )
@@ -1136,7 +1329,7 @@ export function RsvpAdminView() {
                       }
                     />
                   }
-                  label="Enable attendance question"
+                  label="Enable attendance question on the form"
                 />
               </Grid>
               {rsvpFormSettings.attendanceEnabled && (
@@ -1208,20 +1401,132 @@ export function RsvpAdminView() {
                   fullWidth
                 />
               </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Submit Button Label"
-                  value={rsvpFormSettings.submitLabel}
-                  onChange={(e) =>
-                    setRsvpFormSettings((prev) => ({
-                      ...prev,
-                      submitLabel: e.target.value,
-                    }))
-                  }
-                  fullWidth
-                />
-              </Grid>
             </Grid>
+            <Divider />
+            <Stack spacing={2}>
+              <Stack
+                direction={{ xs: 'column', sm: 'row' }}
+                spacing={2}
+                alignItems={{ xs: 'flex-start', sm: 'center' }}
+                justifyContent="space-between"
+              >
+                <Box>
+                  <Typography variant="subtitle1">Additional Questions</Typography>
+                  <Typography variant="body2" color="text.secondary">
+                    These questions appear on the RSVP form only.
+                  </Typography>
+                </Box>
+                <Button
+                  variant="outlined"
+                  startIcon={<Iconify icon="mingcute:add-line" />}
+                  onClick={addCustomField}
+                >
+                  Add Question
+                </Button>
+              </Stack>
+
+              {rsvpFormSettings.customFields.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">
+                  No additional questions yet.
+                </Typography>
+              ) : (
+                <Stack spacing={2}>
+                  {rsvpFormSettings.customFields.map((field, index) => (
+                    <Card key={field.id} variant="outlined" sx={{ p: 2 }}>
+                      <Stack spacing={2}>
+                        <Stack
+                          direction={{ xs: 'column', sm: 'row' }}
+                          spacing={2}
+                          alignItems={{ xs: 'flex-start', sm: 'center' }}
+                          justifyContent="space-between"
+                        >
+                          <Typography variant="subtitle2">Question {index + 1}</Typography>
+                          <Button color="error" onClick={() => removeCustomField(field.id)}>
+                            Remove
+                          </Button>
+                        </Stack>
+                        <Grid container spacing={2}>
+                          <Grid item xs={12} md={6}>
+                            <TextField
+                              label="Question Label"
+                              value={field.label}
+                              onChange={(e) =>
+                                updateCustomField(field.id, { label: e.target.value })
+                              }
+                              fullWidth
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={6}>
+                            <TextField
+                              select
+                              label="Field Type"
+                              value={field.type}
+                              onChange={(e) => {
+                                const nextType = e.target.value as RsvpCustomFieldType;
+                                updateCustomField(field.id, {
+                                  type: nextType,
+                                  options: customFieldNeedsOptions(nextType) ? field.options : [],
+                                });
+                              }}
+                              fullWidth
+                            >
+                              {CUSTOM_FIELD_TYPES.map((type) => (
+                                <MenuItem key={type} value={type}>
+                                  {formatCustomFieldType(type)}
+                                </MenuItem>
+                              ))}
+                            </TextField>
+                          </Grid>
+                          <Grid item xs={12} md={6}>
+                            <TextField
+                              label="Placeholder"
+                              value={field.placeholder}
+                              onChange={(e) =>
+                                updateCustomField(field.id, { placeholder: e.target.value })
+                              }
+                              fullWidth
+                            />
+                          </Grid>
+                          <Grid item xs={12} md={6}>
+                            <FormControlLabel
+                              control={
+                                <Switch
+                                  checked={field.required}
+                                  onChange={(e) =>
+                                    updateCustomField(field.id, { required: e.target.checked })
+                                  }
+                                />
+                              }
+                              label="Required question"
+                            />
+                          </Grid>
+                          {customFieldNeedsOptions(field.type) && (
+                            <Grid item xs={12}>
+                              <TextField
+                                label="Options"
+                                value={field.options.join('\n')}
+                                onChange={(e) =>
+                                  updateCustomField(field.id, {
+                                    options: e.target.value
+                                      .split('\n')
+                                      .map((option) => option.trim())
+                                      .filter(Boolean),
+                                  })
+                                }
+                                fullWidth
+                                multiline
+                                minRows={4}
+                                helperText="Enter one option per line."
+                              />
+                            </Grid>
+                          )}
+                        </Grid>
+                      </Stack>
+                    </Card>
+                  ))}
+                </Stack>
+              )}
+            </Stack>
             <Box>
               <Button variant="contained" onClick={handleRsvpFormSettings}>
                 Save RSVP Form Settings
@@ -1302,13 +1607,6 @@ export function RsvpAdminView() {
                   {sequenceSaving ? 'Saving...' : 'Save Sequence'}
                 </Button>
               </Stack>
-              <TextField
-                label="Sequence JSON Preview"
-                value={sequenceJson}
-                multiline
-                minRows={4}
-                InputProps={{ readOnly: true }}
-              />
             </Stack>
           )}
         </Card>
@@ -1656,6 +1954,61 @@ export function RsvpAdminView() {
         <DialogActions>
           <Button onClick={() => setAddOpen(false)}>Cancel</Button>
           <Button variant="contained" onClick={handleAddGuest}>Add</Button>
+        </DialogActions>
+      </Dialog>
+
+      <Dialog open={Boolean(editTarget)} onClose={closeEditGuestDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          {mode === 'invitation-only' ? 'Edit Invitation Guest' : 'Edit RSVP Guest'}
+        </DialogTitle>
+        <DialogContent>
+          <Stack spacing={2} mt={1}>
+            <TextField
+              label="Full name"
+              value={editGuest.guestName}
+              onChange={(e) => setEditGuest((prev) => ({ ...prev, guestName: e.target.value }))}
+              fullWidth
+              required
+            />
+            <TextField
+              label="Email"
+              value={editGuest.email}
+              onChange={(e) => setEditGuest((prev) => ({ ...prev, email: e.target.value }))}
+              fullWidth
+            />
+            <TextField
+              label="Phone"
+              value={editGuest.phone}
+              onChange={(e) => setEditGuest((prev) => ({ ...prev, phone: e.target.value }))}
+              fullWidth
+            />
+            {mode !== 'invitation-only' && (
+              <TextField
+                select
+                label="Attendance Status"
+                value={editGuest.attendanceStatus}
+                onChange={(e) =>
+                  setEditGuest((prev) => ({
+                    ...prev,
+                    attendanceStatus: e.target.value as RsvpAttendanceStatus,
+                  }))
+                }
+                fullWidth
+              >
+                <MenuItem value="pending">Pending</MenuItem>
+                <MenuItem value="yes">Yes</MenuItem>
+                <MenuItem value="no">No</MenuItem>
+              </TextField>
+            )}
+          </Stack>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeEditGuestDialog} disabled={editLoading}>
+            Cancel
+          </Button>
+          <Button variant="contained" onClick={handleEditGuest} disabled={editLoading}>
+            {editLoading ? 'Saving...' : 'Save'}
+          </Button>
         </DialogActions>
       </Dialog>
 
