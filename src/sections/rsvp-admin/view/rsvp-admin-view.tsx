@@ -38,6 +38,7 @@ import { AnalyticsCurrentVisits } from 'src/sections/overview/analytics-current-
 import { AnalyticsConversionRates } from 'src/sections/overview/analytics-conversion-rates';
 import {
   collectSequenceAttachmentFiles,
+  getMessageAudienceLabel,
   MessageSequenceBuilder,
   getDefaultMessageSequence,
   normalizeMessageSequence,
@@ -1651,7 +1652,7 @@ export function RsvpAdminView() {
                         )}
                       </TableCell>
                       <TableCell>{schedule.channel}</TableCell>
-                      <TableCell>{schedule.targetAudience}</TableCell>
+                      <TableCell>{getMessageAudienceLabel(schedule.targetAudience)}</TableCell>
                       <TableCell>
                         {schedule.scheduledDate
                           ? new Date(schedule.scheduledDate).toLocaleString()

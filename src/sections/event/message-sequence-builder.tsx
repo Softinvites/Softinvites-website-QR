@@ -21,7 +21,13 @@ import {
 } from '@mui/material';
 import { Iconify } from 'src/components/iconify';
 
-export type MessageAudience = 'all' | 'responders' | 'yes' | 'no' | 'pending';
+export type MessageAudience =
+  | 'all'
+  | 'responders'
+  | 'yes'
+  | 'no'
+  | 'pending'
+  | 'pending-and-no';
 
 export type MessageChannelConfig = {
   enabled: boolean;
@@ -62,13 +68,27 @@ type BuilderProps = {
   disabled?: boolean;
 };
 
-const AUDIENCE_OPTIONS: { label: string; value: MessageAudience }[] = [
+export const AUDIENCE_OPTIONS: { label: string; value: MessageAudience }[] = [
   { label: 'All Guests', value: 'all' },
   { label: 'Responded (Yes/No)', value: 'responders' },
-  { label: 'Responded Yes', value: 'yes' },
-  { label: 'Responded No', value: 'no' },
+  { label: 'Yes', value: 'yes' },
+  { label: 'No', value: 'no' },
   { label: 'Pending', value: 'pending' },
+  { label: 'Pending and No', value: 'pending-and-no' },
 ];
+
+export const normalizeMessageAudience = (value: any): MessageAudience => {
+  if (value === 'non-responders') return 'pending';
+  if (value === 'pending-no' || value === 'pending_and_no') return 'pending-and-no';
+  if (AUDIENCE_OPTIONS.some((option) => option.value === value)) {
+    return value as MessageAudience;
+  }
+  return 'all';
+};
+
+export const getMessageAudienceLabel = (value: any) =>
+  AUDIENCE_OPTIONS.find((option) => option.value === normalizeMessageAudience(value))?.label ||
+  'All Guests';
 
 const createTrackingId = () =>
   (globalThis.crypto && 'randomUUID' in globalThis.crypto
@@ -165,7 +185,7 @@ export const normalizeMessageSequence = (input: any): MessageSequenceItem[] => {
         bulkSms: normalizeChannel(raw.channels?.bulkSms, false),
       },
       conditions: {
-        audienceType: raw.conditions?.audienceType || 'all',
+        audienceType: normalizeMessageAudience(raw.conditions?.audienceType),
       },
       raw,
     };
