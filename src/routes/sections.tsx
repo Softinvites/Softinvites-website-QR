@@ -101,6 +101,14 @@ export function Router() {
       ),
     },
     {
+      path: 'r/:token',
+      element: (
+        <Suspense fallback={renderFallback}>
+          <RsvpPage />
+        </Suspense>
+      ),
+    },
+    {
       path: 'rsvp/respond/:rsvpId',
       element: (
         <Suspense fallback={renderFallback}>

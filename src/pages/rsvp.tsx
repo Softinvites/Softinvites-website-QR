@@ -1,12 +1,14 @@
-import { FormEvent, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import './rsvp.css';
+
+import type { FormEvent } from 'react';
+
 import axios from 'axios';
-import { Helmet } from 'react-helmet-async';
 import { toast } from 'react-toastify';
+import { Helmet } from 'react-helmet-async';
+import { useParams } from 'react-router-dom';
+import { useMemo, useState, useEffect } from 'react';
 
 import { API_BASE } from 'src/utils/apiBase';
-
-import './rsvp.css';
 
 type AttendanceStatus = 'yes' | 'no';
 type RsvpCustomFieldType = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'number';
@@ -128,10 +130,69 @@ function formatDate(value?: string) {
     : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-function rgbString(value: string | undefined, fallback: string) {
+function normalizeCssColor(value: string | undefined, fallback: string) {
   if (!value) return fallback;
   const cleaned = value.trim();
-  return cleaned.includes('rgb') ? cleaned : `rgb(${cleaned})`;
+  if (!cleaned) return fallback;
+  if (
+    cleaned.startsWith('#') ||
+    cleaned.startsWith('rgb') ||
+    cleaned.startsWith('hsl') ||
+    cleaned.startsWith('var(')
+  ) {
+    return cleaned;
+  }
+  return `rgb(${cleaned})`;
+}
+
+function parseColorChannels(value: string): [number, number, number] | null {
+  const cleaned = value.trim();
+
+  if (cleaned.startsWith('#')) {
+    const hex = cleaned.slice(1);
+    const normalized = hex.length === 3 ? hex.split('').map((char) => char + char).join('') : hex;
+    if (!/^[\da-fA-F]{6}$/.test(normalized)) {
+      return null;
+    }
+    return [
+      Number.parseInt(normalized.slice(0, 2), 16),
+      Number.parseInt(normalized.slice(2, 4), 16),
+      Number.parseInt(normalized.slice(4, 6), 16),
+    ];
+  }
+
+  const matches = cleaned.match(/\d+(\.\d+)?/g);
+  if (!matches || matches.length < 3) {
+    return null;
+  }
+
+  const channels = matches.slice(0, 3).map((channel) => Number(channel));
+  if (channels.some((channel) => Number.isNaN(channel))) {
+    return null;
+  }
+
+  return [channels[0], channels[1], channels[2]];
+}
+
+function getReadableTextColor(
+  background: string,
+  darkText: string = '#0f172a',
+  lightText: string = '#f8fafc'
+) {
+  const channels = parseColorChannels(background);
+  if (!channels) {
+    return lightText;
+  }
+
+  const [r, g, b] = channels.map((channel) => {
+    const normalized = channel / 255;
+    return normalized <= 0.03928
+      ? normalized / 12.92
+      : ((normalized + 0.055) / 1.055) ** 2.4;
+  });
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+
+  return luminance > 0.55 ? darkText : lightText;
 }
 
 export default function RsvpPage() {
@@ -278,11 +339,13 @@ export default function RsvpPage() {
     );
   }, [payload]);
 
-  const rsvpBg = rgbString(payload?.event?.rsvpBgColor, '#111827');
-  const rsvpAccent = rgbString(
+  const rsvpBg = normalizeCssColor(payload?.event?.rsvpBgColor, '#111827');
+  const rsvpAccent = normalizeCssColor(
     payload?.event?.rsvpAccentColor || payload?.event?.qrCodeCenterColor,
     '#1f2937'
   );
+  const rsvpBgText = getReadableTextColor(rsvpBg);
+  const rsvpAccentText = getReadableTextColor(rsvpAccent);
 
   return (
     <div
@@ -291,6 +354,8 @@ export default function RsvpPage() {
         {
           '--rsvp-bg': rsvpBg,
           '--rsvp-accent': rsvpAccent,
+          '--rsvp-bg-contrast': rsvpBgText,
+          '--rsvp-accent-contrast': rsvpAccentText,
         } as React.CSSProperties
       }
     >
