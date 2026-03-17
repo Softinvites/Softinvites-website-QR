@@ -212,8 +212,9 @@
 .rsvp-radio-group,
 .rsvp-checkbox-group {
   display: flex;
-  flex-wrap: wrap;
-  gap: 10px 16px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
 }
 
 .rsvp-checkboxes {
@@ -233,10 +234,24 @@
 .rsvp-radio,
 .rsvp-checkbox {
   display: inline-flex;
-  align-items: center;
-  gap: 6px;
+  align-items: flex-start;
+  gap: 10px;
   font-weight: 500;
-  color: #0f172a;
+  color: #f8fafc;
+  width: 100%;
+}
+
+.rsvp-radio input,
+.rsvp-checkbox input {
+  accent-color: var(--rsvp-bg, #ffffff);
+  flex: 0 0 auto;
+  margin-top: 2px;
+}
+
+.rsvp-radio span,
+.rsvp-checkbox span {
+  color: #f8fafc;
+  line-height: 1.4;
 }
 
 .rsvp-submit {
