@@ -122,6 +122,74 @@ const createInitialResponses = (fields: RsvpCustomField[]) =>
     return acc;
   }, {});
 
+const RSVP_FORM_DEVICE_KEY_PREFIX = 'softinvite:rsvp-form-device:';
+const RSVP_FORM_SUBMISSION_PREFIX = 'softinvite:rsvp-form-submission:';
+const DUPLICATE_SUBMISSION_MESSAGE =
+  'This form has already been submitted on this device for this email address.';
+
+function normalizeEmailAddress(value: string) {
+  return value.trim().toLowerCase();
+}
+
+function createSubmissionKey() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 12)}`;
+}
+
+function getDeviceKeyStorageKey(token: string) {
+  return `${RSVP_FORM_DEVICE_KEY_PREFIX}${token}`;
+}
+
+function getSubmissionStorageKey(token: string, email: string) {
+  return `${RSVP_FORM_SUBMISSION_PREFIX}${token}:${normalizeEmailAddress(email)}`;
+}
+
+function getOrCreateDeviceSubmissionKey(token: string) {
+  if (typeof window === 'undefined' || !token) return '';
+  try {
+    const storageKey = getDeviceKeyStorageKey(token);
+    const existingKey = window.localStorage.getItem(storageKey);
+    if (existingKey) {
+      return existingKey;
+    }
+    const nextKey = createSubmissionKey();
+    window.localStorage.setItem(storageKey, nextKey);
+    return nextKey;
+  } catch {
+    return '';
+  }
+}
+
+function hasStoredSubmission(token: string, email: string) {
+  const normalizedEmail = normalizeEmailAddress(email);
+  if (typeof window === 'undefined' || !token || !normalizedEmail) return false;
+  try {
+    return Boolean(window.localStorage.getItem(getSubmissionStorageKey(token, normalizedEmail)));
+  } catch {
+    return false;
+  }
+}
+
+function storeSubmission(token: string, email: string, submissionKey: string, rsvpId?: string) {
+  const normalizedEmail = normalizeEmailAddress(email);
+  if (typeof window === 'undefined' || !token || !normalizedEmail) return;
+  try {
+    window.localStorage.setItem(
+      getSubmissionStorageKey(token, normalizedEmail),
+      JSON.stringify({
+        email: normalizedEmail,
+        rsvpId: rsvpId || null,
+        submissionKey: submissionKey || null,
+        submittedAt: new Date().toISOString(),
+      })
+    );
+  } catch {
+    // Ignore storage failures and allow the backend to handle duplicate checks when possible.
+  }
+}
+
 function formatDate(value?: string) {
   if (!value) return '';
   const d = new Date(value);
@@ -201,6 +269,8 @@ export default function RsvpPage() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<RsvpFormResponse | null>(null);
+  const [deviceSubmissionKey, setDeviceSubmissionKey] = useState('');
+  const [deviceEmailLocked, setDeviceEmailLocked] = useState(false);
 
   const [guestName, setGuestName] = useState('');
   const [email, setEmail] = useState('');
@@ -236,7 +306,6 @@ export default function RsvpPage() {
     };
   }, [token]);
 
-  const formLocked = useMemo(() => payload?.submitted === true, [payload]);
   const formSettings = useMemo(() => {
     const savedSettings = payload?.event?.rsvpFormSettings || {};
     return {
@@ -251,6 +320,14 @@ export default function RsvpPage() {
   useEffect(() => {
     setResponses(createInitialResponses(formSettings.customFields));
   }, [formSettings.customFields]);
+
+  useEffect(() => {
+    setDeviceSubmissionKey(getOrCreateDeviceSubmissionKey(token));
+  }, [token]);
+
+  useEffect(() => {
+    setDeviceEmailLocked(hasStoredSubmission(token, email));
+  }, [token, email]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -287,8 +364,8 @@ export default function RsvpPage() {
       toast.error(`Please complete "${missingRequiredField.label}"`);
       return;
     }
-    if (formLocked) {
-      toast.error('This RSVP form is already submitted.');
+    if (deviceEmailLocked) {
+      toast.error(DUPLICATE_SUBMISSION_MESSAGE);
       return;
     }
 
@@ -308,15 +385,26 @@ export default function RsvpPage() {
         phone,
         attendanceStatus: attendanceEnabled ? status : undefined,
         comments,
+        submissionKey: deviceSubmissionKey || undefined,
         responses: responsePayload,
       });
+      storeSubmission(token, email, deviceSubmissionKey);
       toast.success('RSVP submitted. Thank you!');
-      setPayload((prev) => (prev ? { ...prev, submitted: true } : prev));
+      setGuestName('');
+      setEmail('');
+      setPhone('');
+      setStatus('');
+      setComments('');
+      setResponses(createInitialResponses(formSettings.customFields));
     } catch (err: any) {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         toast.error('No internet connection. Please try again when you are online.');
       } else {
-        toast.error(err?.response?.data?.message || 'Failed to submit RSVP');
+        const message = err?.response?.data?.message || 'Failed to submit RSVP';
+        if (message === DUPLICATE_SUBMISSION_MESSAGE) {
+          setDeviceEmailLocked(true);
+        }
+        toast.error(message);
       }
     } finally {
       setSubmitting(false);
@@ -389,7 +477,7 @@ export default function RsvpPage() {
                   type="text"
                   name="guestName"
                   value={guestName}
-                  disabled={submitting || formLocked}
+                  disabled={submitting}
                   placeholder={formSettings.guestNamePlaceholder}
                   onChange={(e) => setGuestName(e.target.value)}
                   required
@@ -403,7 +491,7 @@ export default function RsvpPage() {
                   type="email"
                   name="email"
                   value={email}
-                  disabled={submitting || formLocked}
+                  disabled={submitting}
                   placeholder={formSettings.emailPlaceholder}
                   onChange={(e) => setEmail(e.target.value)}
                   required
@@ -417,7 +505,7 @@ export default function RsvpPage() {
                   type="tel"
                   name="phone"
                   value={phone}
-                  disabled={submitting || formLocked}
+                  disabled={submitting}
                   placeholder={formSettings.phonePlaceholder}
                   onChange={(e) => setPhone(e.target.value)}
                   required
@@ -436,7 +524,7 @@ export default function RsvpPage() {
                         id={inputId}
                         name={field.id}
                         value={typeof value === 'string' ? value : ''}
-                        disabled={submitting || formLocked}
+                        disabled={submitting}
                         placeholder={field.placeholder}
                         onChange={(e) =>
                           setResponses((prev) => ({ ...prev, [field.id]: e.target.value }))
@@ -455,7 +543,7 @@ export default function RsvpPage() {
                         id={inputId}
                         name={field.id}
                         value={typeof value === 'string' ? value : ''}
-                        disabled={submitting || formLocked}
+                        disabled={submitting}
                         onChange={(e) =>
                           setResponses((prev) => ({ ...prev, [field.id]: e.target.value }))
                         }
@@ -484,7 +572,7 @@ export default function RsvpPage() {
                               name={field.id}
                               value={option}
                               checked={value === option}
-                              disabled={submitting || formLocked}
+                              disabled={submitting}
                               onChange={(e) =>
                                 setResponses((prev) => ({ ...prev, [field.id]: e.target.value }))
                               }
@@ -515,7 +603,7 @@ export default function RsvpPage() {
                               name={`${field.id}[]`}
                               value={option}
                               checked={selectedValues.includes(option)}
-                              disabled={submitting || formLocked}
+                              disabled={submitting}
                               onChange={(e) =>
                                 setResponses((prev) => {
                                   const current = Array.isArray(prev[field.id])
@@ -546,7 +634,7 @@ export default function RsvpPage() {
                       type={field.type === 'number' ? 'number' : 'text'}
                       name={field.id}
                       value={typeof value === 'string' ? value : ''}
-                      disabled={submitting || formLocked}
+                      disabled={submitting}
                       placeholder={field.placeholder}
                       onChange={(e) =>
                         setResponses((prev) => ({ ...prev, [field.id]: e.target.value }))
@@ -569,7 +657,7 @@ export default function RsvpPage() {
                         type="button"
                         className={`rsvp-chip ${status === opt ? 'active' : ''} ${opt}`}
                         onClick={() => setStatus(opt)}
-                        disabled={submitting || formLocked}
+                        disabled={submitting}
                       >
                         {label}
                       </button>
@@ -584,18 +672,22 @@ export default function RsvpPage() {
                   id="rsvp-comments"
                   name="comments"
                   value={comments}
-                  disabled={submitting || formLocked}
+                  disabled={submitting}
                   placeholder={formSettings.commentsPlaceholder}
                   onChange={(e) => setComments(e.target.value)}
                   rows={4}
                 />
               </label>
 
-              {formLocked && (
-                <p className="rsvp-warning">This form has already been submitted.</p>
+              {deviceEmailLocked && normalizeEmailAddress(email) && (
+                <p className="rsvp-warning">{DUPLICATE_SUBMISSION_MESSAGE}</p>
               )}
 
-              <button type="submit" className="rsvp-submit" disabled={submitting || formLocked}>
+              <button
+                type="submit"
+                className="rsvp-submit"
+                disabled={submitting || deviceEmailLocked}
+              >
                 {submitting ? 'Submitting...' : 'Submit'}
               </button>
             </form>
