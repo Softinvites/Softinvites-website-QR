@@ -311,6 +311,10 @@ export function RsvpAdminView() {
   const [activeTab, setActiveTab] = useState(0);
   const [guestSearch, setGuestSearch] = useState('');
   const [submissionSearch, setSubmissionSearch] = useState('');
+  const [guestPage, setGuestPage] = useState(0);
+  const [guestRowsPerPage, setGuestRowsPerPage] = useState(10);
+  const [submissionPage, setSubmissionPage] = useState(0);
+  const [submissionRowsPerPage, setSubmissionRowsPerPage] = useState(10);
   const [formLink, setFormLink] = useState('');
   const [rsvpBgColor, setRsvpBgColor] = useState('#111827');
   const [rsvpAccentColor, setRsvpAccentColor] = useState('#1f2937');
@@ -355,6 +359,22 @@ export function RsvpAdminView() {
 
     return formSubmissions.filter((guest) => guest.guestName?.toLowerCase().includes(query));
   }, [formSubmissions, submissionSearch]);
+  const paginatedGuests = useMemo(
+    () =>
+      filteredGuests.slice(
+        guestPage * guestRowsPerPage,
+        guestPage * guestRowsPerPage + guestRowsPerPage
+      ),
+    [filteredGuests, guestPage, guestRowsPerPage]
+  );
+  const paginatedFormSubmissions = useMemo(
+    () =>
+      filteredFormSubmissions.slice(
+        submissionPage * submissionRowsPerPage,
+        submissionPage * submissionRowsPerPage + submissionRowsPerPage
+      ),
+    [filteredFormSubmissions, submissionPage, submissionRowsPerPage]
+  );
   const filteredEvents = useMemo(() => {
     const statusSortWeight: Record<RsvpEventStatusLabel, number> = {
       Active: 0,
@@ -532,6 +552,8 @@ export function RsvpAdminView() {
     setMode('rsvp');
     setGuestSearch('');
     setSubmissionSearch('');
+    setGuestPage(0);
+    setSubmissionPage(0);
     setFormLink('');
     setRsvpBgColor('#111827');
     setRsvpAccentColor('#1f2937');
@@ -753,6 +775,8 @@ export function RsvpAdminView() {
 
         setGuestSearch('');
         setSubmissionSearch('');
+        setGuestPage(0);
+        setSubmissionPage(0);
         setFormLink('');
         setEventId(nextEventId);
         localStorage.setItem('allRowIds', JSON.stringify([nextEventId]));
@@ -788,6 +812,8 @@ export function RsvpAdminView() {
 
       setGuestSearch('');
       setSubmissionSearch('');
+      setGuestPage(0);
+      setSubmissionPage(0);
       setFormLink('');
       setEventId(nextEventId);
       localStorage.setItem('allRowIds', JSON.stringify([nextEventId]));
@@ -806,6 +832,31 @@ export function RsvpAdminView() {
     loadData,
     resetEventView,
   ]);
+
+  useEffect(() => {
+    setGuestPage(0);
+  }, [guestSearch]);
+
+  useEffect(() => {
+    setSubmissionPage(0);
+  }, [submissionSearch]);
+
+  useEffect(() => {
+    const maxPage = Math.max(0, Math.ceil(filteredGuests.length / guestRowsPerPage) - 1);
+    if (guestPage > maxPage) {
+      setGuestPage(maxPage);
+    }
+  }, [filteredGuests.length, guestPage, guestRowsPerPage]);
+
+  useEffect(() => {
+    const maxPage = Math.max(
+      0,
+      Math.ceil(filteredFormSubmissions.length / submissionRowsPerPage) - 1
+    );
+    if (submissionPage > maxPage) {
+      setSubmissionPage(maxPage);
+    }
+  }, [filteredFormSubmissions.length, submissionPage, submissionRowsPerPage]);
 
   useEffect(() => {
     const maxPage = Math.max(0, Math.ceil(schedules.length / scheduleRowsPerPage) - 1);
@@ -1742,7 +1793,7 @@ export function RsvpAdminView() {
                   )}
                 </TableHead>
                 <TableBody>
-                  {filteredGuests.map((guest) =>
+                  {paginatedGuests.map((guest) =>
                     mode === 'invitation-only' ? (
                       <TableRow key={guest._id}>
                         <TableCell>{guest.guestName}</TableCell>
@@ -1810,6 +1861,18 @@ export function RsvpAdminView() {
               </Table>
             </TableContainer>
           </Scrollbar>
+          <TablePagination
+            component="div"
+            count={filteredGuests.length}
+            page={guestPage}
+            onPageChange={(_, nextPage) => setGuestPage(nextPage)}
+            rowsPerPage={guestRowsPerPage}
+            onRowsPerPageChange={(changeEvent) => {
+              setGuestRowsPerPage(parseInt(changeEvent.target.value, 10));
+              setGuestPage(0);
+            }}
+            rowsPerPageOptions={[5, 10, 25, 50]}
+          />
         </Card>
       )}
 
@@ -1902,7 +1965,7 @@ export function RsvpAdminView() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {filteredFormSubmissions.map((guest) => (
+                      {paginatedFormSubmissions.map((guest) => (
                         <TableRow key={guest._id}>
                           <TableCell>{guest.guestName}</TableCell>
                           <TableCell>{guest.email || '—'}</TableCell>
@@ -1928,6 +1991,18 @@ export function RsvpAdminView() {
                   </Table>
                 </TableContainer>
               </Scrollbar>
+              <TablePagination
+                component="div"
+                count={filteredFormSubmissions.length}
+                page={submissionPage}
+                onPageChange={(_, nextPage) => setSubmissionPage(nextPage)}
+                rowsPerPage={submissionRowsPerPage}
+                onRowsPerPageChange={(changeEvent) => {
+                  setSubmissionRowsPerPage(parseInt(changeEvent.target.value, 10));
+                  setSubmissionPage(0);
+                }}
+                rowsPerPageOptions={[5, 10, 25, 50]}
+              />
             </Card>
           )}
         </Stack>
