@@ -1,41 +1,64 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
 import axios from 'axios';
-import { API_BASE } from 'src/utils/apiBase';
+import { toast } from 'react-toastify';
+import { useNavigate } from 'react-router-dom';
+import { useMemo, useState, useEffect, useCallback } from 'react';
+
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
 import Table from '@mui/material/Table';
+import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import TableBody from '@mui/material/TableBody';
 import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
 import TablePagination from '@mui/material/TablePagination';
-import Stack from '@mui/material/Stack';
 
-import { toast } from 'react-toastify';
+import { API_BASE } from 'src/utils/apiBase';
 
-import { useNavigate } from 'react-router-dom';
 import { DashboardContent } from 'src/layouts/dashboard';
 
 import { Iconify } from 'src/components/iconify';
 import { Scrollbar } from 'src/components/scrollbar';
 
+import EventModal from './EventModal';
 import { TableNoData } from '../table-no-data';
 import { UserTableRow } from '../user-table-row';
 import { UserTableHead } from '../user-table-head';
 import { TableEmptyRows } from '../table-empty-rows';
+import DeleteConfirmModal from './DeleteConfirmModal';
 import { UserTableToolbar } from '../user-table-toolbar';
 import { emptyRows, applyFilter, getComparator } from '../utils';
 
-import type { UserProps } from '../user-table-row';
-import EventModal from './EventModal';
-
-import DeleteConfirmModal from './DeleteConfirmModal'; // Import the new modal
+import type { EventStatusFilter } from '../utils';
+import type { UserProps } from '../user-table-row'; // Import the new modal
 
 // ----------------------------------------------------------------------
+
+const EVENT_EXPIRATION_GRACE_MS = 2 * 24 * 60 * 60 * 1000;
+
+const getEventStatus = (event: any): UserProps['status'] => {
+  const cleanedDate = String(event?.date || '').replace(/(\d+)(st|nd|rd|th)/g, '$1');
+  const eventDate = new Date(cleanedDate);
+  const hasValidDate = !Number.isNaN(eventDate.getTime());
+  const isExpired = hasValidDate
+    ? Date.now() > eventDate.getTime() + EVENT_EXPIRATION_GRACE_MS
+    : event?.eventStatus === 'expired';
+
+  if (event?.eventStatus === 'expired' || isExpired) {
+    return 'Expired';
+  }
+
+  if (event?.isActive === false) {
+    return 'Inactive';
+  }
+
+  return 'Active';
+};
 
 export function UserView() {
   const table = useTable();
   const [filterName, setFilterName] = useState('');
+  const [filterStatus, setFilterStatus] = useState<EventStatusFilter>('all');
   const [users, setUsers] = useState<UserProps[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null); // ✅ Define error state
@@ -100,39 +123,21 @@ export function UserView() {
           return;
         }
 
-        const formattedData: UserProps[] = data.events.map((event: any) => {
-          // Calculate event status based on date (2 days after event date)
-          // Handle ordinal dates like "November 1st, 2025" by removing ordinal suffixes
-          const cleanedDate = event.date.replace(/(\d+)(st|nd|rd|th)/g, '$1');
-          const eventDate = new Date(cleanedDate);
-          const expirationDate = new Date(eventDate.getTime() + 2 * 24 * 60 * 60 * 1000);
-          const now = new Date();
-          const isExpired = now > expirationDate;
-
-          // Determine status with priority: Expired > Inactive > Active
-          let status = 'Active';
-          if (isExpired) {
-            status = 'Expired';
-          } else if (!event.isActive) {
-            status = 'Inactive';
-          }
-
-          return {
-            id: event._id,
-            name: event.name,
-            date: event.date,
-            description: event.description,
-            location: event.location,
-            createdAt: new Date(event.createdAt).toLocaleDateString(),
-            status,
-            servicePackage: event.servicePackage,
-            channelConfig: event.channelConfig,
-            messageCycle: event.messageCycle,
-            rsvpDeadline: event.rsvpDeadline,
-            eventEndDate: event.eventEndDate,
-            customMessageSequence: event.customMessageSequence,
-          };
-        });
+        const formattedData: UserProps[] = data.events.map((event: any) => ({
+          id: event._id,
+          name: event.name,
+          date: event.date,
+          description: event.description,
+          location: event.location,
+          createdAt: new Date(event.createdAt).toLocaleDateString(),
+          status: getEventStatus(event),
+          servicePackage: event.servicePackage,
+          channelConfig: event.channelConfig,
+          messageCycle: event.messageCycle,
+          rsvpDeadline: event.rsvpDeadline,
+          eventEndDate: event.eventEndDate,
+          customMessageSequence: event.customMessageSequence,
+        }));
 
         // console.log('Formatted Data:', formattedData);
 
@@ -155,17 +160,32 @@ export function UserView() {
     return () => clearTimeout(timer); // Cleanup timeout if component unmounts
   }, [navigate]);
 
+  const statusCounts = useMemo(
+    () =>
+      users.reduce<Record<EventStatusFilter, number>>(
+        (acc, user) => {
+          acc.all += 1;
+          if (user.status === 'Active') acc.active += 1;
+          if (user.status === 'Expired') acc.expired += 1;
+          return acc;
+        },
+        { all: 0, active: 0, expired: 0 }
+      ),
+    [users]
+  );
+
   const dataFiltered: UserProps[] = applyFilter({
     inputData: users,
     comparator: getComparator(table.order, table.orderBy),
     filterName,
+    filterStatus,
   });
 
-  const notFound = !dataFiltered.length && !!filterName;
-
-  function handleDeleteConfirm(): void {
-    throw new Error('Function not implemented.');
-  }
+  const notFound = !dataFiltered.length && (!!filterName || filterStatus !== 'all');
+  const activeStatusLabel =
+    filterStatus === 'all'
+      ? undefined
+      : filterStatus.charAt(0).toUpperCase() + filterStatus.slice(1);
 
   return (
     <DashboardContent>
@@ -224,8 +244,14 @@ export function UserView() {
         <UserTableToolbar
           numSelected={table.selected.length}
           filterName={filterName}
+          filterStatus={filterStatus}
+          statusCounts={statusCounts}
           onFilterName={(event: React.ChangeEvent<HTMLInputElement>) => {
             setFilterName(event.target.value);
+            table.onResetPage();
+          }}
+          onFilterStatus={(value) => {
+            setFilterStatus(value);
             table.onResetPage();
           }}
         />
@@ -236,13 +262,13 @@ export function UserView() {
               <UserTableHead
                 order={table.order}
                 orderBy={table.orderBy}
-                rowCount={users.length}
+                rowCount={dataFiltered.length}
                 numSelected={table.selected.length}
                 onSort={table.onSort}
                 onSelectAllRows={(checked) =>
                   table.onSelectAllRows(
                     checked,
-                    users.map((user) => user.id)
+                    dataFiltered.map((user) => user.id)
                   )
                 }
                 headLabel={[
@@ -284,10 +310,12 @@ export function UserView() {
 
                 <TableEmptyRows
                   height={68}
-                  emptyRows={emptyRows(table.page, table.rowsPerPage, users.length)}
+                  emptyRows={emptyRows(table.page, table.rowsPerPage, dataFiltered.length)}
                 />
 
-                {notFound && <TableNoData searchQuery={filterName} />}
+                {notFound && (
+                  <TableNoData searchQuery={filterName} statusFilterLabel={activeStatusLabel} />
+                )}
               </TableBody>
             </Table>
           </TableContainer>
@@ -296,7 +324,7 @@ export function UserView() {
         <TablePagination
           component="div"
           page={table.page}
-          count={users.length}
+          count={dataFiltered.length}
           rowsPerPage={table.rowsPerPage}
           onPageChange={table.onChangePage}
           rowsPerPageOptions={[5, 10, 25]}

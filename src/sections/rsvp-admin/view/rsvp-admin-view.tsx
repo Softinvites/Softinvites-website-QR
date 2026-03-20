@@ -1,49 +1,56 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import axios from 'axios';
+import { toast } from 'react-toastify';
+import { SketchPicker } from 'react-color';
+import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
+
 import Box from '@mui/material/Box';
+import Tab from '@mui/material/Tab';
 import Card from '@mui/material/Card';
-import CardHeader from '@mui/material/CardHeader';
+import Grid from '@mui/material/Grid';
+import Tabs from '@mui/material/Tabs';
+import Chip from '@mui/material/Chip';
 import Table from '@mui/material/Table';
+import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
+import Dialog from '@mui/material/Dialog';
+import Switch from '@mui/material/Switch';
+import Divider from '@mui/material/Divider';
+import TableRow from '@mui/material/TableRow';
+import MenuItem from '@mui/material/MenuItem';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
-import TableContainer from '@mui/material/TableContainer';
 import TableHead from '@mui/material/TableHead';
-import TableRow from '@mui/material/TableRow';
-import TablePagination from '@mui/material/TablePagination';
-import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
-import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
+import { alpha, useTheme } from '@mui/material/styles';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
-import TextField from '@mui/material/TextField';
-import Grid from '@mui/material/Grid';
-import MenuItem from '@mui/material/MenuItem';
-import Tabs from '@mui/material/Tabs';
-import Tab from '@mui/material/Tab';
-import Divider from '@mui/material/Divider';
+import TableContainer from '@mui/material/TableContainer';
+import InputAdornment from '@mui/material/InputAdornment';
+import TablePagination from '@mui/material/TablePagination';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import Switch from '@mui/material/Switch';
-import { SketchPicker } from 'react-color';
 
-import { toast } from 'react-toastify';
 import { API_BASE } from 'src/utils/apiBase';
+
 import { DashboardContent } from 'src/layouts/dashboard';
-import { Iconify } from 'src/components/iconify/iconify';
+
 import { Scrollbar } from 'src/components/scrollbar';
 import { Chart, useChart } from 'src/components/chart';
+import { Iconify } from 'src/components/iconify/iconify';
+
 import { AnalyticsWidgetSummary } from 'src/sections/overview/analytics-widget-summary';
 import { AnalyticsCurrentVisits } from 'src/sections/overview/analytics-current-visits';
 import { AnalyticsConversionRates } from 'src/sections/overview/analytics-conversion-rates';
 import {
-  collectSequenceAttachmentFiles,
-  getMessageAudienceLabel,
   MessageSequenceBuilder,
-  getDefaultMessageSequence,
+  getMessageAudienceLabel,
   normalizeMessageSequence,
   serializeMessageSequence,
   type MessageSequenceItem,
+  getDefaultMessageSequence,
+  collectSequenceAttachmentFiles,
 } from 'src/sections/event/message-sequence-builder';
 
 type RsvpRecord = {
@@ -123,9 +130,9 @@ const CUSTOM_FIELD_TYPES: RsvpCustomFieldType[] = [
 ];
 
 const createCustomFieldId = () =>
-  (globalThis.crypto && 'randomUUID' in globalThis.crypto
+  globalThis.crypto && 'randomUUID' in globalThis.crypto
     ? globalThis.crypto.randomUUID()
-    : `form_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+    : `form_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 const createEmptyCustomField = (): RsvpCustomField => ({
   id: createCustomFieldId(),
@@ -168,11 +175,125 @@ const customFieldNeedsOptions = (type: RsvpCustomFieldType) =>
 const formatCustomFieldType = (type: RsvpCustomFieldType) =>
   type === 'textarea' ? 'Textarea' : type.charAt(0).toUpperCase() + type.slice(1);
 
+type RsvpEventStatusFilter = 'all' | 'active' | 'expired';
+type RsvpEventStatusLabel = 'Active' | 'Expired' | 'Inactive';
+
+type EventCatalogRecord = {
+  _id: string;
+  name: string;
+  date: string;
+  location: string;
+  description?: string;
+  servicePackage?: string;
+  channelConfig?: any;
+  isActive?: boolean;
+  eventStatus?: 'active' | 'expired';
+};
+
+const emptySummary = { yes: 0, no: 0, pending: 0, total: 0, sent: 0 };
+const EVENT_EXPIRATION_GRACE_MS = 2 * 24 * 60 * 60 * 1000;
+
+const normalizeEventDateValue = (value?: string) =>
+  String(value || '').replace(/(\d+)(st|nd|rd|th)/gi, '$1');
+
+const getEventDateTimestamp = (value?: string) => {
+  const parsed = new Date(normalizeEventDateValue(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+};
+
+const getEventStatusLabel = (event?: Partial<EventCatalogRecord> | null): RsvpEventStatusLabel => {
+  if (!event) return 'Active';
+  if (event.eventStatus === 'expired') return 'Expired';
+
+  const eventTimestamp = getEventDateTimestamp(event.date);
+  if (eventTimestamp && Date.now() > eventTimestamp + EVENT_EXPIRATION_GRACE_MS) {
+    return 'Expired';
+  }
+
+  if (event.isActive === false) {
+    return 'Inactive';
+  }
+
+  return 'Active';
+};
+
+const matchesEventStatusFilter = (
+  event: Partial<EventCatalogRecord>,
+  filter: RsvpEventStatusFilter
+) => {
+  if (filter === 'all') return true;
+
+  const status = getEventStatusLabel(event);
+  if (filter === 'active') return status === 'Active';
+  return status === 'Expired';
+};
+
+const formatEventDateDisplay = (value?: string) => {
+  if (!value) return 'Date not set';
+
+  const parsed = new Date(normalizeEventDateValue(value));
+  if (Number.isNaN(parsed.getTime())) {
+    return value;
+  }
+
+  return parsed.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
+const getEventRelativeTimeline = (value?: string) => {
+  const eventTimestamp = getEventDateTimestamp(value);
+  if (!eventTimestamp) {
+    return 'Add a valid event date to unlock timeline context.';
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  const diffDays = Math.round((eventTimestamp - today.getTime()) / (24 * 60 * 60 * 1000));
+
+  if (diffDays === 0) return 'Happening today';
+  if (diffDays === 1) return 'Happening tomorrow';
+  if (diffDays === -1) return 'Happened yesterday';
+  if (diffDays > 1) return `Happening in ${diffDays} days`;
+  return `Happened ${Math.abs(diffDays)} days ago`;
+};
+
+const getEventModeDisplay = (servicePackage?: string) =>
+  servicePackage === 'invitation-only' ? 'Invitation Only' : 'Scheduler Driven';
+
+const getEventChannelsLabel = (event?: Partial<EventCatalogRecord> | null) => {
+  const enabledChannels = ['Email'];
+
+  if (event?.channelConfig?.whatsapp?.enabled) {
+    enabledChannels.push('WhatsApp');
+  }
+
+  if (event?.channelConfig?.bulkSms?.enabled) {
+    enabledChannels.push('SMS');
+  }
+
+  return enabledChannels.join(' • ');
+};
+
+const getEventFilterEmptyMessage = (filter: RsvpEventStatusFilter) => {
+  if (filter === 'active') return 'No active events available';
+  if (filter === 'expired') return 'No expired events available';
+  return 'No events available';
+};
+
 export function RsvpAdminView() {
+  const theme = useTheme();
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<any | null>(null);
+  const [events, setEvents] = useState<EventCatalogRecord[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventFilter, setEventFilter] = useState<RsvpEventStatusFilter>('all');
   const [guests, setGuests] = useState<RsvpRecord[]>([]);
-  const [summary, setSummary] = useState({ yes: 0, no: 0, pending: 0, total: 0, sent: 0 });
+  const [summary, setSummary] = useState(emptySummary);
   const [mode, setMode] = useState<'rsvp' | 'invitation-only'>('rsvp');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -188,12 +309,15 @@ export function RsvpAdminView() {
   });
   const [editLoading, setEditLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
+  const [guestSearch, setGuestSearch] = useState('');
+  const [submissionSearch, setSubmissionSearch] = useState('');
   const [formLink, setFormLink] = useState('');
   const [rsvpBgColor, setRsvpBgColor] = useState('#111827');
   const [rsvpAccentColor, setRsvpAccentColor] = useState('#1f2937');
   const [rsvpFormSettings, setRsvpFormSettings] =
     useState<RsvpFormSettings>(defaultRsvpFormSettings);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const loadRequestRef = useRef(0);
   const [deleteTarget, setDeleteTarget] = useState<RsvpRecord | null>(null);
   const [deleteLoading, setDeleteLoading] = useState(false);
   const [schedules, setSchedules] = useState<any[]>([]);
@@ -211,9 +335,87 @@ export function RsvpAdminView() {
     () => (summary.total ? Math.round((summary.yes / summary.total) * 100) : 0),
     [summary.total, summary.yes]
   );
+  const respondedCount = useMemo(
+    () => Math.max(0, summary.total - summary.pending),
+    [summary.total, summary.pending]
+  );
   const formSubmissions = useMemo(
     () => guests.filter((g) => g.source === 'form_submission'),
     [guests]
+  );
+  const filteredGuests = useMemo(() => {
+    const query = guestSearch.trim().toLowerCase();
+    if (!query) return guests;
+
+    return guests.filter((guest) => guest.guestName?.toLowerCase().includes(query));
+  }, [guests, guestSearch]);
+  const filteredFormSubmissions = useMemo(() => {
+    const query = submissionSearch.trim().toLowerCase();
+    if (!query) return formSubmissions;
+
+    return formSubmissions.filter((guest) => guest.guestName?.toLowerCase().includes(query));
+  }, [formSubmissions, submissionSearch]);
+  const filteredEvents = useMemo(() => {
+    const statusSortWeight: Record<RsvpEventStatusLabel, number> = {
+      Active: 0,
+      Inactive: 1,
+      Expired: 2,
+    };
+
+    return [...events]
+      .filter((item) => matchesEventStatusFilter(item, eventFilter))
+      .sort((left, right) => {
+        const statusDiff =
+          statusSortWeight[getEventStatusLabel(left)] -
+          statusSortWeight[getEventStatusLabel(right)];
+
+        if (statusDiff !== 0 && eventFilter === 'all') {
+          return statusDiff;
+        }
+
+        const leftTimestamp = getEventDateTimestamp(left.date) ?? Number.MAX_SAFE_INTEGER;
+        const rightTimestamp = getEventDateTimestamp(right.date) ?? Number.MAX_SAFE_INTEGER;
+
+        if (leftTimestamp !== rightTimestamp) {
+          return leftTimestamp - rightTimestamp;
+        }
+
+        return left.name.localeCompare(right.name);
+      });
+  }, [events, eventFilter]);
+  const selectedEventOption = useMemo(
+    () => events.find((item) => item._id === eventId) || null,
+    [events, eventId]
+  );
+  const eventStatus = useMemo(
+    () => getEventStatusLabel(event || selectedEventOption),
+    [event, selectedEventOption]
+  );
+  const eventStatusColor = useMemo(() => {
+    if (eventStatus === 'Expired') return 'error';
+    if (eventStatus === 'Inactive') return 'warning';
+    return 'success';
+  }, [eventStatus]);
+  const eventModeLabel = useMemo(
+    () => getEventModeDisplay(event?.servicePackage || selectedEventOption?.servicePackage),
+    [event?.servicePackage, selectedEventOption?.servicePackage]
+  );
+  const eventChannelSummary = useMemo(
+    () => getEventChannelsLabel(event || selectedEventOption),
+    [event, selectedEventOption]
+  );
+  const eventFilterCounts = useMemo(
+    () =>
+      events.reduce(
+        (acc, item) => {
+          acc.all += 1;
+          if (getEventStatusLabel(item) === 'Active') acc.active += 1;
+          if (getEventStatusLabel(item) === 'Expired') acc.expired += 1;
+          return acc;
+        },
+        { all: 0, active: 0, expired: 0 }
+      ),
+    [events]
   );
   const allowWhatsApp = useMemo(
     () => !!event?.channelConfig?.whatsapp?.enabled,
@@ -233,17 +435,14 @@ export function RsvpAdminView() {
     () => (sequencePayload.length ? JSON.stringify(sequencePayload, null, 2) : ''),
     [sequencePayload]
   );
-  const updateCustomField = useCallback(
-    (fieldId: string, updates: Partial<RsvpCustomField>) => {
-      setRsvpFormSettings((prev) => ({
-        ...prev,
-        customFields: prev.customFields.map((field) =>
-          field.id === fieldId ? { ...field, ...updates } : field
-        ),
-      }));
-    },
-    []
-  );
+  const updateCustomField = useCallback((fieldId: string, updates: Partial<RsvpCustomField>) => {
+    setRsvpFormSettings((prev) => ({
+      ...prev,
+      customFields: prev.customFields.map((field) =>
+        field.id === fieldId ? { ...field, ...updates } : field
+      ),
+    }));
+  }, []);
   const addCustomField = useCallback(() => {
     setRsvpFormSettings((prev) => ({
       ...prev,
@@ -264,7 +463,8 @@ export function RsvpAdminView() {
   const emailSent = analytics?.email?.sent ?? analytics?.channels?.email?.sent ?? 0;
   const emailOpens = analytics?.email?.opens ?? analytics?.channels?.email?.opens ?? 0;
   const emailClicks = analytics?.email?.clicks ?? analytics?.channels?.email?.clicks ?? 0;
-  const emailOpenRate = analytics?.email?.openRate ?? (emailSent ? (emailOpens / emailSent) * 100 : 0);
+  const emailOpenRate =
+    analytics?.email?.openRate ?? (emailSent ? (emailOpens / emailSent) * 100 : 0);
   const emailClickRate =
     analytics?.email?.clickRate ?? (emailSent ? (emailClicks / emailSent) * 100 : 0);
 
@@ -323,6 +523,26 @@ export function RsvpAdminView() {
     return `#${parts.map((v) => v.toString(16).padStart(2, '0')).join('')}`;
   };
 
+  const resetEventView = useCallback(() => {
+    loadRequestRef.current += 1;
+    setLoading(false);
+    setEvent(null);
+    setGuests([]);
+    setSummary(emptySummary);
+    setMode('rsvp');
+    setGuestSearch('');
+    setSubmissionSearch('');
+    setFormLink('');
+    setRsvpBgColor('#111827');
+    setRsvpAccentColor('#1f2937');
+    setRsvpFormSettings(defaultRsvpFormSettings);
+    setSchedules([]);
+    setReports([]);
+    setAnalytics(null);
+    setMessageSequence([]);
+    setSchedulePage(0);
+  }, []);
+
   const loadData = useCallback(
     async (
       currentEventId: string,
@@ -336,154 +556,256 @@ export function RsvpAdminView() {
       if (filter?.end) query.set('end', filter.end);
       const queryString = query.toString();
       const analyticsSuffix = queryString ? `?${queryString}` : '';
-    setLoading(true);
-    setError(null);
-    try {
-      const [eventRes, guestsRes] = await Promise.all([
-        axios.get(`${API_BASE}/events/events/${currentEventId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-        axios.get(`${API_BASE}/events/${currentEventId}/rsvp/guests`, {
-          headers: { Authorization: `Bearer ${token}` },
-        }),
-      ]);
+      const requestId = loadRequestRef.current + 1;
+      loadRequestRef.current = requestId;
 
-      const nextEvent = eventRes.data?.event || eventRes.data;
-      setEvent(nextEvent);
-      if (nextEvent?.servicePackage !== 'invitation-only') {
-        const allowWa = !!nextEvent?.channelConfig?.whatsapp?.enabled;
-        const allowSmsLocal = !!nextEvent?.channelConfig?.bulkSms?.enabled;
-        const normalizedSequence = normalizeMessageSequence(nextEvent?.customMessageSequence);
-        setMessageSequence(
-          normalizedSequence.length
-            ? normalizedSequence
-            : getDefaultMessageSequence('full-rsvp', allowWa, allowSmsLocal)
-        );
-      } else {
-        setMessageSequence([]);
-      }
-      if (nextEvent?.rsvpBgColor) {
-        setRsvpBgColor(rgbToHex(nextEvent.rsvpBgColor));
-      }
-      if (nextEvent?.rsvpAccentColor) {
-        setRsvpAccentColor(rgbToHex(nextEvent.rsvpAccentColor));
-      }
-      if (nextEvent?.rsvpFormSettings) {
-        setRsvpFormSettings(normalizeRsvpFormSettings(nextEvent.rsvpFormSettings));
-      } else {
-        setRsvpFormSettings(defaultRsvpFormSettings);
-      }
-      const nextMode = guestsRes.data?.mode === 'invitation-only' ? 'invitation-only' : 'rsvp';
-      setMode(nextMode);
-      if (nextMode === 'invitation-only') {
-        setGuests(guestsRes.data?.invitations || []);
-      } else {
-        setGuests(guestsRes.data?.rsvps || []);
-      }
-      const reportSummary = guestsRes.data?.summary || {};
-      setSummary({ yes: 0, no: 0, pending: 0, total: 0, sent: 0, ...reportSummary });
+      setLoading(true);
+      setError(null);
       try {
-        const schedulesRes = await axios.get(
-          `${API_BASE}/events/${currentEventId}/rsvp/schedules`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setSchedules(schedulesRes.data?.schedules || []);
-        setSchedulePage(0);
-      } catch {
-        setSchedules([]);
-        setSchedulePage(0);
-      }
-      try {
-        const reportsRes = await axios.get(
-          `${API_BASE}/events/${currentEventId}/rsvp/reports`,
-          { headers: { Authorization: `Bearer ${token}` } }
-        );
-        setReports(reportsRes.data?.reports || []);
-      } catch {
-        setReports([]);
-      }
-      try {
-        const requests = [
-          axios.get(`${API_BASE}/events/${currentEventId}/analytics/overview${analyticsSuffix}`, {
+        const [eventRes, guestsRes] = await Promise.all([
+          axios.get(`${API_BASE}/events/events/${currentEventId}`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get(`${API_BASE}/events/${currentEventId}/analytics/channels${analyticsSuffix}`, {
+          axios.get(`${API_BASE}/events/${currentEventId}/rsvp/guests`, {
             headers: { Authorization: `Bearer ${token}` },
           }),
-          axios.get(`${API_BASE}/events/${currentEventId}/analytics/timeline${analyticsSuffix}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          axios.get(`${API_BASE}/events/${currentEventId}/analytics/email${analyticsSuffix}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          axios.get(`${API_BASE}/events/${currentEventId}/analytics/whatsapp${analyticsSuffix}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-          axios.get(`${API_BASE}/events/${currentEventId}/analytics/sms${analyticsSuffix}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          }),
-        ];
-        const [
-          overviewRes,
-          channelsRes,
-          timelineRes,
-          emailRes,
-          whatsappRes,
-          smsRes,
-        ] = await Promise.allSettled(requests);
+        ]);
 
-        const overview = overviewRes.status === 'fulfilled' ? overviewRes.value.data : null;
-        const channels = channelsRes.status === 'fulfilled' ? channelsRes.value.data : null;
-        const timeline =
-          timelineRes.status === 'fulfilled' ? timelineRes.value.data?.timeline || [] : [];
-        const email = emailRes.status === 'fulfilled' ? emailRes.value.data : null;
-        const whatsapp = whatsappRes.status === 'fulfilled' ? whatsappRes.value.data : null;
-        const sms = smsRes.status === 'fulfilled' ? smsRes.value.data : null;
+        if (loadRequestRef.current !== requestId) return;
 
-        if (overview || channels || timeline.length || email || whatsapp || sms) {
-          setAnalytics({
-            overview,
-            channels,
-            timeline,
-            email,
-            whatsapp,
-            sms,
-          });
+        const nextEvent = eventRes.data?.event || eventRes.data;
+        setEvent(nextEvent);
+        setEvents((prev) =>
+          prev.map((item) => (item._id === nextEvent?._id ? { ...item, ...nextEvent } : item))
+        );
+        if (nextEvent?.servicePackage !== 'invitation-only') {
+          const allowWa = !!nextEvent?.channelConfig?.whatsapp?.enabled;
+          const allowSmsLocal = !!nextEvent?.channelConfig?.bulkSms?.enabled;
+          const normalizedSequence = normalizeMessageSequence(nextEvent?.customMessageSequence);
+          setMessageSequence(
+            normalizedSequence.length
+              ? normalizedSequence
+              : getDefaultMessageSequence('full-rsvp', allowWa, allowSmsLocal)
+          );
         } else {
-          setAnalytics(null);
+          setMessageSequence([]);
         }
-      } catch {
-        setAnalytics(null);
+        if (nextEvent?.rsvpBgColor) {
+          setRsvpBgColor(rgbToHex(nextEvent.rsvpBgColor));
+        } else {
+          setRsvpBgColor('#111827');
+        }
+        if (nextEvent?.rsvpAccentColor) {
+          setRsvpAccentColor(rgbToHex(nextEvent.rsvpAccentColor));
+        } else {
+          setRsvpAccentColor('#1f2937');
+        }
+        if (nextEvent?.rsvpFormSettings) {
+          setRsvpFormSettings(normalizeRsvpFormSettings(nextEvent.rsvpFormSettings));
+        } else {
+          setRsvpFormSettings(defaultRsvpFormSettings);
+        }
+        const nextMode = guestsRes.data?.mode === 'invitation-only' ? 'invitation-only' : 'rsvp';
+        setMode(nextMode);
+        if (nextMode === 'invitation-only') {
+          setGuests(guestsRes.data?.invitations || []);
+        } else {
+          setGuests(guestsRes.data?.rsvps || []);
+        }
+        const reportSummary = guestsRes.data?.summary || {};
+        setSummary({ ...emptySummary, ...reportSummary });
+        try {
+          const schedulesRes = await axios.get(
+            `${API_BASE}/events/${currentEventId}/rsvp/schedules`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (loadRequestRef.current === requestId) {
+            setSchedules(schedulesRes.data?.schedules || []);
+            setSchedulePage(0);
+          }
+        } catch {
+          if (loadRequestRef.current === requestId) {
+            setSchedules([]);
+            setSchedulePage(0);
+          }
+        }
+        try {
+          const reportsRes = await axios.get(`${API_BASE}/events/${currentEventId}/rsvp/reports`, {
+            headers: { Authorization: `Bearer ${token}` },
+          });
+          if (loadRequestRef.current === requestId) {
+            setReports(reportsRes.data?.reports || []);
+          }
+        } catch {
+          if (loadRequestRef.current === requestId) {
+            setReports([]);
+          }
+        }
+        try {
+          const requests = [
+            axios.get(`${API_BASE}/events/${currentEventId}/analytics/overview${analyticsSuffix}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            axios.get(`${API_BASE}/events/${currentEventId}/analytics/channels${analyticsSuffix}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            axios.get(`${API_BASE}/events/${currentEventId}/analytics/timeline${analyticsSuffix}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            axios.get(`${API_BASE}/events/${currentEventId}/analytics/email${analyticsSuffix}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            axios.get(`${API_BASE}/events/${currentEventId}/analytics/whatsapp${analyticsSuffix}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+            axios.get(`${API_BASE}/events/${currentEventId}/analytics/sms${analyticsSuffix}`, {
+              headers: { Authorization: `Bearer ${token}` },
+            }),
+          ];
+          const [overviewRes, channelsRes, timelineRes, emailRes, whatsappRes, smsRes] =
+            await Promise.allSettled(requests);
+
+          if (loadRequestRef.current !== requestId) return;
+
+          const overview = overviewRes.status === 'fulfilled' ? overviewRes.value.data : null;
+          const channels = channelsRes.status === 'fulfilled' ? channelsRes.value.data : null;
+          const timeline =
+            timelineRes.status === 'fulfilled' ? timelineRes.value.data?.timeline || [] : [];
+          const email = emailRes.status === 'fulfilled' ? emailRes.value.data : null;
+          const whatsapp = whatsappRes.status === 'fulfilled' ? whatsappRes.value.data : null;
+          const sms = smsRes.status === 'fulfilled' ? smsRes.value.data : null;
+
+          if (overview || channels || timeline.length || email || whatsapp || sms) {
+            setAnalytics({
+              overview,
+              channels,
+              timeline,
+              email,
+              whatsapp,
+              sms,
+            });
+          } else {
+            setAnalytics(null);
+          }
+        } catch {
+          if (loadRequestRef.current === requestId) {
+            setAnalytics(null);
+          }
+        }
+      } catch (err: any) {
+        if (loadRequestRef.current !== requestId) return;
+        console.error('RSVP admin load error:', err);
+        setError(err?.response?.data?.message || 'Failed to load RSVP data');
+      } finally {
+        if (loadRequestRef.current === requestId) {
+          setLoading(false);
+        }
       }
-    } catch (err: any) {
-      console.error('RSVP admin load error:', err);
-      setError(err?.response?.data?.message || 'Failed to load RSVP data');
-    } finally {
-      setLoading(false);
-    }
     },
     [token]
   );
 
   useEffect(() => {
-    const storedIds = localStorage.getItem('allRowIds');
-    if (!storedIds) {
-      setError('No event selected. Please open RSVP from the Events page.');
+    const loadEventsCatalog = async () => {
+      setEventsLoading(true);
+      try {
+        const storedIds = localStorage.getItem('allRowIds');
+        let preferredEventId: string | null = null;
+
+        if (storedIds) {
+          try {
+            const parsed = JSON.parse(storedIds);
+            preferredEventId = Array.isArray(parsed) && parsed.length ? parsed[0] : null;
+          } catch {
+            preferredEventId = null;
+          }
+        }
+
+        const eventsRes = await axios.get(`${API_BASE}/events/events`, {
+          headers: { Authorization: `Bearer ${token}` },
+        });
+        const nextEvents: EventCatalogRecord[] = Array.isArray(eventsRes.data?.events)
+          ? eventsRes.data.events
+          : [];
+        setEvents(nextEvents);
+
+        if (!nextEvents.length) {
+          setEventId(null);
+          resetEventView();
+          setError('No events available yet.');
+          return;
+        }
+
+        const nextEventId =
+          (preferredEventId && nextEvents.some((item) => item._id === preferredEventId)
+            ? preferredEventId
+            : null) ||
+          nextEvents.find((item) => getEventStatusLabel(item) === 'Active')?._id ||
+          nextEvents[0]?._id ||
+          null;
+
+        if (!nextEventId) {
+          setEventId(null);
+          resetEventView();
+          setError('No events available yet.');
+          return;
+        }
+
+        setGuestSearch('');
+        setSubmissionSearch('');
+        setFormLink('');
+        setEventId(nextEventId);
+        localStorage.setItem('allRowIds', JSON.stringify([nextEventId]));
+        await loadData(nextEventId);
+      } catch (err: any) {
+        console.error('RSVP admin event catalog load error:', err);
+        setEvents([]);
+        setEventId(null);
+        resetEventView();
+        setError(err?.response?.data?.message || 'Failed to load events');
+      } finally {
+        setEventsLoading(false);
+      }
+    };
+
+    loadEventsCatalog();
+  }, [loadData, resetEventView, token]);
+
+  useEffect(() => {
+    if (eventsLoading || !events.length) {
       return;
     }
-    try {
-      const parsed = JSON.parse(storedIds);
-      const currentEventId = Array.isArray(parsed) && parsed.length ? parsed[0] : null;
-      if (!currentEventId) {
-        setError('No event selected. Please open RSVP from the Events page.');
-        return;
-      }
-      setEventId(currentEventId);
-      loadData(currentEventId);
-    } catch {
-      setError('Invalid event selection.');
+
+    if (!filteredEvents.length) {
+      setEventId(null);
+      resetEventView();
+      return;
     }
-  }, [loadData]);
+
+    if (!eventId || !filteredEvents.some((item) => item._id === eventId)) {
+      const nextEventId = filteredEvents[0]?._id;
+      if (!nextEventId) return;
+
+      setGuestSearch('');
+      setSubmissionSearch('');
+      setFormLink('');
+      setEventId(nextEventId);
+      localStorage.setItem('allRowIds', JSON.stringify([nextEventId]));
+      loadData(nextEventId, {
+        start: analyticsStart || undefined,
+        end: analyticsEnd || undefined,
+      });
+    }
+  }, [
+    analyticsEnd,
+    analyticsStart,
+    eventId,
+    events.length,
+    eventsLoading,
+    filteredEvents,
+    loadData,
+    resetEventView,
+  ]);
 
   useEffect(() => {
     const maxPage = Math.max(0, Math.ceil(schedules.length / scheduleRowsPerPage) - 1);
@@ -508,11 +830,9 @@ export function RsvpAdminView() {
     }
 
     try {
-      await axios.post(
-        `${API_BASE}/events/${eventId}/rsvp/guests`,
-        newGuest,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+      await axios.post(`${API_BASE}/events/${eventId}/rsvp/guests`, newGuest, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       toast.success(mode === 'invitation-only' ? 'Invitation guest added' : 'RSVP guest added');
       setAddOpen(false);
       setNewGuest({ guestName: '', email: '', phone: '' });
@@ -533,7 +853,9 @@ export function RsvpAdminView() {
           'Content-Type': 'multipart/form-data',
         },
       });
-      toast.success(mode === 'invitation-only' ? 'Invitation guests imported' : 'RSVP guests imported');
+      toast.success(
+        mode === 'invitation-only' ? 'Invitation guests imported' : 'RSVP guests imported'
+      );
       reloadData();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Import failed');
@@ -576,15 +898,11 @@ export function RsvpAdminView() {
           guestName: editGuest.guestName,
           email: editGuest.email,
           phone: editGuest.phone,
-          ...(mode === 'invitation-only'
-            ? {}
-            : { attendanceStatus: editGuest.attendanceStatus }),
+          ...(mode === 'invitation-only' ? {} : { attendanceStatus: editGuest.attendanceStatus }),
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success(
-        mode === 'invitation-only' ? 'Invitation guest updated' : 'RSVP guest updated'
-      );
+      toast.success(mode === 'invitation-only' ? 'Invitation guest updated' : 'RSVP guest updated');
       closeEditGuestDialog();
       reloadData();
     } catch (err: any) {
@@ -620,7 +938,9 @@ export function RsvpAdminView() {
       const link = document.createElement('a');
       link.href = url;
       link.download =
-        mode === 'invitation-only' ? `event-${eventId}-invitation.csv` : `event-${eventId}-rsvp.csv`;
+        mode === 'invitation-only'
+          ? `event-${eventId}-invitation.csv`
+          : `event-${eventId}-rsvp.csv`;
       document.body.appendChild(link);
       link.click();
       link.remove();
@@ -649,7 +969,7 @@ export function RsvpAdminView() {
   const handleGenerateReport = async () => {
     if (!eventId) return;
     try {
-      const res = await axios.post(
+      await axios.post(
         `${API_BASE}/events/${eventId}/rsvp/generate-report`,
         { type: 'excel' },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -753,10 +1073,7 @@ export function RsvpAdminView() {
   const handleSaveMessageSequence = async () => {
     if (!eventId || !canEditSequence) return;
     const invalidStep = messageSequence.find(
-      (item) =>
-        !item.scheduledDate ||
-        !item.messageTitle?.trim() ||
-        !item.messageBody?.trim()
+      (item) => !item.scheduledDate || !item.messageTitle?.trim() || !item.messageBody?.trim()
     );
     if (invalidStep) {
       toast.error(
@@ -895,6 +1212,23 @@ export function RsvpAdminView() {
     }
   };
 
+  const handleSelectEvent = useCallback(
+    (nextEventId: string) => {
+      if (!nextEventId) return;
+
+      setGuestSearch('');
+      setSubmissionSearch('');
+      setFormLink('');
+      setEventId(nextEventId);
+      localStorage.setItem('allRowIds', JSON.stringify([nextEventId]));
+      loadData(nextEventId, {
+        start: analyticsStart || undefined,
+        end: analyticsEnd || undefined,
+      });
+    },
+    [analyticsEnd, analyticsStart, loadData]
+  );
+
   return (
     <DashboardContent>
       <Box display="flex" alignItems="center" mb={3}>
@@ -903,20 +1237,40 @@ export function RsvpAdminView() {
         </Typography>
         {activeTab === 0 && (
           <Stack direction="row" spacing={1}>
-          <Button variant="contained" onClick={() => setAddOpen(true)} startIcon={<Iconify icon="mingcute:add-line" />}>
-            {mode === 'invitation-only' ? 'Add Invitation Guest' : 'Add RSVP Guest'}
-          </Button>
-          <Button variant="outlined" onClick={() => fileInputRef.current?.click()} startIcon={<Iconify icon="mdi:file-upload" />}>
-            Import CSV
-          </Button>
-          {mode === 'invitation-only' && (
-            <Button variant="outlined" onClick={() => handleSendInvites()} startIcon={<Iconify icon="mdi:email-fast" />}>
-              Send Invitations
+            <Button
+              variant="contained"
+              onClick={() => setAddOpen(true)}
+              startIcon={<Iconify icon="mingcute:add-line" />}
+              disabled={!eventId || eventsLoading}
+            >
+              {mode === 'invitation-only' ? 'Add Invitation Guest' : 'Add RSVP Guest'}
             </Button>
-          )}
-          <Button variant="outlined" onClick={handleExportCsv} startIcon={<Iconify icon="mdi:file-download" />}>
-            Export CSV
-          </Button>
+            <Button
+              variant="outlined"
+              onClick={() => fileInputRef.current?.click()}
+              startIcon={<Iconify icon="mdi:file-upload" />}
+              disabled={!eventId || eventsLoading}
+            >
+              Import CSV
+            </Button>
+            {mode === 'invitation-only' && (
+              <Button
+                variant="outlined"
+                onClick={() => handleSendInvites()}
+                startIcon={<Iconify icon="mdi:email-fast" />}
+                disabled={!eventId || eventsLoading}
+              >
+                Send Invitations
+              </Button>
+            )}
+            <Button
+              variant="outlined"
+              onClick={handleExportCsv}
+              startIcon={<Iconify icon="mdi:file-download" />}
+              disabled={!eventId || eventsLoading}
+            >
+              Export CSV
+            </Button>
           </Stack>
         )}
       </Box>
@@ -933,20 +1287,309 @@ export function RsvpAdminView() {
         }}
       />
 
-      {error && <Typography color="error" sx={{ mb: 2 }}>{error}</Typography>}
+      {error && (
+        <Typography color="error" sx={{ mb: 2 }}>
+          {error}
+        </Typography>
+      )}
 
-      <Card sx={{ p: 2, mb: 3 }}>
-        <Typography variant="subtitle2">Event</Typography>
-        <Typography variant="h6">{event?.name || '—'}</Typography>
-        <Typography variant="body2" color="text.secondary">
-          {event?.date || ''}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {event?.location || ''}
-        </Typography>
-        <Typography variant="body2" color="text.secondary">
-          RSVP Mode: {mode === 'invitation-only' ? 'Invitation Only' : 'Scheduler Driven'}
-        </Typography>
+      <Card
+        sx={{
+          mb: 3,
+          p: { xs: 2.5, md: 3 },
+          position: 'relative',
+          overflow: 'hidden',
+          borderRadius: 4,
+          border: `1px solid ${alpha(theme.palette.info.main, 0.12)}`,
+          background: `linear-gradient(135deg, ${alpha(theme.palette.info.light, 0.18)} 0%, ${theme.palette.background.paper} 46%, ${alpha(theme.palette.primary.light, 0.14)} 100%)`,
+          boxShadow: `0 20px 48px ${alpha(theme.palette.common.black, 0.08)}`,
+          '&::before': {
+            content: '""',
+            position: 'absolute',
+            top: -120,
+            right: -70,
+            width: 260,
+            height: 260,
+            borderRadius: '50%',
+            background: `radial-gradient(circle, ${alpha(theme.palette.info.main, 0.2)} 0%, transparent 68%)`,
+          },
+          '&::after': {
+            content: '""',
+            position: 'absolute',
+            bottom: -150,
+            left: -110,
+            width: 280,
+            height: 280,
+            borderRadius: '50%',
+            background: `radial-gradient(circle, ${alpha(theme.palette.primary.main, 0.14)} 0%, transparent 70%)`,
+          },
+        }}
+      >
+        <Stack spacing={3} sx={{ position: 'relative', zIndex: 1 }}>
+          <Stack direction={{ xs: 'column', lg: 'row' }} spacing={3} justifyContent="space-between">
+            <Box sx={{ maxWidth: 760 }}>
+              <Stack direction="row" spacing={1} useFlexGap flexWrap="wrap" sx={{ mb: 1.75 }}>
+                <Chip
+                  size="small"
+                  label="RSVP Control Center"
+                  sx={{
+                    bgcolor: alpha(theme.palette.info.main, 0.12),
+                    color: 'info.dark',
+                    fontWeight: 700,
+                  }}
+                />
+                <Chip
+                  size="small"
+                  label={eventId ? eventStatus : 'No Event Selected'}
+                  color={eventId ? eventStatusColor : 'default'}
+                  variant={eventStatus === 'Inactive' ? 'outlined' : 'filled'}
+                />
+                <Chip size="small" label={eventModeLabel} variant="outlined" />
+              </Stack>
+
+              <Typography variant="overline" sx={{ color: 'text.secondary', letterSpacing: 1.4 }}>
+                Selected Event
+              </Typography>
+              <Typography variant="h3" sx={{ mt: 0.5, mb: 1 }}>
+                {event?.name ||
+                  selectedEventOption?.name ||
+                  (eventsLoading ? 'Loading events...' : getEventFilterEmptyMessage(eventFilter))}
+              </Typography>
+              <Typography variant="body1" color="text.secondary" sx={{ maxWidth: 720 }}>
+                {event?.description?.trim() ||
+                  selectedEventOption?.description?.trim() ||
+                  'Move between events, review guest responses, manage invitations, and monitor activity from one polished workspace.'}
+              </Typography>
+            </Box>
+
+            <Box
+              sx={{
+                width: { xs: '100%', lg: 380 },
+                minWidth: { xs: '100%', lg: 340 },
+                p: 2.5,
+                borderRadius: 3,
+                bgcolor: alpha(theme.palette.background.paper, 0.84),
+                border: `1px solid ${alpha(theme.palette.info.main, 0.12)}`,
+                boxShadow: `0 18px 40px ${alpha(theme.palette.common.black, 0.08)}`,
+                backdropFilter: 'blur(10px)',
+              }}
+            >
+              <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                Browse Events
+              </Typography>
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1} sx={{ mb: 2 }}>
+                <Button
+                  variant={eventFilter === 'all' ? 'contained' : 'outlined'}
+                  onClick={() => setEventFilter('all')}
+                  fullWidth
+                  sx={{ textTransform: 'none' }}
+                >
+                  All ({eventFilterCounts.all})
+                </Button>
+                <Button
+                  variant={eventFilter === 'active' ? 'contained' : 'outlined'}
+                  color={eventFilter === 'active' ? 'success' : 'inherit'}
+                  onClick={() => setEventFilter('active')}
+                  fullWidth
+                  sx={{ textTransform: 'none' }}
+                >
+                  Active ({eventFilterCounts.active})
+                </Button>
+                <Button
+                  variant={eventFilter === 'expired' ? 'contained' : 'outlined'}
+                  color={eventFilter === 'expired' ? 'error' : 'inherit'}
+                  onClick={() => setEventFilter('expired')}
+                  fullWidth
+                  sx={{ textTransform: 'none' }}
+                >
+                  Expired ({eventFilterCounts.expired})
+                </Button>
+              </Stack>
+
+              <TextField
+                select
+                fullWidth
+                label="Event"
+                value={eventId || ''}
+                onChange={(e) => handleSelectEvent(e.target.value)}
+                disabled={eventsLoading || !filteredEvents.length}
+                helperText={
+                  filteredEvents.length
+                    ? `${filteredEvents.length} of ${events.length} events in this view`
+                    : getEventFilterEmptyMessage(eventFilter)
+                }
+              >
+                {filteredEvents.map((item) => (
+                  <MenuItem key={item._id} value={item._id}>
+                    <Stack spacing={0.25}>
+                      <Typography variant="body2" fontWeight={600}>
+                        {item.name}
+                      </Typography>
+                      <Typography variant="caption" color="text.secondary">
+                        {`${formatEventDateDisplay(item.date)} • ${item.location || 'Venue not set'} • ${getEventStatusLabel(item)}`}
+                      </Typography>
+                    </Stack>
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Box>
+          </Stack>
+
+          <Grid container spacing={2}>
+            <Grid item xs={12} sm={6} md={3}>
+              <Box
+                sx={{
+                  height: '100%',
+                  p: 2,
+                  borderRadius: 3,
+                  bgcolor: alpha(theme.palette.background.paper, 0.78),
+                  border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
+                }}
+              >
+                <Stack direction="row" spacing={1.5}>
+                  <Box
+                    sx={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 2,
+                      display: 'grid',
+                      placeItems: 'center',
+                      bgcolor: alpha(theme.palette.primary.main, 0.1),
+                      color: 'primary.main',
+                    }}
+                  >
+                    <Iconify icon="mdi:calendar-month-outline" width={22} />
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Event Date
+                    </Typography>
+                    <Typography variant="subtitle1">
+                      {formatEventDateDisplay(event?.date || selectedEventOption?.date)}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {getEventRelativeTimeline(event?.date || selectedEventOption?.date)}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Box
+                sx={{
+                  height: '100%',
+                  p: 2,
+                  borderRadius: 3,
+                  bgcolor: alpha(theme.palette.background.paper, 0.78),
+                  border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
+                }}
+              >
+                <Stack direction="row" spacing={1.5}>
+                  <Box
+                    sx={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 2,
+                      display: 'grid',
+                      placeItems: 'center',
+                      bgcolor: alpha(theme.palette.success.main, 0.1),
+                      color: 'success.main',
+                    }}
+                  >
+                    <Iconify icon="mdi:map-marker-outline" width={22} />
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Venue
+                    </Typography>
+                    <Typography variant="subtitle1">
+                      {event?.location || selectedEventOption?.location || 'Venue not set'}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Ready for invitee-facing details
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Box
+                sx={{
+                  height: '100%',
+                  p: 2,
+                  borderRadius: 3,
+                  bgcolor: alpha(theme.palette.background.paper, 0.78),
+                  border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
+                }}
+              >
+                <Stack direction="row" spacing={1.5}>
+                  <Box
+                    sx={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 2,
+                      display: 'grid',
+                      placeItems: 'center',
+                      bgcolor: alpha(theme.palette.info.main, 0.1),
+                      color: 'info.main',
+                    }}
+                  >
+                    <Iconify icon="mdi:message-badge-outline" width={22} />
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Channels & Mode
+                    </Typography>
+                    <Typography variant="subtitle1">{eventChannelSummary}</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {eventModeLabel}
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+            </Grid>
+            <Grid item xs={12} sm={6} md={3}>
+              <Box
+                sx={{
+                  height: '100%',
+                  p: 2,
+                  borderRadius: 3,
+                  bgcolor: alpha(theme.palette.background.paper, 0.78),
+                  border: `1px solid ${alpha(theme.palette.info.main, 0.1)}`,
+                }}
+              >
+                <Stack direction="row" spacing={1.5}>
+                  <Box
+                    sx={{
+                      width: 42,
+                      height: 42,
+                      borderRadius: 2,
+                      display: 'grid',
+                      placeItems: 'center',
+                      bgcolor: alpha(theme.palette.warning.main, 0.12),
+                      color: 'warning.dark',
+                    }}
+                  >
+                    <Iconify icon="mdi:account-group-outline" width={22} />
+                  </Box>
+                  <Box>
+                    <Typography variant="caption" sx={{ color: 'text.secondary' }}>
+                      Guest Progress
+                    </Typography>
+                    <Typography variant="subtitle1">
+                      {mode === 'invitation-only'
+                        ? `${summary.sent || 0} invitation${summary.sent === 1 ? '' : 's'} sent`
+                        : `${respondedCount} response${respondedCount === 1 ? '' : 's'} received`}
+                    </Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      {summary.pending} pending out of {summary.total} total guests
+                    </Typography>
+                  </Box>
+                </Stack>
+              </Box>
+            </Grid>
+          </Grid>
+        </Stack>
       </Card>
 
       {mode === 'invitation-only' ? (
@@ -1029,11 +1672,7 @@ export function RsvpAdminView() {
         </Grid>
       )}
 
-      <Tabs
-        value={activeTab}
-        onChange={(_, next) => setActiveTab(next)}
-        sx={{ mb: 2 }}
-      >
+      <Tabs value={activeTab} onChange={(_, next) => setActiveTab(next)} sx={{ mb: 2 }}>
         <Tab label="RSVP Guest List" />
         <Tab label="RSVP Form" />
         <Tab label="Form Settings" />
@@ -1048,7 +1687,33 @@ export function RsvpAdminView() {
       {activeTab === 0 && (
         <Card sx={{ mb: 3 }}>
           <Box p={2} borderBottom="1px solid" borderColor="divider">
-            <Typography variant="h6">RSVP Guest List</Typography>
+            <Stack
+              direction={{ xs: 'column', md: 'row' }}
+              spacing={2}
+              justifyContent="space-between"
+              alignItems={{ xs: 'stretch', md: 'center' }}
+            >
+              <Box>
+                <Typography variant="h6">RSVP Guest List</Typography>
+                <Typography variant="body2" color="text.secondary">
+                  Search guests by name to jump straight to the record you need.
+                </Typography>
+              </Box>
+              <TextField
+                size="small"
+                value={guestSearch}
+                onChange={(e) => setGuestSearch(e.target.value)}
+                placeholder="Search by guest name"
+                sx={{ width: { xs: '100%', md: 280 } }}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <Iconify icon="solar:magnifer-linear" width={18} />
+                    </InputAdornment>
+                  ),
+                }}
+              />
+            </Stack>
           </Box>
           <Scrollbar>
             <TableContainer sx={{ minWidth: 720 }}>
@@ -1077,7 +1742,7 @@ export function RsvpAdminView() {
                   )}
                 </TableHead>
                 <TableBody>
-                  {guests.map((guest) =>
+                  {filteredGuests.map((guest) =>
                     mode === 'invitation-only' ? (
                       <TableRow key={guest._id}>
                         <TableCell>{guest.guestName}</TableCell>
@@ -1113,7 +1778,9 @@ export function RsvpAdminView() {
                         <TableCell>{guest.attendanceStatus || 'pending'}</TableCell>
                         <TableCell>{guest.source || 'imported'}</TableCell>
                         <TableCell>
-                          {guest.submissionDate ? new Date(guest.submissionDate).toLocaleString() : '—'}
+                          {guest.submissionDate
+                            ? new Date(guest.submissionDate).toLocaleString()
+                            : '—'}
                         </TableCell>
                         <TableCell align="right">
                           <Stack direction="row" spacing={1} justifyContent="flex-end">
@@ -1128,10 +1795,14 @@ export function RsvpAdminView() {
                       </TableRow>
                     )
                   )}
-                  {!loading && guests.length === 0 && (
+                  {!loading && filteredGuests.length === 0 && (
                     <TableRow>
                       <TableCell colSpan={7} align="center">
-                        {mode === 'invitation-only' ? 'No invitation guests yet.' : 'No RSVP guests yet.'}
+                        {guestSearch.trim()
+                          ? `No guest matches "${guestSearch.trim()}".`
+                          : mode === 'invitation-only'
+                            ? 'No invitation guests yet.'
+                            : 'No RSVP guests yet.'}
                       </TableCell>
                     </TableRow>
                   )}
@@ -1162,7 +1833,7 @@ export function RsvpAdminView() {
               <Button
                 variant="contained"
                 onClick={handleGenerateFormLink}
-                disabled={mode === 'invitation-only'}
+                disabled={!eventId || mode === 'invitation-only'}
               >
                 Generate Form Link
               </Button>
@@ -1174,7 +1845,7 @@ export function RsvpAdminView() {
               />
               <Button
                 variant="outlined"
-                disabled={mode === 'invitation-only'}
+                disabled={!eventId || mode === 'invitation-only' || !formLink}
                 onClick={() => {
                   if (formLink) {
                     navigator.clipboard.writeText(formLink);
@@ -1190,7 +1861,33 @@ export function RsvpAdminView() {
           {mode !== 'invitation-only' && (
             <Card>
               <Box p={2} borderBottom="1px solid" borderColor="divider">
-                <Typography variant="h6">Form Submissions</Typography>
+                <Stack
+                  direction={{ xs: 'column', md: 'row' }}
+                  spacing={2}
+                  justifyContent="space-between"
+                  alignItems={{ xs: 'stretch', md: 'center' }}
+                >
+                  <Box>
+                    <Typography variant="h6">Form Submissions</Typography>
+                    <Typography variant="body2" color="text.secondary">
+                      Search submitted responses by guest name.
+                    </Typography>
+                  </Box>
+                  <TextField
+                    size="small"
+                    value={submissionSearch}
+                    onChange={(e) => setSubmissionSearch(e.target.value)}
+                    placeholder="Search by guest name"
+                    sx={{ width: { xs: '100%', md: 280 } }}
+                    InputProps={{
+                      startAdornment: (
+                        <InputAdornment position="start">
+                          <Iconify icon="solar:magnifer-linear" width={18} />
+                        </InputAdornment>
+                      ),
+                    }}
+                  />
+                </Stack>
               </Box>
               <Scrollbar>
                 <TableContainer sx={{ minWidth: 720 }}>
@@ -1205,21 +1902,25 @@ export function RsvpAdminView() {
                       </TableRow>
                     </TableHead>
                     <TableBody>
-                      {formSubmissions.map((guest) => (
+                      {filteredFormSubmissions.map((guest) => (
                         <TableRow key={guest._id}>
                           <TableCell>{guest.guestName}</TableCell>
                           <TableCell>{guest.email || '—'}</TableCell>
                           <TableCell>{guest.phone || '—'}</TableCell>
                           <TableCell>{guest.attendanceStatus || 'pending'}</TableCell>
                           <TableCell>
-                            {guest.submissionDate ? new Date(guest.submissionDate).toLocaleString() : '—'}
+                            {guest.submissionDate
+                              ? new Date(guest.submissionDate).toLocaleString()
+                              : '—'}
                           </TableCell>
                         </TableRow>
                       ))}
-                      {!loading && formSubmissions.length === 0 && (
+                      {!loading && filteredFormSubmissions.length === 0 && (
                         <TableRow>
                           <TableCell colSpan={5} align="center">
-                            No form submissions yet.
+                            {submissionSearch.trim()
+                              ? `No form submission matches "${submissionSearch.trim()}".`
+                              : 'No form submissions yet.'}
                           </TableCell>
                         </TableRow>
                       )}
@@ -1593,7 +2294,9 @@ export function RsvpAdminView() {
                 <Button
                   variant="outlined"
                   onClick={() =>
-                    setMessageSequence(getDefaultMessageSequence('full-rsvp', allowWhatsApp, allowSms))
+                    setMessageSequence(
+                      getDefaultMessageSequence('full-rsvp', allowWhatsApp, allowSms)
+                    )
                   }
                 >
                   Reset to Defaults
@@ -1640,11 +2343,7 @@ export function RsvpAdminView() {
                       </TableCell>
                       <TableCell>
                         {schedule.attachment?.url ? (
-                          <a
-                            href={schedule.attachment.url}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
+                          <a href={schedule.attachment.url} target="_blank" rel="noreferrer">
                             {schedule.attachment?.filename || 'View Attachment'}
                           </a>
                         ) : (
@@ -1928,7 +2627,9 @@ export function RsvpAdminView() {
       )}
 
       <Dialog open={addOpen} onClose={() => setAddOpen(false)} maxWidth="sm" fullWidth>
-        <DialogTitle>{mode === 'invitation-only' ? 'Add Invitation Guest' : 'Add RSVP Guest'}</DialogTitle>
+        <DialogTitle>
+          {mode === 'invitation-only' ? 'Add Invitation Guest' : 'Add RSVP Guest'}
+        </DialogTitle>
         <DialogContent>
           <Stack spacing={2} mt={1}>
             <TextField
@@ -1954,7 +2655,9 @@ export function RsvpAdminView() {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setAddOpen(false)}>Cancel</Button>
-          <Button variant="contained" onClick={handleAddGuest}>Add</Button>
+          <Button variant="contained" onClick={handleAddGuest}>
+            Add
+          </Button>
         </DialogActions>
       </Dialog>
 

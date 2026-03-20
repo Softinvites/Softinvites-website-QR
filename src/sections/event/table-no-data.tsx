@@ -9,9 +9,14 @@ import Typography from '@mui/material/Typography';
 
 type TableNoDataProps = TableRowProps & {
   searchQuery: string;
+  statusFilterLabel?: string;
 };
 
-export function TableNoData({ searchQuery, ...other }: TableNoDataProps) {
+export function TableNoData({ searchQuery, statusFilterLabel, ...other }: TableNoDataProps) {
+  const trimmedQuery = searchQuery.trim();
+  const hasSearchQuery = Boolean(trimmedQuery);
+  const hasStatusFilter = Boolean(statusFilterLabel);
+
   return (
     <TableRow {...other}>
       <TableCell align="center" colSpan={7}>
@@ -21,9 +26,18 @@ export function TableNoData({ searchQuery, ...other }: TableNoDataProps) {
           </Typography>
 
           <Typography variant="body2">
-            No results found for &nbsp;
-            <strong>&quot;{searchQuery}&quot;</strong>.
-            <br /> Try checking for typos or using complete words.
+            {hasStatusFilter
+              ? `No ${statusFilterLabel?.toLowerCase()} events found`
+              : 'No matching events found'}
+            {hasSearchQuery && (
+              <>
+                {' '}
+                for <strong>&quot;{trimmedQuery}&quot;</strong>
+              </>
+            )}
+            .
+            <br />
+            Try checking for typos or changing the event status filter.
           </Typography>
         </Box>
       </TableCell>

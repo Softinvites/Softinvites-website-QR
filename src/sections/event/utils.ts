@@ -2,6 +2,10 @@ import type { UserProps } from './user-table-row';
 
 // ----------------------------------------------------------------------
 
+export type EventStatusFilter = 'all' | 'active' | 'expired';
+
+// ----------------------------------------------------------------------
+
 export const visuallyHidden = {
   border: 0,
   margin: -1,
@@ -55,10 +59,11 @@ export function getComparator<Key extends keyof any>(
 type ApplyFilterProps = {
   inputData: UserProps[];
   filterName: string;
+  filterStatus: EventStatusFilter;
   comparator: (a: any, b: any) => number;
 };
 
-export function applyFilter({ inputData, comparator, filterName }: ApplyFilterProps) {
+export function applyFilter({ inputData, comparator, filterName, filterStatus }: ApplyFilterProps) {
   const stabilizedThis = inputData.map((el, index) => [el, index] as const);
 
   stabilizedThis.sort((a, b) => {
@@ -73,6 +78,10 @@ export function applyFilter({ inputData, comparator, filterName }: ApplyFilterPr
     inputData = inputData.filter(
       (user) => user.name.toLowerCase().indexOf(filterName.toLowerCase()) !== -1
     );
+  }
+
+  if (filterStatus !== 'all') {
+    inputData = inputData.filter((user) => user.status.toLowerCase() === filterStatus);
   }
 
   return inputData;
