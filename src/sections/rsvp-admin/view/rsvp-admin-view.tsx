@@ -228,6 +228,11 @@ const parseGuestCountInput = (value: string) => {
   return Math.max(1, Math.trunc(parsed));
 };
 
+const normalizeTagValue = (value?: string | null) =>
+  String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
+
 const normalizeEventDateValue = (value?: string) =>
   String(value || '').replace(/(\d+)(st|nd|rd|th)/gi, '$1');
 
@@ -379,10 +384,20 @@ export function RsvpAdminView() {
     [guests]
   );
   const availableTags = useMemo(
-    () =>
-      [...new Set(guests.map((guest) => guest.tag?.trim()).filter(Boolean) as string[])].sort(
-        (left, right) => left.localeCompare(right)
-      ),
+    () => {
+      const deduped = new Map<string, string>();
+      guests.forEach((guest) => {
+        const normalizedTag = normalizeTagValue(guest.tag);
+        if (!normalizedTag) return;
+        const key = normalizedTag.toLowerCase();
+        if (!deduped.has(key)) {
+          deduped.set(key, normalizedTag);
+        }
+      });
+      return [...deduped.values()].sort((left, right) =>
+        left.localeCompare(right, undefined, { sensitivity: 'base' })
+      );
+    },
     [guests]
   );
   const filteredGuests = useMemo(() => {
@@ -948,7 +963,7 @@ export function RsvpAdminView() {
             ? {}
             : {
                 guestCount: parseGuestCountInput(newGuest.guestCount),
-                tag: newGuest.tag.trim(),
+                tag: normalizeTagValue(newGuest.tag),
               }),
         },
         {
@@ -1029,7 +1044,7 @@ export function RsvpAdminView() {
             : {
                 attendanceStatus: editGuest.attendanceStatus,
                 guestCount: parseGuestCountInput(editGuest.guestCount),
-                tag: editGuest.tag.trim(),
+                tag: normalizeTagValue(editGuest.tag),
               }),
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -1217,7 +1232,7 @@ export function RsvpAdminView() {
       return;
     }
     const invalidTagStep = messageSequence.find(
-      (item) => item.conditions.audienceType === 'tag' && !item.conditions.targetTag.trim()
+      (item) => item.conditions.audienceType === 'tag' && !normalizeTagValue(item.conditions.targetTag)
     );
     if (invalidTagStep) {
       toast.error('Every tag-based message must include a recipient tag.');

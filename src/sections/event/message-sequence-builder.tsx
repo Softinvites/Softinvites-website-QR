@@ -1,5 +1,6 @@
 import { useMemo, useState, type DragEvent } from 'react';
 import {
+  Autocomplete,
   Box,
   Button,
   Card,
@@ -81,6 +82,8 @@ export const AUDIENCE_OPTIONS: { label: string; value: MessageAudience }[] = [
   { label: 'Specific Tag', value: 'tag' },
 ];
 
+const normalizeTagValue = (value: any) => String(value || '').replace(/\s+/g, ' ').trim();
+
 export const normalizeMessageAudience = (value: any): MessageAudience => {
   if (value === 'non-responders') return 'pending';
   if (value === 'pending-no' || value === 'pending_and_no') return 'pending-and-no';
@@ -93,7 +96,7 @@ export const normalizeMessageAudience = (value: any): MessageAudience => {
 export const getMessageAudienceLabel = (value: any, targetTag?: string | null) => {
   const normalizedAudience = normalizeMessageAudience(value);
   if (normalizedAudience === 'tag') {
-    const trimmedTag = String(targetTag || '').trim();
+    const trimmedTag = normalizeTagValue(targetTag);
     return trimmedTag ? `Tag: ${trimmedTag}` : 'Specific Tag';
   }
   return (
@@ -199,9 +202,7 @@ export const normalizeMessageSequence = (input: any): MessageSequenceItem[] => {
         audienceType: normalizeMessageAudience(raw.conditions?.audienceType),
         targetTag:
           normalizeMessageAudience(raw.conditions?.audienceType) === 'tag'
-            ? typeof raw.conditions?.targetTag === 'string'
-              ? raw.conditions.targetTag
-              : ''
+            ? normalizeTagValue(raw.conditions?.targetTag)
             : '',
       },
       raw,
@@ -329,7 +330,7 @@ export const serializeMessageSequence = (
         audienceType: item.conditions.audienceType,
         targetTag:
           item.conditions.audienceType === 'tag'
-            ? item.conditions.targetTag.trim() || null
+            ? normalizeTagValue(item.conditions.targetTag) || null
             : null,
       },
     };
@@ -471,15 +472,29 @@ export function MessageSequenceBuilder({
         : 'Set per-step date, title, and body. Attachment is optional (PNG/JPG/PDF). Email is always enabled.',
     [allowWhatsApp, allowSms]
   );
-  const tagHelperText = useMemo(() => {
-    if (!availableTags.length) {
-      return 'Only guests with this exact tag will receive the message.';
-    }
-    const preview = availableTags.slice(0, 4).join(', ');
-    return availableTags.length > 4
-      ? `Existing tags: ${preview} +${availableTags.length - 4} more`
-      : `Existing tags: ${preview}`;
+  const tagOptions = useMemo(() => {
+    const deduped = new Map<string, string>();
+    availableTags.forEach((tag) => {
+      const normalizedTag = normalizeTagValue(tag);
+      if (!normalizedTag) return;
+      const key = normalizedTag.toLowerCase();
+      if (!deduped.has(key)) {
+        deduped.set(key, normalizedTag);
+      }
+    });
+    return [...deduped.values()].sort((left, right) =>
+      left.localeCompare(right, undefined, { sensitivity: 'base' })
+    );
   }, [availableTags]);
+  const tagHelperText = useMemo(() => {
+    if (!tagOptions.length) {
+      return 'Only guests with the matching tag will receive the message.';
+    }
+    const preview = tagOptions.slice(0, 4).join(', ');
+    return tagOptions.length > 4
+      ? `Select an existing tag or type one. Current tags: ${preview} +${tagOptions.length - 4} more`
+      : `Select an existing tag or type one. Current tags: ${preview}`;
+  }, [tagOptions]);
 
   return (
     <Card sx={{ p: 2, mt: 1 }}>
@@ -621,26 +636,52 @@ export function MessageSequenceBuilder({
                 </Grid>
                 {item.conditions.audienceType === 'tag' && (
                   <Grid item xs={12} md={4}>
-                    <TextField
-                      label="Recipient Tag"
+                    <Autocomplete
+                      freeSolo
+                      fullWidth
+                      options={tagOptions}
                       value={item.conditions.targetTag}
-                      onChange={(event) => {
+                      inputValue={item.conditions.targetTag}
+                      onChange={(_, newValue) => {
+                        const nextTag = normalizeTagValue(
+                          typeof newValue === 'string' ? newValue : newValue || ''
+                        );
                         const next = value.map((entry, idx) =>
                           idx === index
                             ? {
                                 ...entry,
                                 conditions: {
                                   ...entry.conditions,
-                                  targetTag: event.target.value,
+                                  targetTag: nextTag,
                                 },
                               }
                             : entry
                         );
                         onChange(next);
                       }}
-                      fullWidth
+                      onInputChange={(_, newInputValue) => {
+                        const next = value.map((entry, idx) =>
+                          idx === index
+                            ? {
+                                ...entry,
+                                conditions: {
+                                  ...entry.conditions,
+                                  targetTag: newInputValue,
+                                },
+                              }
+                            : entry
+                        );
+                        onChange(next);
+                      }}
                       disabled={disabled}
-                      helperText={tagHelperText}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          label="Recipient Tag"
+                          helperText={tagHelperText}
+                          fullWidth
+                        />
+                      )}
                     />
                   </Grid>
                 )}
