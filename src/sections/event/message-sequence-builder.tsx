@@ -27,7 +27,8 @@ export type MessageAudience =
   | 'yes'
   | 'no'
   | 'pending'
-  | 'pending-and-no';
+  | 'pending-and-no'
+  | 'tag';
 
 export type MessageChannelConfig = {
   enabled: boolean;
@@ -56,6 +57,7 @@ export type MessageSequenceItem = {
   };
   conditions: {
     audienceType: MessageAudience;
+    targetTag: string;
   };
   raw?: any;
 };
@@ -65,6 +67,7 @@ type BuilderProps = {
   onChange: (next: MessageSequenceItem[]) => void;
   allowWhatsApp: boolean;
   allowSms: boolean;
+  availableTags?: string[];
   disabled?: boolean;
 };
 
@@ -75,6 +78,7 @@ export const AUDIENCE_OPTIONS: { label: string; value: MessageAudience }[] = [
   { label: 'No', value: 'no' },
   { label: 'Pending', value: 'pending' },
   { label: 'Pending and No', value: 'pending-and-no' },
+  { label: 'Specific Tag', value: 'tag' },
 ];
 
 export const normalizeMessageAudience = (value: any): MessageAudience => {
@@ -86,9 +90,16 @@ export const normalizeMessageAudience = (value: any): MessageAudience => {
   return 'all';
 };
 
-export const getMessageAudienceLabel = (value: any) =>
-  AUDIENCE_OPTIONS.find((option) => option.value === normalizeMessageAudience(value))?.label ||
-  'All Guests';
+export const getMessageAudienceLabel = (value: any, targetTag?: string | null) => {
+  const normalizedAudience = normalizeMessageAudience(value);
+  if (normalizedAudience === 'tag') {
+    const trimmedTag = String(targetTag || '').trim();
+    return trimmedTag ? `Tag: ${trimmedTag}` : 'Specific Tag';
+  }
+  return (
+    AUDIENCE_OPTIONS.find((option) => option.value === normalizedAudience)?.label || 'All Guests'
+  );
+};
 
 const createTrackingId = () =>
   (globalThis.crypto && 'randomUUID' in globalThis.crypto
@@ -186,6 +197,12 @@ export const normalizeMessageSequence = (input: any): MessageSequenceItem[] => {
       },
       conditions: {
         audienceType: normalizeMessageAudience(raw.conditions?.audienceType),
+        targetTag:
+          normalizeMessageAudience(raw.conditions?.audienceType) === 'tag'
+            ? typeof raw.conditions?.targetTag === 'string'
+              ? raw.conditions.targetTag
+              : ''
+            : '',
       },
       raw,
     };
@@ -233,7 +250,7 @@ export const getDefaultMessageSequence = (
         ...(channelOverrides?.bulkSms || {}),
       },
     },
-    conditions: { audienceType },
+    conditions: { audienceType, targetTag: '' },
   });
 
   if (servicePackage === 'invitation-only') return [];
@@ -310,6 +327,10 @@ export const serializeMessageSequence = (
       conditions: {
         ...(raw.conditions || {}),
         audienceType: item.conditions.audienceType,
+        targetTag:
+          item.conditions.audienceType === 'tag'
+            ? item.conditions.targetTag.trim() || null
+            : null,
       },
     };
   });
@@ -331,6 +352,7 @@ export function MessageSequenceBuilder({
   onChange,
   allowWhatsApp,
   allowSms,
+  availableTags = [],
   disabled,
 }: BuilderProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -361,7 +383,7 @@ export function MessageSequenceBuilder({
         whatsapp: { enabled: allowWhatsApp },
         bulkSms: { enabled: allowSms },
       },
-      conditions: { audienceType: 'all' },
+      conditions: { audienceType: 'all', targetTag: '' },
     };
     const next: MessageSequenceItem[] = [...value, nextItem];
     onChange(next);
@@ -449,6 +471,15 @@ export function MessageSequenceBuilder({
         : 'Set per-step date, title, and body. Attachment is optional (PNG/JPG/PDF). Email is always enabled.',
     [allowWhatsApp, allowSms]
   );
+  const tagHelperText = useMemo(() => {
+    if (!availableTags.length) {
+      return 'Only guests with this exact tag will receive the message.';
+    }
+    const preview = availableTags.slice(0, 4).join(', ');
+    return availableTags.length > 4
+      ? `Existing tags: ${preview} +${availableTags.length - 4} more`
+      : `Existing tags: ${preview}`;
+  }, [availableTags]);
 
   return (
     <Card sx={{ p: 2, mt: 1 }}>
@@ -570,6 +601,8 @@ export function MessageSequenceBuilder({
                               conditions: {
                                 ...entry.conditions,
                                 audienceType: event.target.value as MessageAudience,
+                                targetTag:
+                                  event.target.value === 'tag' ? entry.conditions.targetTag : '',
                               },
                             }
                           : entry
@@ -586,6 +619,31 @@ export function MessageSequenceBuilder({
                     ))}
                   </TextField>
                 </Grid>
+                {item.conditions.audienceType === 'tag' && (
+                  <Grid item xs={12} md={4}>
+                    <TextField
+                      label="Recipient Tag"
+                      value={item.conditions.targetTag}
+                      onChange={(event) => {
+                        const next = value.map((entry, idx) =>
+                          idx === index
+                            ? {
+                                ...entry,
+                                conditions: {
+                                  ...entry.conditions,
+                                  targetTag: event.target.value,
+                                },
+                              }
+                            : entry
+                        );
+                        onChange(next);
+                      }}
+                      fullWidth
+                      disabled={disabled}
+                      helperText={tagHelperText}
+                    />
+                  </Grid>
+                )}
               </Grid>
 
               <TextField

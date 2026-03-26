@@ -58,6 +58,8 @@ type RsvpRecord = {
   guestName: string;
   email?: string;
   phone?: string;
+  guestCount?: number;
+  tag?: string;
   attendanceStatus?: RsvpAttendanceStatus;
   submissionDate?: string;
   source?: 'imported' | 'form_submission' | 'manual';
@@ -73,6 +75,16 @@ type EditGuestFormState = {
   email: string;
   phone: string;
   attendanceStatus: RsvpAttendanceStatus;
+  guestCount: string;
+  tag: string;
+};
+
+type AddGuestFormState = {
+  guestName: string;
+  email: string;
+  phone: string;
+  guestCount: string;
+  tag: string;
 };
 
 type RsvpFormSettings = {
@@ -193,6 +205,29 @@ type EventCatalogRecord = {
 const emptySummary = { yes: 0, no: 0, pending: 0, total: 0, sent: 0 };
 const EVENT_EXPIRATION_GRACE_MS = 2 * 24 * 60 * 60 * 1000;
 
+const defaultAddGuestFormState: AddGuestFormState = {
+  guestName: '',
+  email: '',
+  phone: '',
+  guestCount: '1',
+  tag: '',
+};
+
+const defaultEditGuestFormState: EditGuestFormState = {
+  guestName: '',
+  email: '',
+  phone: '',
+  attendanceStatus: 'pending',
+  guestCount: '1',
+  tag: '',
+};
+
+const parseGuestCountInput = (value: string) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) return NaN;
+  return Math.max(1, Math.trunc(parsed));
+};
+
 const normalizeEventDateValue = (value?: string) =>
   String(value || '').replace(/(\d+)(st|nd|rd|th)/gi, '$1');
 
@@ -299,14 +334,9 @@ export function RsvpAdminView() {
   const [error, setError] = useState<string | null>(null);
 
   const [addOpen, setAddOpen] = useState(false);
-  const [newGuest, setNewGuest] = useState({ guestName: '', email: '', phone: '' });
+  const [newGuest, setNewGuest] = useState<AddGuestFormState>(defaultAddGuestFormState);
   const [editTarget, setEditTarget] = useState<RsvpRecord | null>(null);
-  const [editGuest, setEditGuest] = useState<EditGuestFormState>({
-    guestName: '',
-    email: '',
-    phone: '',
-    attendanceStatus: 'pending',
-  });
+  const [editGuest, setEditGuest] = useState<EditGuestFormState>(defaultEditGuestFormState);
   const [editLoading, setEditLoading] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [guestSearch, setGuestSearch] = useState('');
@@ -316,6 +346,7 @@ export function RsvpAdminView() {
   const [submissionPage, setSubmissionPage] = useState(0);
   const [submissionRowsPerPage, setSubmissionRowsPerPage] = useState(10);
   const [formLink, setFormLink] = useState('');
+  const [formLinkTitle, setFormLinkTitle] = useState('');
   const [rsvpBgColor, setRsvpBgColor] = useState('#111827');
   const [rsvpAccentColor, setRsvpAccentColor] = useState('#1f2937');
   const [rsvpFormSettings, setRsvpFormSettings] =
@@ -347,17 +378,34 @@ export function RsvpAdminView() {
     () => guests.filter((g) => g.source === 'form_submission'),
     [guests]
   );
+  const availableTags = useMemo(
+    () =>
+      [...new Set(guests.map((guest) => guest.tag?.trim()).filter(Boolean) as string[])].sort(
+        (left, right) => left.localeCompare(right)
+      ),
+    [guests]
+  );
   const filteredGuests = useMemo(() => {
     const query = guestSearch.trim().toLowerCase();
     if (!query) return guests;
 
-    return guests.filter((guest) => guest.guestName?.toLowerCase().includes(query));
+    return guests.filter(
+      (guest) =>
+        guest.guestName?.toLowerCase().includes(query) ||
+        guest.email?.toLowerCase().includes(query) ||
+        guest.tag?.toLowerCase().includes(query)
+    );
   }, [guests, guestSearch]);
   const filteredFormSubmissions = useMemo(() => {
     const query = submissionSearch.trim().toLowerCase();
     if (!query) return formSubmissions;
 
-    return formSubmissions.filter((guest) => guest.guestName?.toLowerCase().includes(query));
+    return formSubmissions.filter(
+      (guest) =>
+        guest.guestName?.toLowerCase().includes(query) ||
+        guest.email?.toLowerCase().includes(query) ||
+        guest.tag?.toLowerCase().includes(query)
+    );
   }, [formSubmissions, submissionSearch]);
   const paginatedGuests = useMemo(
     () =>
@@ -555,6 +603,7 @@ export function RsvpAdminView() {
     setGuestPage(0);
     setSubmissionPage(0);
     setFormLink('');
+    setFormLinkTitle('');
     setRsvpBgColor('#111827');
     setRsvpAccentColor('#1f2937');
     setRsvpFormSettings(defaultRsvpFormSettings);
@@ -597,6 +646,7 @@ export function RsvpAdminView() {
 
         const nextEvent = eventRes.data?.event || eventRes.data;
         setEvent(nextEvent);
+        setFormLinkTitle(nextEvent?.name || '');
         setEvents((prev) =>
           prev.map((item) => (item._id === nextEvent?._id ? { ...item, ...nextEvent } : item))
         );
@@ -879,14 +929,35 @@ export function RsvpAdminView() {
       toast.error('Guest name is required');
       return;
     }
+    if (mode !== 'invitation-only') {
+      const parsedGuestCount = parseGuestCountInput(newGuest.guestCount);
+      if (Number.isNaN(parsedGuestCount) || parsedGuestCount < 1) {
+        toast.error('Guest count must be at least 1');
+        return;
+      }
+    }
 
     try {
-      await axios.post(`${API_BASE}/events/${eventId}/rsvp/guests`, newGuest, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      await axios.post(
+        `${API_BASE}/events/${eventId}/rsvp/guests`,
+        {
+          guestName: newGuest.guestName,
+          email: newGuest.email,
+          phone: newGuest.phone,
+          ...(mode === 'invitation-only'
+            ? {}
+            : {
+                guestCount: parseGuestCountInput(newGuest.guestCount),
+                tag: newGuest.tag.trim(),
+              }),
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
       toast.success(mode === 'invitation-only' ? 'Invitation guest added' : 'RSVP guest added');
       setAddOpen(false);
-      setNewGuest({ guestName: '', email: '', phone: '' });
+      setNewGuest(defaultAddGuestFormState);
       reloadData();
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to add RSVP guest');
@@ -920,18 +991,15 @@ export function RsvpAdminView() {
       email: guest.email || '',
       phone: guest.phone || '',
       attendanceStatus: guest.attendanceStatus || 'pending',
+      guestCount: String(guest.guestCount || 1),
+      tag: guest.tag || '',
     });
   }, []);
 
   const closeEditGuestDialog = useCallback(() => {
     if (editLoading) return;
     setEditTarget(null);
-    setEditGuest({
-      guestName: '',
-      email: '',
-      phone: '',
-      attendanceStatus: 'pending',
-    });
+    setEditGuest(defaultEditGuestFormState);
   }, [editLoading]);
 
   const handleEditGuest = async () => {
@@ -939,6 +1007,13 @@ export function RsvpAdminView() {
     if (!editGuest.guestName.trim()) {
       toast.error('Guest name is required');
       return;
+    }
+    if (mode !== 'invitation-only') {
+      const parsedGuestCount = parseGuestCountInput(editGuest.guestCount);
+      if (Number.isNaN(parsedGuestCount) || parsedGuestCount < 1) {
+        toast.error('Guest count must be at least 1');
+        return;
+      }
     }
 
     try {
@@ -949,7 +1024,13 @@ export function RsvpAdminView() {
           guestName: editGuest.guestName,
           email: editGuest.email,
           phone: editGuest.phone,
-          ...(mode === 'invitation-only' ? {} : { attendanceStatus: editGuest.attendanceStatus }),
+          ...(mode === 'invitation-only'
+            ? {}
+            : {
+                attendanceStatus: editGuest.attendanceStatus,
+                guestCount: parseGuestCountInput(editGuest.guestCount),
+                tag: editGuest.tag.trim(),
+              }),
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -1006,7 +1087,10 @@ export function RsvpAdminView() {
     try {
       const res = await axios.post(
         `${API_BASE}/events/${eventId}/rsvp/generate-form`,
-        { publicBaseUrl: window.location.origin },
+        {
+          publicBaseUrl: window.location.origin,
+          customLinkTitle: formLinkTitle.trim(),
+        },
         { headers: { Authorization: `Bearer ${token}` } }
       );
       const nextLink = res.data?.url || '';
@@ -1132,6 +1216,13 @@ export function RsvpAdminView() {
       );
       return;
     }
+    const invalidTagStep = messageSequence.find(
+      (item) => item.conditions.audienceType === 'tag' && !item.conditions.targetTag.trim()
+    );
+    if (invalidTagStep) {
+      toast.error('Every tag-based message must include a recipient tag.');
+      return;
+    }
     try {
       setSequenceSaving(true);
       const formData = new FormData();
@@ -1208,6 +1299,8 @@ export function RsvpAdminView() {
         'guestName',
         'email',
         'phone',
+        'guestCount',
+        'tag',
         'attendanceStatus',
         'submissionDate',
         'createdAt',
@@ -1747,14 +1840,14 @@ export function RsvpAdminView() {
               <Box>
                 <Typography variant="h6">RSVP Guest List</Typography>
                 <Typography variant="body2" color="text.secondary">
-                  Search guests by name to jump straight to the record you need.
+                  Search guests by name, email, or tag to jump straight to the record you need.
                 </Typography>
               </Box>
               <TextField
                 size="small"
                 value={guestSearch}
                 onChange={(e) => setGuestSearch(e.target.value)}
-                placeholder="Search by guest name"
+                placeholder="Search by name, email, or tag"
                 sx={{ width: { xs: '100%', md: 280 } }}
                 InputProps={{
                   startAdornment: (
@@ -1767,7 +1860,7 @@ export function RsvpAdminView() {
             </Stack>
           </Box>
           <Scrollbar>
-            <TableContainer sx={{ minWidth: 720 }}>
+            <TableContainer sx={{ minWidth: 900 }}>
               <Table>
                 <TableHead>
                   {mode === 'invitation-only' ? (
@@ -1785,6 +1878,8 @@ export function RsvpAdminView() {
                       <TableCell>Name</TableCell>
                       <TableCell>Email</TableCell>
                       <TableCell>Phone</TableCell>
+                      <TableCell>Guests</TableCell>
+                      <TableCell>Tag</TableCell>
                       <TableCell>Status</TableCell>
                       <TableCell>Source</TableCell>
                       <TableCell>Submitted At</TableCell>
@@ -1826,6 +1921,8 @@ export function RsvpAdminView() {
                         <TableCell>{guest.guestName}</TableCell>
                         <TableCell>{guest.email || '—'}</TableCell>
                         <TableCell>{guest.phone || '—'}</TableCell>
+                        <TableCell>{guest.guestCount || 1}</TableCell>
+                        <TableCell>{guest.tag || '—'}</TableCell>
                         <TableCell>{guest.attendanceStatus || 'pending'}</TableCell>
                         <TableCell>{guest.source || 'imported'}</TableCell>
                         <TableCell>
@@ -1848,7 +1945,7 @@ export function RsvpAdminView() {
                   )}
                   {!loading && filteredGuests.length === 0 && (
                     <TableRow>
-                      <TableCell colSpan={7} align="center">
+                      <TableCell colSpan={mode === 'invitation-only' ? 7 : 9} align="center">
                         {guestSearch.trim()
                           ? `No guest matches "${guestSearch.trim()}".`
                           : mode === 'invitation-only'
@@ -1892,32 +1989,43 @@ export function RsvpAdminView() {
             <Typography variant="h6" mb={2}>
               RSVP Form Generator
             </Typography>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
-              <Button
-                variant="contained"
-                onClick={handleGenerateFormLink}
-                disabled={!eventId || mode === 'invitation-only'}
-              >
-                Generate Form Link
-              </Button>
+            <Stack spacing={2}>
               <TextField
-                label="Form Link"
-                value={formLink}
+                label="Custom Link Title"
+                value={formLinkTitle}
+                onChange={(e) => setFormLinkTitle(e.target.value)}
+                placeholder="Wedding Ceremony"
+                disabled={!eventId || mode === 'invitation-only'}
+                helperText="Optional. We will convert this into a URL-safe title before the token."
                 fullWidth
-                InputProps={{ readOnly: true }}
               />
-              <Button
-                variant="outlined"
-                disabled={!eventId || mode === 'invitation-only' || !formLink}
-                onClick={() => {
-                  if (formLink) {
-                    navigator.clipboard.writeText(formLink);
-                    toast.success('Link copied');
-                  }
-                }}
-              >
-                Copy
-              </Button>
+              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
+                <Button
+                  variant="contained"
+                  onClick={handleGenerateFormLink}
+                  disabled={!eventId || mode === 'invitation-only'}
+                >
+                  Generate Form Link
+                </Button>
+                <TextField
+                  label="Form Link"
+                  value={formLink}
+                  fullWidth
+                  InputProps={{ readOnly: true }}
+                />
+                <Button
+                  variant="outlined"
+                  disabled={!eventId || mode === 'invitation-only' || !formLink}
+                  onClick={() => {
+                    if (formLink) {
+                      navigator.clipboard.writeText(formLink);
+                      toast.success('Link copied');
+                    }
+                  }}
+                >
+                  Copy
+                </Button>
+              </Stack>
             </Stack>
           </Card>
 
@@ -1933,14 +2041,14 @@ export function RsvpAdminView() {
                   <Box>
                     <Typography variant="h6">Form Submissions</Typography>
                     <Typography variant="body2" color="text.secondary">
-                      Search submitted responses by guest name.
+                      Search submitted responses by name, email, or tag.
                     </Typography>
                   </Box>
                   <TextField
                     size="small"
                     value={submissionSearch}
                     onChange={(e) => setSubmissionSearch(e.target.value)}
-                    placeholder="Search by guest name"
+                    placeholder="Search by name, email, or tag"
                     sx={{ width: { xs: '100%', md: 280 } }}
                     InputProps={{
                       startAdornment: (
@@ -1953,15 +2061,18 @@ export function RsvpAdminView() {
                 </Stack>
               </Box>
               <Scrollbar>
-                <TableContainer sx={{ minWidth: 720 }}>
+                <TableContainer sx={{ minWidth: 900 }}>
                   <Table>
                     <TableHead>
                       <TableRow>
                         <TableCell>Name</TableCell>
                         <TableCell>Email</TableCell>
                         <TableCell>Phone</TableCell>
+                        <TableCell>Guests</TableCell>
+                        <TableCell>Tag</TableCell>
                         <TableCell>Status</TableCell>
                         <TableCell>Submitted At</TableCell>
+                        <TableCell align="right">Actions</TableCell>
                       </TableRow>
                     </TableHead>
                     <TableBody>
@@ -1970,17 +2081,24 @@ export function RsvpAdminView() {
                           <TableCell>{guest.guestName}</TableCell>
                           <TableCell>{guest.email || '—'}</TableCell>
                           <TableCell>{guest.phone || '—'}</TableCell>
+                          <TableCell>{guest.guestCount || 1}</TableCell>
+                          <TableCell>{guest.tag || '—'}</TableCell>
                           <TableCell>{guest.attendanceStatus || 'pending'}</TableCell>
                           <TableCell>
                             {guest.submissionDate
                               ? new Date(guest.submissionDate).toLocaleString()
                               : '—'}
                           </TableCell>
+                          <TableCell align="right">
+                            <Button variant="outlined" onClick={() => openEditGuestDialog(guest)}>
+                              Edit
+                            </Button>
+                          </TableCell>
                         </TableRow>
                       ))}
                       {!loading && filteredFormSubmissions.length === 0 && (
                         <TableRow>
-                          <TableCell colSpan={5} align="center">
+                          <TableCell colSpan={8} align="center">
                             {submissionSearch.trim()
                               ? `No form submission matches "${submissionSearch.trim()}".`
                               : 'No form submissions yet.'}
@@ -2364,6 +2482,7 @@ export function RsvpAdminView() {
                 onChange={setMessageSequence}
                 allowWhatsApp={allowWhatsApp}
                 allowSms={allowSms}
+                availableTags={availableTags}
               />
               <Stack direction="row" spacing={1}>
                 <Button
@@ -2426,7 +2545,9 @@ export function RsvpAdminView() {
                         )}
                       </TableCell>
                       <TableCell>{schedule.channel}</TableCell>
-                      <TableCell>{getMessageAudienceLabel(schedule.targetAudience)}</TableCell>
+                      <TableCell>
+                        {getMessageAudienceLabel(schedule.targetAudience, schedule.targetTag)}
+                      </TableCell>
                       <TableCell>
                         {schedule.scheduledDate
                           ? new Date(schedule.scheduledDate).toLocaleString()
@@ -2701,7 +2822,15 @@ export function RsvpAdminView() {
         </Stack>
       )}
 
-      <Dialog open={addOpen} onClose={() => setAddOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog
+        open={addOpen}
+        onClose={() => {
+          setAddOpen(false);
+          setNewGuest(defaultAddGuestFormState);
+        }}
+        maxWidth="sm"
+        fullWidth
+      >
         <DialogTitle>
           {mode === 'invitation-only' ? 'Add Invitation Guest' : 'Add RSVP Guest'}
         </DialogTitle>
@@ -2726,10 +2855,38 @@ export function RsvpAdminView() {
               onChange={(e) => setNewGuest((prev) => ({ ...prev, phone: e.target.value }))}
               fullWidth
             />
+            {mode !== 'invitation-only' && (
+              <>
+                <TextField
+                  label="Guest Count"
+                  type="number"
+                  value={newGuest.guestCount}
+                  onChange={(e) =>
+                    setNewGuest((prev) => ({ ...prev, guestCount: e.target.value }))
+                  }
+                  inputProps={{ min: 1, step: 1 }}
+                  fullWidth
+                />
+                <TextField
+                  label="Tag"
+                  value={newGuest.tag}
+                  onChange={(e) => setNewGuest((prev) => ({ ...prev, tag: e.target.value }))}
+                  fullWidth
+                  helperText="Optional. Use tags like VIP, Family, Vendors, Table-A."
+                />
+              </>
+            )}
           </Stack>
         </DialogContent>
         <DialogActions>
-          <Button onClick={() => setAddOpen(false)}>Cancel</Button>
+          <Button
+            onClick={() => {
+              setAddOpen(false);
+              setNewGuest(defaultAddGuestFormState);
+            }}
+          >
+            Cancel
+          </Button>
           <Button variant="contained" onClick={handleAddGuest}>
             Add
           </Button>
@@ -2762,22 +2919,41 @@ export function RsvpAdminView() {
               fullWidth
             />
             {mode !== 'invitation-only' && (
-              <TextField
-                select
-                label="Attendance Status"
-                value={editGuest.attendanceStatus}
-                onChange={(e) =>
-                  setEditGuest((prev) => ({
-                    ...prev,
-                    attendanceStatus: e.target.value as RsvpAttendanceStatus,
-                  }))
-                }
-                fullWidth
-              >
-                <MenuItem value="pending">Pending</MenuItem>
-                <MenuItem value="yes">Yes</MenuItem>
-                <MenuItem value="no">No</MenuItem>
-              </TextField>
+              <>
+                <TextField
+                  label="Guest Count"
+                  type="number"
+                  value={editGuest.guestCount}
+                  onChange={(e) =>
+                    setEditGuest((prev) => ({ ...prev, guestCount: e.target.value }))
+                  }
+                  inputProps={{ min: 1, step: 1 }}
+                  fullWidth
+                />
+                <TextField
+                  label="Tag"
+                  value={editGuest.tag}
+                  onChange={(e) => setEditGuest((prev) => ({ ...prev, tag: e.target.value }))}
+                  fullWidth
+                  helperText="Optional. Tags are used for message-builder targeting."
+                />
+                <TextField
+                  select
+                  label="Attendance Status"
+                  value={editGuest.attendanceStatus}
+                  onChange={(e) =>
+                    setEditGuest((prev) => ({
+                      ...prev,
+                      attendanceStatus: e.target.value as RsvpAttendanceStatus,
+                    }))
+                  }
+                  fullWidth
+                >
+                  <MenuItem value="pending">Pending</MenuItem>
+                  <MenuItem value="yes">Yes</MenuItem>
+                  <MenuItem value="no">No</MenuItem>
+                </TextField>
+              </>
             )}
           </Stack>
         </DialogContent>
