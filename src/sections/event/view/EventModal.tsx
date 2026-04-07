@@ -14,15 +14,7 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { API_BASE } from 'src/utils/apiBase';
-
-const MAX_EVENT_IV_BYTES = 5 * 1024 * 1024;
-
-const formatBytes = (value: number) => {
-  if (value >= 1024 * 1024) {
-    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-  }
-  return `${Math.ceil(value / 1024)} KB`;
-};
+import { uploadEventAsset } from 'src/utils/event-asset-upload';
 
 interface EventModalProps {
   open: boolean;
@@ -53,12 +45,6 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
 
     if (selectedFile.type !== 'image/png') {
       alert('Only PNG is allowed for the event IV image.');
-      e.target.value = '';
-      return;
-    }
-
-    if (selectedFile.size > MAX_EVENT_IV_BYTES) {
-      alert(`IV image is too large. Maximum allowed size is ${formatBytes(MAX_EVENT_IV_BYTES)}.`);
       e.target.value = '';
       return;
     }
@@ -95,7 +81,13 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
       formData.append('channelConfig', JSON.stringify(channelConfig));
 
       if (file) {
-        formData.append('iv', file); // optional
+        const uploadedIv = await uploadEventAsset({
+          token,
+          file,
+          assetType: 'iv',
+          eventRef: eventData.name || 'event',
+        });
+        formData.append('ivUrl', uploadedIv.url);
       }
 
       const response = await fetch(

@@ -33,6 +33,7 @@ import TablePagination from '@mui/material/TablePagination';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { API_BASE } from 'src/utils/apiBase';
+import { uploadEventAsset } from 'src/utils/event-asset-upload';
 
 import { DashboardContent } from 'src/layouts/dashboard';
 
@@ -509,15 +510,6 @@ export function RsvpAdminView() {
     [event?.channelConfig?.bulkSms?.enabled]
   );
   const canEditSequence = mode !== 'invitation-only';
-  const sequencePayload = useMemo(
-    () =>
-      canEditSequence ? serializeMessageSequence(messageSequence, allowWhatsApp, allowSms) : [],
-    [canEditSequence, messageSequence, allowWhatsApp, allowSms]
-  );
-  const sequenceJson = useMemo(
-    () => (sequencePayload.length ? JSON.stringify(sequencePayload, null, 2) : ''),
-    [sequencePayload]
-  );
   const updateCustomField = useCallback((fieldId: string, updates: Partial<RsvpCustomField>) => {
     setRsvpFormSettings((prev) => ({
       ...prev,
@@ -1240,13 +1232,46 @@ export function RsvpAdminView() {
     }
     try {
       setSequenceSaving(true);
+      let sequenceToSave = messageSequence;
+      const attachmentFiles = collectSequenceAttachmentFiles(messageSequence);
+      if (attachmentFiles.length) {
+        const uploadedAttachments = await Promise.all(
+          attachmentFiles.map(async ({ fieldName, file }) => {
+            const uploaded = await uploadEventAsset({
+              token: token || '',
+              file,
+              assetType: 'sequence-attachment',
+              eventRef: eventId,
+            });
+            return [fieldName, uploaded] as const;
+          })
+        );
+        const uploadedByFieldName = new Map(uploadedAttachments);
+        sequenceToSave = messageSequence.map((item) => {
+          const uploaded = uploadedByFieldName.get(`sequenceAttachment_${item.trackingId}`);
+          if (!uploaded) return item;
+          return {
+            ...item,
+            attachment: {
+              url: uploaded.url,
+              filename: uploaded.filename,
+              contentType: uploaded.contentType,
+              file: null,
+            },
+          };
+        });
+      }
+
+      const sequencePayloadToSave = canEditSequence
+        ? serializeMessageSequence(sequenceToSave, allowWhatsApp, allowSms)
+        : [];
+      const sequenceJsonToSave = sequencePayloadToSave.length
+        ? JSON.stringify(sequencePayloadToSave, null, 2)
+        : '[]';
+
       const formData = new FormData();
       formData.append('id', eventId);
-      formData.append('customMessageSequence', sequenceJson || '[]');
-      const attachmentFiles = collectSequenceAttachmentFiles(messageSequence);
-      attachmentFiles.forEach(({ fieldName, file }) => {
-        formData.append(fieldName, file, file.name);
-      });
+      formData.append('customMessageSequence', sequenceJsonToSave);
       formData.append('servicePackage', 'full-rsvp');
 
       const response = await fetch(`${API_BASE}/events/update`, {

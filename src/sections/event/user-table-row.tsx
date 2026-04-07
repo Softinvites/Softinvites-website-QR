@@ -291,15 +291,7 @@ import { useNavigate } from 'react-router-dom';
 import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { API_BASE } from '../../utils/apiBase';
-
-const MAX_EVENT_IV_BYTES = 5 * 1024 * 1024;
-
-const formatBytes = (value: number) => {
-  if (value >= 1024 * 1024) {
-    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
-  }
-  return `${Math.ceil(value / 1024)} KB`;
-};
+import { uploadEventAsset } from '../../utils/event-asset-upload';
 
 export type UserProps = {
   id: string;
@@ -403,7 +395,13 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       formData.append('channelConfig', JSON.stringify(channelConfig));
 
       if (editIv) {
-        formData.append('iv', editIv); // 👈 send actual file
+        const uploadedIv = await uploadEventAsset({
+          token: token || '',
+          file: editIv,
+          assetType: 'iv',
+          eventRef: row.id,
+        });
+        formData.append('ivUrl', uploadedIv.url);
       }
 
       const response = await fetch(`${API_BASE}/events/update`, {
@@ -657,17 +655,6 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
                   position: 'top-right',
                   autoClose: 3000,
                 });
-                e.target.value = '';
-                return;
-              }
-              if (file.size > MAX_EVENT_IV_BYTES) {
-                toast.error(
-                  `IV image is too large. Maximum allowed size is ${formatBytes(MAX_EVENT_IV_BYTES)}.`,
-                  {
-                    position: 'top-right',
-                    autoClose: 3000,
-                  }
-                );
                 e.target.value = '';
                 return;
               }

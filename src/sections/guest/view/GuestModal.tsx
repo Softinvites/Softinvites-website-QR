@@ -145,11 +145,19 @@ const GuestModal: React.FC<GuestModalProps> = ({ open, handleClose }) => {
         throw new Error(message);
       }
 
-      toast.success('Guest added successfully', {
-        position: 'top-right',
-        autoClose: 3000,
-        onClose: () => window.location.reload(),
-      });
+      if (payload.email && result?.emailSent === false) {
+        toast.warning(result?.emailError || 'Guest was created, but the email was not sent.', {
+          position: 'top-right',
+          autoClose: 5000,
+          onClose: () => window.location.reload(),
+        });
+      } else {
+        toast.success('Guest added successfully', {
+          position: 'top-right',
+          autoClose: 3000,
+          onClose: () => window.location.reload(),
+        });
+      }
       handleClose();
     } catch (error) {
       console.error('Error adding guest:', error);
