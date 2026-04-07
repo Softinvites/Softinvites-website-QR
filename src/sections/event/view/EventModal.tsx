@@ -15,6 +15,15 @@ import {
 import { toast } from 'react-toastify';
 import { API_BASE } from 'src/utils/apiBase';
 
+const MAX_EVENT_IV_BYTES = 5 * 1024 * 1024;
+
+const formatBytes = (value: number) => {
+  if (value >= 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${Math.ceil(value / 1024)} KB`;
+};
+
 interface EventModalProps {
   open: boolean;
   handleClose: () => void;
@@ -41,6 +50,18 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
+
+    if (selectedFile.type !== 'image/png') {
+      alert('Only PNG is allowed for the event IV image.');
+      e.target.value = '';
+      return;
+    }
+
+    if (selectedFile.size > MAX_EVENT_IV_BYTES) {
+      alert(`IV image is too large. Maximum allowed size is ${formatBytes(MAX_EVENT_IV_BYTES)}.`);
+      e.target.value = '';
+      return;
+    }
 
     setFile(selectedFile);
 

@@ -292,6 +292,15 @@ import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { API_BASE } from '../../utils/apiBase';
 
+const MAX_EVENT_IV_BYTES = 5 * 1024 * 1024;
+
+const formatBytes = (value: number) => {
+  if (value >= 1024 * 1024) {
+    return `${(value / (1024 * 1024)).toFixed(1)} MB`;
+  }
+  return `${Math.ceil(value / 1024)} KB`;
+};
+
 export type UserProps = {
   id: string;
   name: string;
@@ -635,14 +644,33 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
             </>
           )}
           <Typography variant="subtitle1" sx={{ mt: 2 }}>
-            Replace IV Image (PNG/JPG):
+            Replace IV Image (PNG):
           </Typography>
           <input
-            accept="image/png,image/jpeg"
+            accept="image/png"
             type="file"
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (!file) return;
+              if (file.type !== 'image/png') {
+                toast.error('Only PNG is allowed for the IV image.', {
+                  position: 'top-right',
+                  autoClose: 3000,
+                });
+                e.target.value = '';
+                return;
+              }
+              if (file.size > MAX_EVENT_IV_BYTES) {
+                toast.error(
+                  `IV image is too large. Maximum allowed size is ${formatBytes(MAX_EVENT_IV_BYTES)}.`,
+                  {
+                    position: 'top-right',
+                    autoClose: 3000,
+                  }
+                );
+                e.target.value = '';
+                return;
+              }
               setEditIv(file); // store file
               const reader = new FileReader();
               reader.onloadend = () => setEditIvPreview(reader.result as string);
