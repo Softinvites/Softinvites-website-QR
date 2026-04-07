@@ -405,7 +405,11 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
         body: formData,
       });
 
-      if (!response.ok) throw new Error(`Failed to update event: ${response.statusText}`);
+      if (!response.ok) {
+        const err = await response.json().catch(() => null);
+        const message = err?.details ? `${err.message} ${err.details}` : err?.message;
+        throw new Error(message || `Failed to update event: ${response.statusText}`);
+      }
 
       toast.success('Edited successfully!', {
         position: 'top-right',
@@ -414,7 +418,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       });
     } catch (error) {
       console.error('Update failed:', error);
-      toast.error('Failed to edit event. Please try again.', {
+      toast.error(error instanceof Error ? error.message : 'Failed to edit event. Please try again.', {
         position: 'top-right',
         autoClose: 3000,
       });

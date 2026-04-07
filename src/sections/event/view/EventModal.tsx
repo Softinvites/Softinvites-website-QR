@@ -89,8 +89,9 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
       );
 
       if (!response.ok) {
-        const err = await response.json();
-        throw new Error(err?.Error || 'Failed to create event');
+        const err = await response.json().catch(() => null);
+        const message = err?.details ? `${err.message} ${err.details}` : err?.message;
+        throw new Error(message || 'Failed to create event');
       }
 
       toast.success('Event created successfully!', {
