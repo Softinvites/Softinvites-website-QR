@@ -105,17 +105,26 @@ export function UserTableRow({
         }),
       });
 
+      const result = await response.json();
+
       if (!response.ok) {
-        const errorText = await response.text();
-        console.error('Server responded with:', errorText);
-        throw new Error(`Failed to update guest: ${response.status} - ${errorText}`);
+        console.error('Server responded with:', result);
+        throw new Error(result?.message || `Failed to update guest: ${response.status}`);
       }
 
-      toast.success('Edited successfully!', {
-        position: 'top-right',
-        autoClose: 3000,
-        onClose: () => window.location.reload(),
-      });
+      if (email && result?.emailSent === false) {
+        toast.warning(result?.emailError || 'Guest was updated, but the email was not sent.', {
+          position: 'top-right',
+          autoClose: 5000,
+          onClose: () => window.location.reload(),
+        });
+      } else {
+        toast.success('Edited successfully!', {
+          position: 'top-right',
+          autoClose: 3000,
+          onClose: () => window.location.reload(),
+        });
+      }
     } catch (error: any) {
       console.error('Error editing guest:', error);
       toast.error(error.message || 'Failed to edit guest.', {
