@@ -29,6 +29,7 @@ type RsvpFormSettings = {
   phoneLabel: string;
   phonePlaceholder: string;
   attendanceEnabled: boolean;
+  isInvalidated: boolean;
   attendanceLabel: string;
   attendanceYesLabel: string;
   attendanceNoLabel: string;
@@ -79,6 +80,7 @@ const defaultFormSettings: RsvpFormSettings = {
   phoneLabel: 'Phone Number',
   phonePlaceholder: '',
   attendanceEnabled: true,
+  isInvalidated: false,
   attendanceLabel: 'Will you attend?',
   attendanceYesLabel: 'YES, I WILL ATTEND',
   attendanceNoLabel: 'UNABLE TO ATTEND',
@@ -311,11 +313,15 @@ export default function RsvpPage() {
     return {
       ...defaultFormSettings,
       ...savedSettings,
+      isInvalidated: savedSettings?.isInvalidated === true,
       submitLabel: 'Submit',
       customFields: normalizeCustomFields(savedSettings.customFields),
     };
   }, [payload]);
   const attendanceEnabled = formSettings.attendanceEnabled !== false;
+  const formInvalidated =
+    formSettings.isInvalidated === true ||
+    payload?.event?.rsvpFormSettings?.acceptingSubmissions === false;
 
   useEffect(() => {
     setResponses(createInitialResponses(formSettings.customFields));
@@ -332,6 +338,10 @@ export default function RsvpPage() {
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!payload || !token) return;
+    if (formInvalidated) {
+      toast.error('This form is no longer receiving submissions');
+      return;
+    }
     if (typeof navigator !== 'undefined' && !navigator.onLine) {
       toast.error('No internet connection. Please try again when you are online.');
       return;
@@ -458,7 +468,11 @@ export default function RsvpPage() {
           {loading && <p className="rsvp-muted">Loading RSVP...</p>}
           {!loading && error && <p className="rsvp-error">{error}</p>}
 
-          {!loading && !error && payload && (
+          {!loading && !error && payload && formInvalidated && (
+            <p className="rsvp-error">This form is no longer receiving submissions.</p>
+          )}
+
+          {!loading && !error && payload && !formInvalidated && (
             <form className="rsvp-form" onSubmit={handleSubmit}>
               <div className="rsvp-header">
                 <div className="rsvp-pill">RSVP</div>

@@ -34,6 +34,7 @@ export type MessageAudience =
 export type MessageChannelConfig = {
   enabled: boolean;
   templateId?: string;
+  templateVariables?: Record<string, string>;
 };
 
 export type MessageAttachmentConfig = {
@@ -63,12 +64,34 @@ export type MessageSequenceItem = {
   raw?: any;
 };
 
+export type WhatsAppTemplateOption = {
+  id: string;
+  name: string;
+  displayName?: string;
+  category?: string;
+};
+
+export type WhatsAppTemplateSample = {
+  templateName: string;
+  title?: string;
+  category?: string;
+  description?: string;
+  expectedVariableCount?: number;
+  buttonUrlVariableIndex?: number;
+  bodySkeleton?: string;
+  supportsMediaHeader?: boolean;
+  sampleParametersArray?: string[];
+  sampleParameters?: Record<string, string>;
+};
+
 type BuilderProps = {
   value: MessageSequenceItem[];
   onChange: (next: MessageSequenceItem[]) => void;
   allowWhatsApp: boolean;
   allowSms: boolean;
   availableTags?: string[];
+  whatsappTemplateOptions?: WhatsAppTemplateOption[];
+  whatsappTemplateSamples?: WhatsAppTemplateSample[];
   disabled?: boolean;
 };
 
@@ -156,7 +179,33 @@ const getAttachmentDisplayName = (attachment: MessageAttachmentConfig) => {
 const normalizeChannel = (channel: any, fallbackEnabled = false): MessageChannelConfig => ({
   enabled: typeof channel?.enabled === 'boolean' ? channel.enabled : fallbackEnabled,
   templateId: channel?.templateId || undefined,
+  templateVariables:
+    channel?.templateVariables && typeof channel.templateVariables === 'object'
+      ? channel.templateVariables
+      : undefined,
 });
+
+const normalizeTemplateVariables = (value: any): Record<string, string> | undefined => {
+  if (!value || typeof value !== 'object') return undefined;
+  const raw = value as Record<string, unknown>;
+
+  const normalized = Object.entries(raw).reduce<Record<string, string>>(
+    (acc, [key, entry]) => {
+      const index = Number.parseInt(key, 10);
+      if (!Number.isInteger(index) || index <= 0) return acc;
+
+      const trimmed =
+        typeof entry === 'string' ? entry.trim() : String(entry ?? '').trim();
+      if (!trimmed) return acc;
+
+      acc[String(index)] = trimmed;
+      return acc;
+    },
+    {},
+  );
+
+  return Object.keys(normalized).length ? normalized : undefined;
+};
 
 export const normalizeMessageSequence = (input: any): MessageSequenceItem[] => {
   let payload = input;
@@ -276,6 +325,9 @@ export const serializeMessageSequence = (
 ) =>
   items.map((item) => {
     const raw = item.raw && typeof item.raw === 'object' ? { ...item.raw } : {};
+    const normalizedWhatsAppTemplateVariables = normalizeTemplateVariables(
+      item.channels.whatsapp?.templateVariables
+    );
     const attachmentFile = item.attachment?.file || null;
     const uploadKey = attachmentFile ? `sequenceAttachment_${item.trackingId}` : '';
     const attachmentUrl =
@@ -318,6 +370,9 @@ export const serializeMessageSequence = (
           ...(raw.channels?.whatsapp || {}),
           enabled: allowWhatsApp ? !!item.channels.whatsapp?.enabled : false,
           templateId: item.channels.whatsapp?.templateId,
+          ...(normalizedWhatsAppTemplateVariables
+            ? { templateVariables: normalizedWhatsAppTemplateVariables }
+            : {}),
         },
         bulkSms: {
           ...(raw.channels?.bulkSms || {}),
@@ -354,6 +409,8 @@ export function MessageSequenceBuilder({
   allowWhatsApp,
   allowSms,
   availableTags = [],
+  whatsappTemplateOptions = [],
+  whatsappTemplateSamples = [],
   disabled,
 }: BuilderProps) {
   const [dragIndex, setDragIndex] = useState<number | null>(null);
@@ -468,7 +525,7 @@ export function MessageSequenceBuilder({
   const helperText = useMemo(
     () =>
       allowWhatsApp || allowSms
-        ? 'Set per-step date, title, and body. Attachment is optional (PNG/JPG/PDF). Email is always enabled; toggle WhatsApp/SMS per step.'
+        ? "Set per-step date, title, and body. For WhatsApp steps, SoftInvites sends approved template variables (not arbitrary body text), header media must be a public image URL (PNG/JPG/WEBP/GIF), and you can pick a WhatsApp template per step. Email is always enabled; toggle WhatsApp/SMS per step."
         : 'Set per-step date, title, and body. Attachment is optional (PNG/JPG/PDF). Email is always enabled.',
     [allowWhatsApp, allowSms]
   );
@@ -495,6 +552,38 @@ export function MessageSequenceBuilder({
       ? `Select an existing tag or type one. Current tags: ${preview} +${tagOptions.length - 4} more`
       : `Select an existing tag or type one. Current tags: ${preview}`;
   }, [tagOptions]);
+  const normalizedWhatsAppTemplateOptions = useMemo(() => {
+    const deduped = new Map<string, WhatsAppTemplateOption>();
+    whatsappTemplateOptions.forEach((option) => {
+      const id = String(option?.id || '').trim();
+      const name = String(option?.name || '').trim();
+      if (!id || !name || deduped.has(id)) return;
+      deduped.set(id, {
+        id,
+        name,
+        displayName: String(option?.displayName || '').trim() || name,
+        category: String(option?.category || '').trim() || undefined,
+      });
+    });
+    return [...deduped.values()].sort((left, right) =>
+      (left.displayName || left.name).localeCompare(right.displayName || right.name, undefined, {
+        sensitivity: 'base',
+      })
+    );
+  }, [whatsappTemplateOptions]);
+  const whatsappTemplateOptionMap = useMemo(
+    () => new Map(normalizedWhatsAppTemplateOptions.map((option) => [option.id, option])),
+    [normalizedWhatsAppTemplateOptions]
+  );
+  const whatsappTemplateSampleMap = useMemo(() => {
+    const map = new Map<string, WhatsAppTemplateSample>();
+    (whatsappTemplateSamples || []).forEach((sample) => {
+      const templateName = String(sample?.templateName || '').trim();
+      if (!templateName || map.has(templateName)) return;
+      map.set(templateName, sample);
+    });
+    return map;
+  }, [whatsappTemplateSamples]);
 
   return (
     <Card sx={{ p: 2, mt: 1 }}>
@@ -521,6 +610,35 @@ export function MessageSequenceBuilder({
         )}
 
         {value.map((item, index) => (
+          (() => {
+            const selectedTemplateId = String(item.channels.whatsapp.templateId || '').trim();
+            const selectedTemplateOption = selectedTemplateId
+              ? whatsappTemplateOptionMap.get(selectedTemplateId)
+              : null;
+            const selectedTemplateName = String(selectedTemplateOption?.name || '').trim();
+            const selectedTemplateSample = selectedTemplateName
+              ? whatsappTemplateSampleMap.get(selectedTemplateName)
+              : undefined;
+            const templateVariableCount = Math.max(
+              Number(selectedTemplateSample?.expectedVariableCount || 0) || 0,
+              selectedTemplateSample?.sampleParametersArray?.length || 0
+            );
+            const attachmentAccept =
+              allowWhatsApp && item.channels.whatsapp.enabled
+                ? '.png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif'
+                : '.png,.jpg,.jpeg,.webp,.gif,.pdf,image/png,image/jpeg,image/webp,image/gif,application/pdf';
+
+            const templateVariablesPreview = selectedTemplateSample?.sampleParameters
+              ? Object.entries(selectedTemplateSample.sampleParameters)
+                  .map(([key, templateValue]) => `${key}: ${templateValue}`)
+                  .join('\n')
+              : '';
+
+            const currentTemplateVariables = normalizeTemplateVariables(
+              item.channels.whatsapp.templateVariables
+            );
+
+            return (
           <Box
             key={item.trackingId}
             draggable={!disabled}
@@ -688,7 +806,7 @@ export function MessageSequenceBuilder({
               </Grid>
 
               <TextField
-                label="Message Body"
+                label="Email / SMS Message Body"
                 value={item.messageBody}
                 onChange={(event) => {
                   const next = value.map((entry, idx) =>
@@ -700,6 +818,11 @@ export function MessageSequenceBuilder({
                 minRows={3}
                 fullWidth
                 disabled={disabled}
+                helperText={
+                  allowWhatsApp && item.channels.whatsapp.enabled
+                    ? 'WhatsApp ignores this field and uses the selected template variables.'
+                    : undefined
+                }
               />
 
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
@@ -708,7 +831,7 @@ export function MessageSequenceBuilder({
                   <input
                     hidden
                     type="file"
-                    accept=".png,.jpg,.jpeg,.pdf,image/png,image/jpeg,application/pdf"
+                    accept={attachmentAccept}
                     onChange={(event) => {
                       const selectedFile = event.target.files?.[0] || null;
                       if (!selectedFile) return;
@@ -826,6 +949,200 @@ export function MessageSequenceBuilder({
                 </Button>
               </Stack>
 
+              {allowWhatsApp && (
+                <TextField
+                  select
+                  label="WhatsApp Template"
+                  value={item.channels.whatsapp.templateId || ''}
+                  onChange={(event) => {
+                    const nextTemplateId = String(event.target.value || '').trim();
+                    const next = value.map((entry, idx) =>
+                      idx === index
+                        ? {
+                            ...entry,
+                            channels: {
+                              ...entry.channels,
+                              whatsapp: {
+                                ...entry.channels.whatsapp,
+                                templateId: nextTemplateId || undefined,
+                              },
+                            },
+                          }
+                        : entry
+                    );
+                    onChange(next);
+                  }}
+                  disabled={disabled || !item.channels.whatsapp.enabled}
+                  helperText={
+                    item.channels.whatsapp.enabled
+                      ? 'Pick a template for this step, or leave Default to use backend default.'
+                      : 'Enable WhatsApp for this step to choose a template.'
+                  }
+                  fullWidth
+                >
+                  <MenuItem value="">Default Template (Backend Config)</MenuItem>
+                  {(() => {
+                    const selectedTemplateMissing =
+                      selectedTemplateId && !whatsappTemplateOptionMap.has(selectedTemplateId);
+                    const options = selectedTemplateMissing
+                      ? [
+                          {
+                            id: selectedTemplateId,
+                            name: selectedTemplateId,
+                            displayName: `Selected template (unavailable): ${selectedTemplateId}`,
+                          },
+                          ...normalizedWhatsAppTemplateOptions,
+                        ]
+                      : normalizedWhatsAppTemplateOptions;
+
+                    return options.map((templateOption) => (
+                      <MenuItem key={templateOption.id} value={templateOption.id}>
+                        {templateOption.displayName || templateOption.name}
+                        {templateOption.category ? ` (${templateOption.category})` : ''}
+                      </MenuItem>
+                    ));
+                  })()}
+                </TextField>
+              )}
+
+              {allowWhatsApp &&
+                item.channels.whatsapp.enabled &&
+                selectedTemplateSample &&
+                selectedTemplateName && (
+                  <Box
+                    sx={{
+                      border: '1px solid',
+                      borderColor: 'divider',
+                      borderRadius: 2,
+                      p: 2,
+                      bgcolor: 'background.paper',
+                    }}
+                  >
+                    <Stack spacing={1}>
+                      <Typography variant="subtitle2">
+                        WhatsApp Template Preview: {selectedTemplateSample.title || selectedTemplateName}
+                      </Typography>
+                      {selectedTemplateSample.bodySkeleton && (
+                        <Typography variant="body2" color="text.secondary">
+                          {selectedTemplateSample.bodySkeleton}
+                        </Typography>
+                      )}
+                      {templateVariablesPreview && (
+                        <TextField
+                          label="Sample {{n}} map"
+                          value={templateVariablesPreview}
+                          InputProps={{ readOnly: true }}
+                          multiline
+                          minRows={4}
+                          fullWidth
+                        />
+                      )}
+                      {templateVariableCount > 0 && (
+                        <Box
+                          sx={{
+                            mt: 1,
+                            border: '1px dashed',
+                            borderColor: 'divider',
+                            borderRadius: 2,
+                            p: 2,
+                          }}
+                        >
+                          <Stack spacing={1}>
+                            <Typography variant="subtitle2">Template Variable Overrides</Typography>
+                            <Typography variant="caption" color="text.secondary">
+                              Leave fields blank to use automatic values from guest + event data.
+                              Only filled fields will override the backend mapping.
+                            </Typography>
+                            <Grid container spacing={2}>
+                              {Array.from({ length: templateVariableCount }).map((_, idx) => {
+                                const varIndex = idx + 1;
+                                const key = String(varIndex);
+                                const sampleValue =
+                                  selectedTemplateSample.sampleParametersArray?.[idx] || '';
+                                const currentValue = currentTemplateVariables?.[key] || '';
+
+                                return (
+                                  <Grid item xs={12} md={6} key={key}>
+                                    <TextField
+                                      label={`{{${varIndex}}}`}
+                                      value={currentValue}
+                                      placeholder={sampleValue}
+                                      helperText={sampleValue ? `Sample: ${sampleValue}` : undefined}
+                                      fullWidth
+                                      disabled={disabled}
+                                      onChange={(event) => {
+                                        const nextRawValue = event.target.value;
+                                        const trimmed = String(nextRawValue || '').trim();
+                                        const next = value.map((entry, entryIndex) => {
+                                          if (entryIndex !== index) return entry;
+                                          const prevVars = normalizeTemplateVariables(
+                                            entry.channels.whatsapp.templateVariables
+                                          );
+                                          const nextVars: Record<string, string> = prevVars
+                                            ? { ...prevVars }
+                                            : {};
+                                          if (!trimmed) {
+                                            delete nextVars[key];
+                                          } else {
+                                            nextVars[key] = trimmed;
+                                          }
+                                          return {
+                                            ...entry,
+                                            channels: {
+                                              ...entry.channels,
+                                              whatsapp: {
+                                                ...entry.channels.whatsapp,
+                                                templateVariables:
+                                                  Object.keys(nextVars).length > 0 ? nextVars : undefined,
+                                              },
+                                            },
+                                          };
+                                        });
+                                        onChange(next);
+                                      }}
+                                    />
+                                  </Grid>
+                                );
+                              })}
+                            </Grid>
+                            <Box>
+                              <Button
+                                size="small"
+                                variant="outlined"
+                                disabled={disabled || !currentTemplateVariables}
+                                onClick={() => {
+                                  const next = value.map((entry, entryIndex) =>
+                                    entryIndex === index
+                                      ? {
+                                          ...entry,
+                                          channels: {
+                                            ...entry.channels,
+                                            whatsapp: {
+                                              ...entry.channels.whatsapp,
+                                              templateVariables: undefined,
+                                            },
+                                          },
+                                        }
+                                      : entry
+                                  );
+                                  onChange(next);
+                                }}
+                              >
+                                Clear Overrides
+                              </Button>
+                            </Box>
+                          </Stack>
+                        </Box>
+                      )}
+                      {selectedTemplateSample.supportsMediaHeader && (
+                        <Typography variant="caption" color="text.secondary">
+                          This template supports a media header. SoftInvites uses the event IV image by default (or the step image attachment if provided).
+                        </Typography>
+                      )}
+                    </Stack>
+                  </Box>
+                )}
+
               <FormControlLabel
                 control={
                   <Switch
@@ -845,6 +1162,8 @@ export function MessageSequenceBuilder({
               />
             </Stack>
           </Box>
+            );
+          })()
         ))}
 
         <Stack direction="row" justifyContent="flex-end">

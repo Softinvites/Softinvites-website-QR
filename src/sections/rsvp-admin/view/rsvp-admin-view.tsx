@@ -50,6 +50,7 @@ import {
   normalizeMessageSequence,
   serializeMessageSequence,
   type MessageSequenceItem,
+  type WhatsAppTemplateOption,
   getDefaultMessageSequence,
   collectSequenceAttachmentFiles,
 } from 'src/sections/event/message-sequence-builder';
@@ -96,6 +97,7 @@ type RsvpFormSettings = {
   phoneLabel: string;
   phonePlaceholder: string;
   attendanceEnabled: boolean;
+  isInvalidated: boolean;
   attendanceLabel: string;
   attendanceYesLabel: string;
   attendanceNoLabel: string;
@@ -124,6 +126,7 @@ const defaultRsvpFormSettings: RsvpFormSettings = {
   phoneLabel: 'Phone Number',
   phonePlaceholder: '',
   attendanceEnabled: true,
+  isInvalidated: false,
   attendanceLabel: 'Will you attend?',
   attendanceYesLabel: 'YES, I WILL ATTEND',
   attendanceNoLabel: 'UNABLE TO ATTEND',
@@ -176,6 +179,7 @@ const normalizeCustomField = (field: any, index: number): RsvpCustomField => ({
 const normalizeRsvpFormSettings = (settings: any): RsvpFormSettings => ({
   ...defaultRsvpFormSettings,
   ...(settings || {}),
+  isInvalidated: settings?.isInvalidated === true,
   submitLabel: 'Submit',
   customFields: Array.isArray(settings?.customFields)
     ? settings.customFields.map((field: any, index: number) => normalizeCustomField(field, index))
@@ -201,6 +205,30 @@ type EventCatalogRecord = {
   channelConfig?: any;
   isActive?: boolean;
   eventStatus?: 'active' | 'expired';
+};
+
+const normalizeWhatsAppTemplateOptions = (input: any): WhatsAppTemplateOption[] => {
+  const list = Array.isArray(input) ? input : [];
+  const deduped = new Map<string, WhatsAppTemplateOption>();
+
+  list.forEach((item) => {
+    const id = String(item?._id || '').trim();
+    const name = String(item?.name || '').trim();
+    if (!id || !name || deduped.has(id)) return;
+
+    deduped.set(id, {
+      id,
+      name,
+      displayName: String(item?.displayName || '').trim() || name,
+      category: String(item?.category || '').trim() || undefined,
+    });
+  });
+
+  return [...deduped.values()].sort((left, right) =>
+    (left.displayName || left.name).localeCompare(right.displayName || right.name, undefined, {
+      sensitivity: 'base',
+    })
+  );
 };
 
 const emptySummary = { yes: 0, no: 0, pending: 0, total: 0, sent: 0 };
@@ -233,6 +261,45 @@ const normalizeTagValue = (value?: string | null) =>
   String(value || '')
     .replace(/\s+/g, ' ')
     .trim();
+
+const HTML_TAG_PATTERN = /<[^>]+>/;
+const WHATSAPP_IMAGE_CONTENT_TYPES = new Set([
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/webp',
+  'image/gif',
+]);
+
+const hasImageFileExtension = (value?: string | null) =>
+  /\.(png|jpe?g|webp|gif)([?#].*)?$/i.test(String(value || '').trim());
+
+const isWhatsAppCompatibleAttachment = (item: MessageSequenceItem) => {
+  const attachment = item.attachment;
+  if (!attachment) return true;
+
+  const hasAttachment =
+    !!attachment.file || (typeof attachment.url === 'string' && attachment.url.trim().length > 0);
+  if (!hasAttachment) return true;
+
+  if (attachment.file) {
+    const fileType = String(attachment.file.type || '').trim().toLowerCase();
+    if (fileType) {
+      return WHATSAPP_IMAGE_CONTENT_TYPES.has(fileType);
+    }
+    return hasImageFileExtension(attachment.file.name);
+  }
+
+  const attachmentType = String(attachment.contentType || '').trim().toLowerCase();
+  if (attachmentType) {
+    return WHATSAPP_IMAGE_CONTENT_TYPES.has(attachmentType);
+  }
+
+  return (
+    hasImageFileExtension(attachment.url) ||
+    hasImageFileExtension(attachment.filename)
+  );
+};
 
 const normalizeEventDateValue = (value?: string) =>
   String(value || '').replace(/(\d+)(st|nd|rd|th)/gi, '$1');
@@ -357,6 +424,8 @@ export function RsvpAdminView() {
   const [rsvpAccentColor, setRsvpAccentColor] = useState('#1f2937');
   const [rsvpFormSettings, setRsvpFormSettings] =
     useState<RsvpFormSettings>(defaultRsvpFormSettings);
+  const [formResponsesDialog, setFormResponsesDialog] = useState<null | 'stop' | 'resume'>(null);
+  const [formResponsesDialogBusy, setFormResponsesDialogBusy] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const loadRequestRef = useRef(0);
   const [deleteTarget, setDeleteTarget] = useState<RsvpRecord | null>(null);
@@ -365,6 +434,10 @@ export function RsvpAdminView() {
   const [reports, setReports] = useState<any[]>([]);
   const [analytics, setAnalytics] = useState<any | null>(null);
   const [messageSequence, setMessageSequence] = useState<MessageSequenceItem[]>([]);
+  const [whatsappTemplateOptions, setWhatsappTemplateOptions] = useState<
+    WhatsAppTemplateOption[]
+  >([]);
+  const [whatsappTemplateSamples, setWhatsappTemplateSamples] = useState<any[]>([]);
   const [sequenceSaving, setSequenceSaving] = useState(false);
   const [analyticsStart, setAnalyticsStart] = useState('');
   const [analyticsEnd, setAnalyticsEnd] = useState('');
@@ -618,6 +691,7 @@ export function RsvpAdminView() {
     setReports([]);
     setAnalytics(null);
     setMessageSequence([]);
+    setWhatsappTemplateOptions([]);
     setSchedulePage(0);
   }, []);
 
@@ -657,6 +731,68 @@ export function RsvpAdminView() {
         setEvents((prev) =>
           prev.map((item) => (item._id === nextEvent?._id ? { ...item, ...nextEvent } : item))
         );
+        try {
+          const templatesRes = await axios.get(
+            `${API_BASE}/events/events/${currentEventId}/whatsapp/templates`,
+            {
+              headers: { Authorization: `Bearer ${token}` },
+            }
+          );
+          if (loadRequestRef.current === requestId) {
+            const normalized = normalizeWhatsAppTemplateOptions(templatesRes.data?.templates);
+
+            // If the event has no template records yet, auto-import the recommended
+            // templates so the message scheduler can show a usable dropdown.
+            if (!normalized.length) {
+              try {
+                await axios.post(
+                  `${API_BASE}/events/events/${currentEventId}/whatsapp/templates`,
+                  { useRecommended: true, provider: 'twilio', upsert: true },
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+
+                const refreshed = await axios.get(
+                  `${API_BASE}/events/events/${currentEventId}/whatsapp/templates`,
+                  { headers: { Authorization: `Bearer ${token}` } }
+                );
+                if (loadRequestRef.current === requestId) {
+                  setWhatsappTemplateOptions(
+                    normalizeWhatsAppTemplateOptions(refreshed.data?.templates)
+                  );
+                }
+              } catch (populateError) {
+                console.warn(
+                  'Unable to auto-import WhatsApp templates for message builder:',
+                  populateError
+                );
+                if (loadRequestRef.current === requestId) {
+                  setWhatsappTemplateOptions([]);
+                }
+              }
+            } else {
+              setWhatsappTemplateOptions(normalized);
+            }
+          }
+        } catch (templateError) {
+          console.warn('Unable to fetch WhatsApp templates for message builder:', templateError);
+          if (loadRequestRef.current === requestId) {
+            setWhatsappTemplateOptions([]);
+          }
+        }
+        try {
+          const samplesRes = await axios.get(
+            `${API_BASE}/events/events/${currentEventId}/whatsapp/template-samples`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (loadRequestRef.current === requestId) {
+            setWhatsappTemplateSamples(samplesRes.data?.templates || []);
+          }
+        } catch (samplesError) {
+          console.warn('Unable to fetch WhatsApp template samples:', samplesError);
+          if (loadRequestRef.current === requestId) {
+            setWhatsappTemplateSamples([]);
+          }
+        }
         if (nextEvent?.servicePackage !== 'invitation-only') {
           const allowWa = !!nextEvent?.channelConfig?.whatsapp?.enabled;
           const allowSmsLocal = !!nextEvent?.channelConfig?.bulkSms?.enabled;
@@ -1177,8 +1313,14 @@ export function RsvpAdminView() {
     }
   };
 
-  const handleRsvpFormSettings = async () => {
-    if (!eventId) return;
+  const persistRsvpFormSettings = async (
+    overrides: Partial<RsvpFormSettings> = {},
+    options: {
+      successMessage?: string;
+      skipOptionsValidation?: boolean;
+    } = {}
+  ): Promise<boolean> => {
+    if (!eventId) return false;
     const sanitizedCustomFields = rsvpFormSettings.customFields.map((field, index) => {
       const normalized = normalizeCustomField(field, index);
       return {
@@ -1186,29 +1328,76 @@ export function RsvpAdminView() {
         options: customFieldNeedsOptions(normalized.type) ? normalized.options : [],
       };
     });
-    const invalidOptionsField = sanitizedCustomFields.find(
-      (field) => customFieldNeedsOptions(field.type) && field.options.length === 0
-    );
-    if (invalidOptionsField) {
-      toast.error(`Add at least one option for "${invalidOptionsField.label}"`);
-      return;
+    if (!options.skipOptionsValidation) {
+      const invalidOptionsField = sanitizedCustomFields.find(
+        (field) => customFieldNeedsOptions(field.type) && field.options.length === 0
+      );
+      if (invalidOptionsField) {
+        toast.error(`Add at least one option for "${invalidOptionsField.label}"`);
+        return false;
+      }
     }
+    const nextSettings = {
+      ...rsvpFormSettings,
+      ...overrides,
+      submitLabel: 'Submit',
+      customFields: sanitizedCustomFields,
+    };
     try {
       await axios.put(
         `${API_BASE}/events/events/${eventId}/rsvp-form-settings`,
         {
-          rsvpFormSettings: {
-            ...rsvpFormSettings,
-            submitLabel: 'Submit',
-            customFields: sanitizedCustomFields,
-          },
+          rsvpFormSettings: nextSettings,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      toast.success('RSVP form settings saved');
+      setRsvpFormSettings(normalizeRsvpFormSettings(nextSettings));
+      toast.success(options.successMessage || 'RSVP form settings saved');
       reloadData();
+      return true;
     } catch (err: any) {
       toast.error(err?.response?.data?.message || 'Failed to save RSVP form settings');
+      return false;
+    }
+  };
+
+  const handleRsvpFormSettings = async () => {
+    await persistRsvpFormSettings();
+  };
+
+  const handleInvalidateRsvpForm = () => {
+    if (!eventId || rsvpFormSettings.isInvalidated) return;
+    setFormResponsesDialog('stop');
+  };
+
+  const handleReactivateRsvpForm = () => {
+    if (!eventId || !rsvpFormSettings.isInvalidated) return;
+    setFormResponsesDialog('resume');
+  };
+
+  const closeFormResponsesDialog = () => {
+    if (formResponsesDialogBusy) return;
+    setFormResponsesDialog(null);
+  };
+
+  const confirmFormResponsesDialog = async () => {
+    if (!eventId) return;
+    if (!formResponsesDialog) return;
+
+    const shouldInvalidate = formResponsesDialog === 'stop';
+
+    setFormResponsesDialogBusy(true);
+    try {
+      const ok = await persistRsvpFormSettings(
+        { isInvalidated: shouldInvalidate },
+        {
+          successMessage: shouldInvalidate ? 'RSVP form invalidated' : 'RSVP form reactivated',
+          skipOptionsValidation: true,
+        }
+      );
+      if (ok) setFormResponsesDialog(null);
+    } finally {
+      setFormResponsesDialogBusy(false);
     }
   };
 
@@ -1228,6 +1417,30 @@ export function RsvpAdminView() {
     );
     if (invalidTagStep) {
       toast.error('Every tag-based message must include a recipient tag.');
+      return;
+    }
+    const invalidWhatsAppBodyStep = messageSequence.find(
+      (item) =>
+        allowWhatsApp &&
+        item.channels.whatsapp.enabled &&
+        HTML_TAG_PATTERN.test(item.messageBody || '')
+    );
+    if (invalidWhatsAppBodyStep) {
+      toast.error(
+        'WhatsApp message bodies must be plain text. Remove HTML tags from WhatsApp-enabled steps.'
+      );
+      return;
+    }
+    const invalidWhatsAppAttachmentStep = messageSequence.find(
+      (item) =>
+        allowWhatsApp &&
+        item.channels.whatsapp.enabled &&
+        !isWhatsAppCompatibleAttachment(item)
+    );
+    if (invalidWhatsAppAttachmentStep) {
+      toast.error(
+        'WhatsApp-enabled steps only support image attachments (PNG/JPG/JPEG/WEBP/GIF).'
+      );
       return;
     }
     try {
@@ -2462,11 +2675,32 @@ export function RsvpAdminView() {
                 </Stack>
               )}
             </Stack>
-            <Box>
+            <Stack
+              direction={{ xs: 'column', sm: 'row' }}
+              spacing={1.5}
+              alignItems={{ xs: 'flex-start', sm: 'center' }}
+            >
+              <Typography
+                variant="body2"
+                color={rsvpFormSettings.isInvalidated ? 'error.main' : 'success.main'}
+              >
+                {rsvpFormSettings.isInvalidated
+                  ? 'Form status: Inactive (not receiving submissions)'
+                  : 'Form status: Active'}
+              </Typography>
               <Button variant="contained" onClick={handleRsvpFormSettings}>
                 Save RSVP Form Settings
               </Button>
-            </Box>
+              {rsvpFormSettings.isInvalidated ? (
+                <Button variant="outlined" color="success" onClick={handleReactivateRsvpForm}>
+                  Resume Form Responses
+                </Button>
+              ) : (
+                <Button variant="outlined" color="error" onClick={handleInvalidateRsvpForm}>
+                  Stop Form Responses
+                </Button>
+              )}
+            </Stack>
           </Stack>
         </Card>
       )}
@@ -2523,6 +2757,8 @@ export function RsvpAdminView() {
                 allowWhatsApp={allowWhatsApp}
                 allowSms={allowSms}
                 availableTags={availableTags}
+                whatsappTemplateOptions={whatsappTemplateOptions}
+                whatsappTemplateSamples={whatsappTemplateSamples}
               />
               <Stack direction="row" spacing={1}>
                 <Button
@@ -2861,6 +3097,41 @@ export function RsvpAdminView() {
           )}
         </Stack>
       )}
+
+      <Dialog
+        open={Boolean(formResponsesDialog)}
+        onClose={closeFormResponsesDialog}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>
+          {formResponsesDialog === 'stop' ? 'Stop form responses?' : 'Resume form responses?'}
+        </DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" color="text.secondary" mt={1}>
+            {formResponsesDialog === 'stop'
+              ? 'Are you sure you want to stop form responses? New submissions will be blocked.'
+              : 'Are you sure you want to resume form responses? New submissions will be accepted again.'}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={closeFormResponsesDialog} disabled={formResponsesDialogBusy}>
+            Cancel
+          </Button>
+          <Button
+            variant="contained"
+            color={formResponsesDialog === 'stop' ? 'error' : 'success'}
+            onClick={confirmFormResponsesDialog}
+            disabled={formResponsesDialogBusy}
+          >
+            {formResponsesDialogBusy
+              ? 'Updating...'
+              : formResponsesDialog === 'stop'
+                ? 'Stop Responses'
+                : 'Resume Responses'}
+          </Button>
+        </DialogActions>
+      </Dialog>
 
       <Dialog
         open={addOpen}

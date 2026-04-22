@@ -31,6 +31,17 @@ import WhatsAppStatusDialog from './WhatsAppStatusDialog';
 import WhatsAppSendDialog from './WhatsAppSendDialog';
 import { AnalyticsWidgetSummary } from '../../overview/analytics-widget-summary';
 
+type WhatsAppTemplateSample = {
+  templateName: string;
+  title?: string;
+  category?: string;
+  description?: string;
+  expectedVariableCount?: number;
+  buttonUrlVariableIndex?: number;
+  sampleParametersArray?: string[];
+  supportsMediaHeader?: boolean;
+};
+
 export function GuestView() {
   const table = useTable();
   const [filterName, setFilterName] = useState('');
@@ -71,6 +82,24 @@ export function GuestView() {
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const [whatsappStatusOpen, setWhatsappStatusOpen] = useState(false);
   const [whatsappSendOpen, setWhatsappSendOpen] = useState(false);
+  const [whatsappTemplateSamples, setWhatsappTemplateSamples] = useState<WhatsAppTemplateSample[]>(
+    []
+  );
+
+  const fetchWhatsAppTemplateSamples = async (currentEventId: string, token: string) => {
+    try {
+      const response = await axios.get(
+        `${API_BASE}/events/events/${currentEventId}/whatsapp/template-samples`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        }
+      );
+      setWhatsappTemplateSamples(response.data?.templates || []);
+    } catch (err) {
+      console.warn('Could not fetch WhatsApp template samples:', err);
+      setWhatsappTemplateSamples([]);
+    }
+  };
 
   const handleBatchDelete = async () => {
     if (table.selected.length === 0) {
@@ -304,11 +333,18 @@ export function GuestView() {
   };
 
 
-  const handleSendBulkWhatsApp = () => {
+  const handleSendBulkWhatsApp = async () => {
+    const token = localStorage.getItem('token');
+    if (eventId && token && whatsappTemplateSamples.length === 0) {
+      await fetchWhatsAppTemplateSamples(eventId, token);
+    }
     setWhatsappSendOpen(true);
   };
 
-  const handleConfirmBulkWhatsApp = async (templateName: string) => {
+  const handleConfirmBulkWhatsApp = async (
+    templateName: string,
+    templateVariables?: Record<string, string> | null
+  ) => {
     setLoading(true);
     setWhatsappSendOpen(false);
 
@@ -334,6 +370,7 @@ export function GuestView() {
         {
           eventId: derivedEventId,
           templateName,
+          ...(templateVariables ? { templateVariables } : {}),
         },
         {
           headers: {
@@ -470,6 +507,7 @@ export function GuestView() {
 
         // Fetch WhatsApp statistics
         fetchWhatsAppStats(currentEventId);
+        fetchWhatsAppTemplateSamples(currentEventId, token);
 
         // Get event details for report
         try {
@@ -986,6 +1024,7 @@ export function GuestView() {
         onConfirm={handleConfirmBulkWhatsApp}
         guestCount={getGuestsWithPhone()}
         loading={loading}
+        templateSamples={whatsappTemplateSamples}
       />
     </DashboardContent>
   );

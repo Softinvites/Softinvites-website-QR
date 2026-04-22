@@ -642,23 +642,24 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
             </>
           )}
           <Typography variant="subtitle1" sx={{ mt: 2 }}>
-            Replace IV Image (PNG):
+            Replace Invitation Image (JPEG/PNG/WEBP):
           </Typography>
           <input
-            accept="image/png"
+            accept="image/jpeg,image/jpg,image/png,image/webp"
             type="file"
             onChange={(e) => {
               const file = e.target.files?.[0];
               if (!file) return;
-              if (file.type !== 'image/png') {
-                toast.error('Only PNG is allowed for the IV image.', {
+              const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+              if (!allowed.includes(file.type)) {
+                toast.error('Only JPEG, PNG, or WEBP images are allowed for the invitation image.', {
                   position: 'top-right',
                   autoClose: 3000,
                 });
                 e.target.value = '';
                 return;
               }
-              setEditIv(file); // store file
+              setEditIv(file);
               const reader = new FileReader();
               reader.onloadend = () => setEditIvPreview(reader.result as string);
               reader.readAsDataURL(file);

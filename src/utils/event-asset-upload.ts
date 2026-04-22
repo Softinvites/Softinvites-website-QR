@@ -24,7 +24,7 @@ const inferContentType = (file: File, assetType: EventAssetType) => {
   if (lowerName.endsWith('.jpg') || lowerName.endsWith('.jpeg')) return 'image/jpeg';
   if (lowerName.endsWith('.pdf')) return 'application/pdf';
 
-  return assetType === 'iv' ? 'image/png' : 'application/octet-stream';
+  return assetType === 'iv' ? 'image/jpeg' : 'application/octet-stream';
 };
 
 const buildErrorMessage = (payload: any, fallback: string) =>

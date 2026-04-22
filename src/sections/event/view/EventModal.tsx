@@ -14,7 +14,6 @@ import {
 } from '@mui/material';
 import { toast } from 'react-toastify';
 import { API_BASE } from 'src/utils/apiBase';
-import { uploadEventAsset } from 'src/utils/event-asset-upload';
 
 interface EventModalProps {
   open: boolean;
@@ -43,8 +42,9 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
 
-    if (selectedFile.type !== 'image/png') {
-      alert('Only PNG is allowed for the event IV image.');
+    const allowed = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'];
+    if (!allowed.includes(selectedFile.type)) {
+      alert('Only PNG, JPEG, or WEBP images are allowed for the invitation image.');
       e.target.value = '';
       return;
     }
@@ -81,13 +81,7 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
       formData.append('channelConfig', JSON.stringify(channelConfig));
 
       if (file) {
-        const uploadedIv = await uploadEventAsset({
-          token,
-          file,
-          assetType: 'iv',
-          eventRef: eventData.name || 'event',
-        });
-        formData.append('ivUrl', uploadedIv.url);
+        formData.append('iv', file);
       }
 
       const response = await fetch(
@@ -202,10 +196,10 @@ const EventModal: React.FC<EventModalProps> = ({ open, handleClose }) => {
         )}
 
         <Typography variant="subtitle1" sx={{ mt: 2 }}>
-          Upload IV Image (PNG, optional):
+          Upload Invitation Image (JPEG/PNG/WEBP, optional):
         </Typography>
         <input
-          accept="image/png"
+          accept="image/png,image/jpeg,image/jpg,image/webp"
           type="file"
           onChange={handleFileChange}
           style={{ marginTop: 8, marginBottom: 12 }}

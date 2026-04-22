@@ -189,7 +189,6 @@ export function UserTableRow({
         },
         body: JSON.stringify({
           guestId: row._id,
-          templateName: 'hello_world',
         }),
       });
 
