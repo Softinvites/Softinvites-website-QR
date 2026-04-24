@@ -42,27 +42,23 @@ const normalizeTemplateVariables = (value: any): Record<string, string> | null =
   if (!value || typeof value !== 'object') return null;
   const raw = value as Record<string, unknown>;
 
-  const normalized = Object.entries(raw).reduce<Record<string, string>>(
-    (acc, [key, entry]) => {
-      const index = Number.parseInt(key, 10);
-      if (!Number.isInteger(index) || index <= 0) return acc;
+  const normalized = Object.entries(raw).reduce<Record<string, string>>((acc, [key, entry]) => {
+    const index = Number.parseInt(key, 10);
+    if (!Number.isInteger(index) || index <= 0) return acc;
 
-      const trimmed = typeof entry === 'string' ? entry.trim() : String(entry ?? '').trim();
-      if (!trimmed) return acc;
+    const trimmed = typeof entry === 'string' ? entry.trim() : String(entry ?? '').trim();
+    if (!trimmed) return acc;
 
-      acc[String(index)] = trimmed;
-      return acc;
-    },
-    {},
-  );
+    acc[String(index)] = trimmed;
+    return acc;
+  }, {});
 
   return Object.keys(normalized).length ? normalized : null;
 };
 
 // Variables that are automatically populated per template (locked from frontend)
-// For wedding_invite: variables 2 (guest name), 8 (media URL), and 9 (pass URL) are locked.
 const LOCKED_VARIABLES: Record<string, number[]> = {
-  wedding_invite: [2, 8, 9],
+  wedding_invite: [2, 10, 11],
   rsvp_followup: [1, 6],
   event_details_reminder: [1],
   logistics: [1],
@@ -73,21 +69,24 @@ const FALLBACK_TEMPLATE_SAMPLES: WhatsAppTemplateSample[] = [
     templateName: 'wedding_invite',
     title: 'Wedding Invite',
     category: 'marketing',
-    description: 'Wedding invitation with media in body (variable 8). Variables 2 (guest name), 8 (media URL), and 9 (pass URL) are set automatically.',
-    expectedVariableCount: 9,
-    buttonUrlVariableIndex: 9,
+    description:
+      'Wedding invitation with event IV as header image. Variables 2 (guest name), 10 (header image), and 11 (pass URL) are set automatically.',
+    expectedVariableCount: 11,
+    buttonUrlVariableIndex: 11,
     sampleParametersArray: [
-      'Judith\'s Wedding',        // {{1}} frontend editable
-      '(auto: guest name)',       // {{2}} locked
-      'Family of Judith',         // {{3}} frontend editable
-      'Judith\'s Wedding',        // {{4}} frontend editable
-      '20th July 2026',           // {{5}} frontend editable
-      '4:00 PM',                  // {{6}} frontend editable
-      'Landmark Event Centre, Lagos', // {{7}} frontend editable
-      '(auto: media URL)',        // {{8}} locked
-      '(auto: pass URL)',         // {{9}} locked
+      "Judith's Wedding", // {{1}}  event title
+      '(auto: guest name)', // {{2}}  locked
+      'Family of Judith', // {{3}}  host/family name
+      "Judith's Wedding", // {{4}}  ceremony type
+      'Judith & Stanley', // {{5}}  couple names
+      'Church Ceremony', // {{6}}  ceremony label
+      '20th July 2026', // {{7}}  date
+      '4:00 PM', // {{8}}  time
+      'Landmark Event Centre, Lagos', // {{9}}  venue
+      '(auto: event image S3 path)', // {{10}} locked
+      '(auto: pass URL suffix)', // {{11}} locked
     ],
-    supportsMediaHeader: false, // Image is inside body, not in header
+    supportsMediaHeader: false,
   },
   {
     templateName: 'event_details_reminder',
@@ -96,27 +95,42 @@ const FALLBACK_TEMPLATE_SAMPLES: WhatsAppTemplateSample[] = [
     description: 'Event reminder template. Variable 1 (guest name) is set automatically.',
     expectedVariableCount: 4,
     buttonUrlVariableIndex: 0,
-    sampleParametersArray: ['(auto: guest name)', 'Judith\'s Wedding', 'Lagos State', '20th July 2026', '4:00 PM'],
+    sampleParametersArray: [
+      '(auto: guest name)',
+      "Judith's Wedding",
+      'Lagos State',
+      '20th July 2026',
+      '4:00 PM',
+    ],
     supportsMediaHeader: false,
   },
   {
     templateName: 'rsvp_followup',
     title: 'RSVP Follow-Up',
     category: 'utility',
-    description: 'Follow-up template with a dynamic pass button. Variables 1 (guest name) and 6 (pass URL) are set automatically.',
+    description:
+      'Follow-up template with a dynamic pass button. Variables 1 (guest name) and 6 (pass URL) are set automatically.',
     expectedVariableCount: 4,
     buttonUrlVariableIndex: 6,
-    sampleParametersArray: ['(auto: guest name)', 'Judith\'s Wedding', 'Lagos', '20th July 2026', '4:00 PM', '(auto: pass URL)'],
+    sampleParametersArray: [
+      '(auto: guest name)',
+      "Judith's Wedding",
+      'Lagos',
+      '20th July 2026',
+      '4:00 PM',
+      '(auto: pass URL)',
+    ],
     supportsMediaHeader: false,
   },
   {
     templateName: 'logistics',
     title: 'Logistics',
     category: 'utility',
-    description: 'Utility template for logistics/support information. Variable 1 (guest name) is set automatically.',
+    description:
+      'Utility template for logistics/support information. Variable 1 (guest name) is set automatically.',
     expectedVariableCount: 2,
     buttonUrlVariableIndex: 0,
-    sampleParametersArray: ['(auto: guest name)', 'Judith\'s Wedding'],
+    sampleParametersArray: ['(auto: guest name)', "Judith's Wedding"],
     supportsMediaHeader: false,
   },
 ];
@@ -161,10 +175,7 @@ export default function WhatsAppSendDialog({
     onConfirm(templateName, normalizeTemplateVariables(templateVariables));
   };
 
-  const lockedVariables = useMemo(
-    () => LOCKED_VARIABLES[templateName] || [],
-    [templateName]
-  );
+  const lockedVariables = useMemo(() => LOCKED_VARIABLES[templateName] || [], [templateName]);
 
   const templateVariableCount = useMemo(() => {
     if (!selectedTemplate) return 0;
@@ -182,7 +193,7 @@ export default function WhatsAppSendDialog({
           Send WhatsApp Messages
         </Box>
       </DialogTitle>
-      
+
       <DialogContent>
         <Alert severity="info" sx={{ mb: 2 }}>
           You are about to send WhatsApp messages to {guestCount} guests with phone numbers.
@@ -225,8 +236,8 @@ export default function WhatsAppSendDialog({
             </Typography>
             {selectedTemplate.sampleParametersArray?.length ? (
               <Typography variant="caption" display="block" color="text.secondary" sx={{ mt: 1 }}>
-                Variable preview:{" "}
-            {selectedTemplate.sampleParametersArray
+                Variable preview:{' '}
+                {selectedTemplate.sampleParametersArray
                   .map((value, index) => `{{${index + 1}}}=${value}`)
                   .join(' | ')}
               </Typography>
@@ -305,18 +316,18 @@ export default function WhatsAppSendDialog({
           </Box>
         )}
       </DialogContent>
-      
+
       <DialogActions>
         <Button onClick={onClose} disabled={loading}>
           Cancel
         </Button>
-        <Button 
-          onClick={handleConfirm} 
-          variant="contained" 
+        <Button
+          onClick={handleConfirm}
+          variant="contained"
           disabled={loading}
-          sx={{ 
-            bgcolor: '#25D366', 
-            '&:hover': { bgcolor: '#128C7E' } 
+          sx={{
+            bgcolor: '#25D366',
+            '&:hover': { bgcolor: '#128C7E' },
           }}
         >
           {loading ? 'Sending...' : `Send to ${guestCount} Guests`}
