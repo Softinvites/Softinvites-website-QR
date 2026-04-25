@@ -382,7 +382,9 @@ export function GuestView() {
       );
 
       toast.success(
-        `WhatsApp bulk send completed! Sent: ${response.data.sent}, Failed: ${response.data.failed}`
+        response.data.details?.[0]?.status === 'processing'
+          ? `WhatsApp bulk send processing for ${response.data.total} guests. You will receive an email notification when complete.`
+          : `WhatsApp bulk send completed! Sent: ${response.data.sent}, Failed: ${response.data.failed}`
       );
 
       // Refresh WhatsApp stats
