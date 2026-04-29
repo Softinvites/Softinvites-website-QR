@@ -292,6 +292,7 @@ import { Label } from 'src/components/label';
 import { Iconify } from 'src/components/iconify';
 import { API_BASE } from '../../utils/apiBase';
 import { uploadEventAsset } from '../../utils/event-asset-upload';
+import WhatsAppRepliesModal from './view/WhatsAppRepliesModal';
 
 export type UserProps = {
   id: string;
@@ -327,6 +328,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
   const [isLinkDialogOpen, setIsLinkDialogOpen] = useState(false);
   const [openDialog, setOpenDialog] = useState(false);
   const [openConfirmDialog, setOpenConfirmDialog] = useState(false);
+  const [openRepliesModal, setOpenRepliesModal] = useState(false);
 
   const [editName, setEditName] = useState(row.name);
   const [editDate, setEditDate] = useState(row.date);
@@ -563,6 +565,13 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           <MenuItem onClick={handleGoToRsvp}>Go to RSVP</MenuItem>
           <MenuItem onClick={handleGoToGuest}>Go to Guest</MenuItem>
           <MenuItem onClick={handleOpenEditDialog}>Edit</MenuItem>
+          <MenuItem
+            onClick={() => { handleClosePopover(); setOpenRepliesModal(true); }}
+            sx={{ color: 'success.main' }}
+          >
+            <Iconify icon="logos:whatsapp-icon" sx={{ mr: 1 }} />
+            WhatsApp Replies
+          </MenuItem>
           <MenuItem onClick={handleDelete} sx={{ color: 'error.main' }}>
             Delete
           </MenuItem>
@@ -571,6 +580,13 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
           </MenuItem>
         </MenuList>
       </Popover>
+
+      <WhatsAppRepliesModal
+        open={openRepliesModal}
+        onClose={() => setOpenRepliesModal(false)}
+        eventId={row.id}
+        eventName={row.name}
+      />
 
       {/* ✅ Edit Dialog */}
       <Dialog open={openDialog} onClose={handleCloseDialog}>
