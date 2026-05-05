@@ -273,6 +273,7 @@ export default function RsvpPage() {
   const [payload, setPayload] = useState<RsvpFormResponse | null>(null);
   const [deviceSubmissionKey, setDeviceSubmissionKey] = useState('');
   const [deviceEmailLocked, setDeviceEmailLocked] = useState(false);
+  const [submitted, setSubmitted] = useState<{ status: AttendanceStatus; rsvpId: string } | null>(null);
 
   const [guestName, setGuestName] = useState('');
   const [email, setEmail] = useState('');
@@ -389,7 +390,7 @@ export default function RsvpPage() {
         },
         {}
       );
-      await axios.post(`${API_BASE}/rsvp/form/${token}/submit`, {
+      const { data } = await axios.post(`${API_BASE}/rsvp/form/${token}/submit`, {
         guestName,
         email,
         phone,
@@ -398,14 +399,8 @@ export default function RsvpPage() {
         submissionKey: deviceSubmissionKey || undefined,
         responses: responsePayload,
       });
-      storeSubmission(token, email, deviceSubmissionKey);
-      toast.success('RSVP submitted. Thank you!');
-      setGuestName('');
-      setEmail('');
-      setPhone('');
-      setStatus('');
-      setComments('');
-      setResponses(createInitialResponses(formSettings.customFields));
+      storeSubmission(token, email, deviceSubmissionKey, data?.rsvp?.id);
+      setSubmitted({ status: (attendanceEnabled ? status : 'yes') as AttendanceStatus, rsvpId: data?.rsvp?.id || '' });
     } catch (err: any) {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         toast.error('No internet connection. Please try again when you are online.');
@@ -472,7 +467,17 @@ export default function RsvpPage() {
             <p className="rsvp-error">This form is no longer receiving submissions.</p>
           )}
 
-          {!loading && !error && payload && !formInvalidated && (
+          {!loading && !error && payload && !formInvalidated && submitted && (
+            <SuccessScreen
+              status={submitted.status}
+              rsvpId={submitted.rsvpId}
+              eventName={payload.event.name}
+              accentColor={rsvpAccent}
+              accentTextColor={rsvpAccentText}
+            />
+          )}
+
+          {!loading && !error && payload && !formInvalidated && !submitted && (
             <form className="rsvp-form" onSubmit={handleSubmit}>
               <div className="rsvp-header">
                 <div className="rsvp-pill">RSVP</div>
@@ -708,6 +713,65 @@ export default function RsvpPage() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Success screen shown after a successful RSVP submission
+// ---------------------------------------------------------------------------
+function SuccessScreen({
+  status,
+  rsvpId,
+  eventName,
+  accentColor,
+  accentTextColor,
+}: {
+  status: AttendanceStatus;
+  rsvpId: string;
+  eventName: string;
+  accentColor: string;
+  accentTextColor: string;
+}) {
+  const isYes = status === 'yes';
+  const calendarUrl = isYes && rsvpId
+    ? `${import.meta.env.VITE_API_BASE || 'https://292x833w13.execute-api.us-east-2.amazonaws.com'}/rsvp/${encodeURIComponent(rsvpId)}/calendar`
+    : '';
+
+  return (
+    <div className="rsvp-success">
+      <div
+        className="rsvp-success-icon"
+        style={{ background: accentColor, color: accentTextColor }}
+      >
+        {isYes ? '🎉' : '💌'}
+      </div>
+
+      <h2 className="rsvp-success-title">
+        {isYes ? "You're confirmed!" : "We'll miss you!"}
+      </h2>
+
+      <p className="rsvp-success-msg">
+        {isYes
+          ? `Thank you! Your attendance at ${eventName} has been confirmed.`
+          : `Thank you for letting us know. We hope to see you next time.`}
+      </p>
+
+      {isYes && calendarUrl && (
+        <>
+          <p className="rsvp-success-hint">
+            Save the event to your calendar so you don't miss it.
+          </p>
+          <a
+            href={calendarUrl}
+            className="rsvp-calendar-btn"
+            style={{ background: accentColor, color: accentTextColor }}
+            download
+          >
+            📅 Add to Calendar
+          </a>
+        </>
+      )}
     </div>
   );
 }
