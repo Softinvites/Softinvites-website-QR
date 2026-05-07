@@ -760,7 +760,7 @@ function SuccessScreen({
       {isYes && calendarUrl && (
         <>
           <p className="rsvp-success-hint">
-            Save the event to your calendar so you don't miss it.
+            Save the event to your calendar so you don&apos;t miss it.
           </p>
           <a
             href={calendarUrl}
