@@ -741,36 +741,32 @@ export function RsvpAdminView() {
           if (loadRequestRef.current === requestId) {
             const normalized = normalizeWhatsAppTemplateOptions(templatesRes.data?.templates);
 
-            // If the event has no template records yet, auto-import the recommended
-            // templates so the message scheduler can show a usable dropdown.
-            if (!normalized.length) {
-              try {
-                await axios.post(
-                  `${API_BASE}/events/events/${currentEventId}/whatsapp/templates`,
-                  { useRecommended: true, provider: 'twilio', upsert: true },
-                  { headers: { Authorization: `Bearer ${token}` } }
-                );
+            // Always upsert recommended templates so new templates (rsvp_party, rsvp_wedding)
+            // are added to existing events automatically.
+            try {
+              await axios.post(
+                `${API_BASE}/events/events/${currentEventId}/whatsapp/templates`,
+                { useRecommended: true, provider: 'twilio', upsert: true },
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
 
-                const refreshed = await axios.get(
-                  `${API_BASE}/events/events/${currentEventId}/whatsapp/templates`,
-                  { headers: { Authorization: `Bearer ${token}` } }
+              const refreshed = await axios.get(
+                `${API_BASE}/events/events/${currentEventId}/whatsapp/templates`,
+                { headers: { Authorization: `Bearer ${token}` } }
+              );
+              if (loadRequestRef.current === requestId) {
+                setWhatsappTemplateOptions(
+                  normalizeWhatsAppTemplateOptions(refreshed.data?.templates)
                 );
-                if (loadRequestRef.current === requestId) {
-                  setWhatsappTemplateOptions(
-                    normalizeWhatsAppTemplateOptions(refreshed.data?.templates)
-                  );
-                }
-              } catch (populateError) {
-                console.warn(
-                  'Unable to auto-import WhatsApp templates for message builder:',
-                  populateError
-                );
-                if (loadRequestRef.current === requestId) {
-                  setWhatsappTemplateOptions([]);
-                }
               }
-            } else {
-              setWhatsappTemplateOptions(normalized);
+            } catch (populateError) {
+              console.warn(
+                'Unable to auto-import WhatsApp templates for message builder:',
+                populateError
+              );
+              if (loadRequestRef.current === requestId) {
+                setWhatsappTemplateOptions(normalized.length ? normalized : []);
+              }
             }
           }
         } catch (templateError) {
