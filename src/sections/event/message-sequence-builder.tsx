@@ -22,6 +22,16 @@ import {
 } from '@mui/material';
 import { Iconify } from 'src/components/iconify';
 
+// Variables that are automatically populated per template (locked from frontend)
+const LOCKED_VARIABLES: Record<string, number[]> = {
+  wedding_invite: [2, 10, 11],
+  rsvp_followup: [1, 6],
+  rsvp_party: [2, 7, 8, 9],
+  rsvp_wedding: [2, 9, 10, 11],
+  event_details_reminder: [1],
+  logistics: [1],
+};
+
 export type MessageAudience =
   | 'all'
   | 'responders'
@@ -623,6 +633,7 @@ export function MessageSequenceBuilder({
               Number(selectedTemplateSample?.expectedVariableCount || 0) || 0,
               selectedTemplateSample?.sampleParametersArray?.length || 0
             );
+            const lockedVariables = LOCKED_VARIABLES[selectedTemplateName] || [];
             const attachmentAccept =
               allowWhatsApp && item.channels.whatsapp.enabled
                 ? '.png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif'
@@ -1057,6 +1068,7 @@ export function MessageSequenceBuilder({
                               {Array.from({ length: templateVariableCount }).map((_, idx) => {
                                 const varIndex = idx + 1;
                                 const key = String(varIndex);
+                                const isLocked = lockedVariables.includes(varIndex);
                                 const sampleValue =
                                   selectedTemplateSample.sampleParametersArray?.[idx] || '';
                                 const currentValue = currentTemplateVariables?.[key] || '';
@@ -1064,13 +1076,19 @@ export function MessageSequenceBuilder({
                                 return (
                                   <Grid item xs={12} md={6} key={key}>
                                     <TextField
-                                      label={`{{${varIndex}}}`}
-                                      value={currentValue}
+                                      label={`{{${varIndex}}}${isLocked ? ' (auto)' : ''}`}
+                                      value={isLocked ? sampleValue : currentValue}
                                       placeholder={sampleValue}
-                                      helperText={sampleValue ? `Sample: ${sampleValue}` : undefined}
+                                      helperText={
+                                        isLocked
+                                          ? 'Auto-filled from guest/event data'
+                                          : sampleValue ? `Sample: ${sampleValue}` : undefined
+                                      }
                                       fullWidth
-                                      disabled={disabled}
+                                      disabled={disabled || isLocked}
+                                      sx={isLocked ? { opacity: 0.6 } : {}}
                                       onChange={(event) => {
+                                        if (isLocked) return;
                                         const nextRawValue = event.target.value;
                                         const trimmed = String(nextRawValue || '').trim();
                                         const next = value.map((entry, entryIndex) => {

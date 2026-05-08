@@ -60,8 +60,8 @@ const normalizeTemplateVariables = (value: any): Record<string, string> | null =
 const LOCKED_VARIABLES: Record<string, number[]> = {
   wedding_invite: [2, 10, 11],
   rsvp_followup: [1, 6],
-  rsvp_party: [2, 8, 9],
-  rsvp_wedding: [2, 9],
+  rsvp_party: [2, 7, 8, 9],
+  rsvp_wedding: [2, 9, 10, 11],
   event_details_reminder: [1],
   logistics: [1],
 };
@@ -128,19 +128,19 @@ const FALLBACK_TEMPLATE_SAMPLES: WhatsAppTemplateSample[] = [
     templateName: 'rsvp_party',
     title: 'RSVP Party',
     category: 'utility',
-    description: 'Party invitation with RSVP buttons and header image. Variables 2 (guest name), 8 (RSVP link) and 9 (header image) are set automatically.',
+    description: 'Party invitation with RSVP buttons and header image. Variables 2 (guest name), 7 (header image), 8 (Yes link) and 9 (No link) are set automatically.',
     expectedVariableCount: 9,
     buttonUrlVariableIndex: 8,
     sampleParametersArray: [
-      'Judith\'s Birthday Party',      // {{1}} event title
-      '(auto: guest name)',             // {{2}} locked
-      'Judith\'s Birthday Party',      // {{3}} event type
-      'Party',                          // {{4}} ceremony label
-      '20th July 2026',                 // {{5}} date
-      '4:00 PM',                        // {{6}} time
-      'Landmark Event Centre, Lagos',   // {{7}} venue
-      '(auto: RSVP link)',              // {{8}} locked
-      '(auto: event image S3 path)',    // {{9}} locked
+      "Judith's Birthday Party",        // {{1}} event title
+      '(auto: guest name)',              // {{2}} locked
+      "Judith's Birthday Party",        // {{3}} event type
+      "Judith's Birthday Party",        // {{4}} event name
+      '20th July 2026',                  // {{5}} date
+      '4:00 PM',                         // {{6}} time
+      '(auto: event image S3 path)',     // {{7}} locked
+      '(auto: rsvpId?status=yes)',       // {{8}} locked
+      '(auto: rsvpId?status=no)',        // {{9}} locked
     ],
     supportsMediaHeader: true,
   },
@@ -148,21 +148,23 @@ const FALLBACK_TEMPLATE_SAMPLES: WhatsAppTemplateSample[] = [
     templateName: 'rsvp_wedding',
     title: 'RSVP Wedding',
     category: 'utility',
-    description: 'Wedding invitation with RSVP buttons. Variables 2 (guest name) and 9 (RSVP link) are set automatically.',
-    expectedVariableCount: 9,
-    buttonUrlVariableIndex: 9,
+    description: 'Wedding invitation with RSVP buttons and header image. Variables 2 (guest name), 9 (header image), 10 (Yes link) and 11 (No link) are set automatically.',
+    expectedVariableCount: 11,
+    buttonUrlVariableIndex: 10,
     sampleParametersArray: [
-      'Judith\'s Wedding',              // {{1}} event title
-      '(auto: guest name)',             // {{2}} locked
-      'Family of Judith',               // {{3}} host/family
-      'Traditional Wedding Reception',  // {{4}} ceremony type
-      'Church Ceremony Details',        // {{5}} ceremony label
-      '20th July 2026',                 // {{6}} date
-      '4:00 PM',                        // {{7}} time
-      'Landmark Event Centre, Lagos',   // {{8}} venue
-      '(auto: RSVP link)',              // {{9}} locked
+      "Judith's Wedding",                // {{1}} event title
+      '(auto: guest name)',              // {{2}} locked
+      'Family of Judith',                // {{3}} host/family
+      'Traditional Wedding Reception',   // {{4}} ceremony type
+      'Judith & Stanley',                // {{5}} couple names
+      '20th July 2026',                  // {{6}} date
+      '4:00 PM',                         // {{7}} time
+      'Landmark Event Centre, Lagos',    // {{8}} venue
+      '(auto: event image S3 path)',     // {{9}} locked
+      '(auto: rsvpId?status=yes)',       // {{10}} locked
+      '(auto: rsvpId?status=no)',        // {{11}} locked
     ],
-    supportsMediaHeader: false,
+    supportsMediaHeader: true,
   },
   {
     templateName: 'logistics',
