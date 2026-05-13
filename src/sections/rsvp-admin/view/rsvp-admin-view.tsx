@@ -25,6 +25,7 @@ import CardHeader from '@mui/material/CardHeader';
 import Typography from '@mui/material/Typography';
 import DialogTitle from '@mui/material/DialogTitle';
 import { alpha, useTheme } from '@mui/material/styles';
+import { useNavigate } from 'react-router-dom';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
@@ -44,6 +45,7 @@ import { Iconify } from 'src/components/iconify/iconify';
 import { AnalyticsWidgetSummary } from 'src/sections/overview/analytics-widget-summary';
 import { AnalyticsCurrentVisits } from 'src/sections/overview/analytics-current-visits';
 import { AnalyticsConversionRates } from 'src/sections/overview/analytics-conversion-rates';
+import WhatsAppRepliesModal from 'src/sections/event/view/WhatsAppRepliesModal';
 import {
   MessageSequenceBuilder,
   getMessageAudienceLabel,
@@ -395,6 +397,7 @@ const getEventFilterEmptyMessage = (filter: RsvpEventStatusFilter) => {
 
 export function RsvpAdminView() {
   const theme = useTheme();
+  const navigate = useNavigate();
   const [eventId, setEventId] = useState<string | null>(null);
   const [event, setEvent] = useState<any | null>(null);
   const [events, setEvents] = useState<EventCatalogRecord[]>([]);
@@ -420,6 +423,7 @@ export function RsvpAdminView() {
   const [submissionRowsPerPage, setSubmissionRowsPerPage] = useState(10);
   const [formLink, setFormLink] = useState('');
   const [formLinkTitle, setFormLinkTitle] = useState('');
+  const [formLinkRedirectUrl, setFormLinkRedirectUrl] = useState('');
   const [rsvpBgColor, setRsvpBgColor] = useState('#111827');
   const [rsvpAccentColor, setRsvpAccentColor] = useState('#1f2937');
   const [rsvpFormSettings, setRsvpFormSettings] =
@@ -438,6 +442,7 @@ export function RsvpAdminView() {
     WhatsAppTemplateOption[]
   >([]);
   const [whatsappTemplateSamples, setWhatsappTemplateSamples] = useState<any[]>([]);
+  const [whatsappRepliesOpen, setWhatsappRepliesOpen] = useState(false);
   const [sequenceSaving, setSequenceSaving] = useState(false);
   const [analyticsStart, setAnalyticsStart] = useState('');
   const [analyticsEnd, setAnalyticsEnd] = useState('');
@@ -744,28 +749,36 @@ export function RsvpAdminView() {
             // Always upsert recommended templates so new templates (rsvp_party, rsvp_wedding)
             // are added to existing events automatically.
             try {
-              await axios.post(
+              const upsertRes = await axios.post(
                 `${API_BASE}/events/events/${currentEventId}/whatsapp/templates`,
                 { useRecommended: true, provider: 'twilio', upsert: true },
                 { headers: { Authorization: `Bearer ${token}` } }
               );
+              console.log('[RSVP Admin] Template upsert result:', upsertRes.data);
+            } catch (populateError: any) {
+              console.warn('[RSVP Admin] Unable to upsert WhatsApp templates:', populateError?.response?.data || populateError?.message);
+            }
 
+            // Always fetch fresh after upsert attempt
+            try {
               const refreshed = await axios.get(
                 `${API_BASE}/events/events/${currentEventId}/whatsapp/templates`,
                 { headers: { Authorization: `Bearer ${token}` } }
               );
+              console.log('[RSVP Admin] Templates fetched:', refreshed.data?.templates?.map((t: any) => t.name));
+              if (loadRequestRef.current === requestId) {
+                // RSVP admin page: only show templates starting with "rsvp_"
+                const all = normalizeWhatsAppTemplateOptions(refreshed.data?.templates);
+                const rsvpOnly = all.filter((t) => t.name.toLowerCase().startsWith('rsvp_'));
+                console.log('[RSVP Admin] rsvp_ templates:', rsvpOnly.map((t) => t.name));
+                setWhatsappTemplateOptions(rsvpOnly);
+              }
+            } catch (refreshError: any) {
+              console.warn('[RSVP Admin] Unable to refresh WhatsApp templates:', refreshError?.response?.data || refreshError?.message);
               if (loadRequestRef.current === requestId) {
                 setWhatsappTemplateOptions(
-                  normalizeWhatsAppTemplateOptions(refreshed.data?.templates)
+                  normalized.filter((t) => t.name.toLowerCase().startsWith('rsvp_'))
                 );
-              }
-            } catch (populateError) {
-              console.warn(
-                'Unable to auto-import WhatsApp templates for message builder:',
-                populateError
-              );
-              if (loadRequestRef.current === requestId) {
-                setWhatsappTemplateOptions(normalized.length ? normalized : []);
               }
             }
           }
@@ -781,7 +794,11 @@ export function RsvpAdminView() {
             { headers: { Authorization: `Bearer ${token}` } }
           );
           if (loadRequestRef.current === requestId) {
-            setWhatsappTemplateSamples(samplesRes.data?.templates || []);
+            // RSVP admin: only show rsvp_ template samples
+            const allSamples = samplesRes.data?.templates || [];
+            setWhatsappTemplateSamples(
+              allSamples.filter((t: any) => String(t?.templateName || '').toLowerCase().startsWith('rsvp_'))
+            );
           }
         } catch (samplesError) {
           console.warn('Unable to fetch WhatsApp template samples:', samplesError);
@@ -1229,6 +1246,7 @@ export function RsvpAdminView() {
         {
           publicBaseUrl: window.location.origin,
           customLinkTitle: formLinkTitle.trim(),
+          redirectUrl: formLinkRedirectUrl.trim() || undefined,
         },
         { headers: { Authorization: `Bearer ${token}` } }
       );
@@ -1628,6 +1646,15 @@ export function RsvpAdminView() {
         <Typography variant="h4" flexGrow={1}>
           RSVP Admin
         </Typography>
+        <Stack direction="row" spacing={1} sx={{ mr: 2 }}>
+          <Button
+            variant="outlined"
+            startIcon={<Iconify icon="mdi:account-group-outline" />}
+            onClick={() => navigate('/guest')}
+          >
+            Go to Guest
+          </Button>
+        </Stack>
         {activeTab === 0 && (
           <Stack direction="row" spacing={1}>
             <Button
@@ -1663,6 +1690,15 @@ export function RsvpAdminView() {
               disabled={!eventId || eventsLoading}
             >
               Export CSV
+            </Button>
+            <Button
+              variant="outlined"
+              onClick={() => setWhatsappRepliesOpen(true)}
+              startIcon={<Iconify icon="logos:whatsapp-icon" />}
+              disabled={!eventId || eventsLoading}
+              sx={{ borderColor: '#25D366', color: '#25D366', '&:hover': { borderColor: '#128C7E', color: '#128C7E' } }}
+            >
+              WhatsApp Replies
             </Button>
           </Stack>
         )}
@@ -2248,6 +2284,15 @@ export function RsvpAdminView() {
                 helperText="Optional. We will convert this into a URL-safe title before the token."
                 fullWidth
               />
+              <TextField
+                label="Optional Redirect URL"
+                value={formLinkRedirectUrl}
+                onChange={(e) => setFormLinkRedirectUrl(e.target.value)}
+                placeholder="https://example.com/my-form"
+                disabled={!eventId || mode === 'invitation-only'}
+                helperText="Optional. If filled, clicking the RSVP form link will redirect to this URL after the auto-generated form loads."
+                fullWidth
+              />
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
                 <Button
                   variant="contained"
@@ -2750,7 +2795,7 @@ export function RsvpAdminView() {
               <MessageSequenceBuilder
                 value={messageSequence}
                 onChange={setMessageSequence}
-                allowWhatsApp={allowWhatsApp}
+                allowWhatsApp
                 allowSms={allowSms}
                 availableTags={availableTags}
                 whatsappTemplateOptions={whatsappTemplateOptions}
@@ -3304,6 +3349,15 @@ export function RsvpAdminView() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      {eventId && (
+        <WhatsAppRepliesModal
+          open={whatsappRepliesOpen}
+          onClose={() => setWhatsappRepliesOpen(false)}
+          eventId={eventId}
+          eventName={event?.name || selectedEventOption?.name || ''}
+        />
+      )}
     </DashboardContent>
   );
 }

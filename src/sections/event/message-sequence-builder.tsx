@@ -28,8 +28,79 @@ const LOCKED_VARIABLES: Record<string, number[]> = {
   rsvp_followup: [1, 6],
   rsvp_party: [2, 7, 8, 9],
   rsvp_wedding: [2, 9, 10, 11],
+  rsvp_form: [2, 7, 8],
   event_details_reminder: [1],
   logistics: [1],
+};
+
+// Human-readable label for each template variable index
+const VARIABLE_LABELS: Record<string, Record<number, string>> = {
+  event_details_reminder: {
+    1: 'Guest Name (auto)',
+    2: 'Event Title',
+    3: 'Venue',
+    4: 'Date',
+    5: 'Time',
+  },
+  rsvp_followup: {
+    1: 'Guest Name (auto)',
+    2: 'Event Title',
+    3: 'Venue',
+    4: 'Date',
+    5: 'Time',
+    6: 'QR Pass URL (auto)',
+  },
+  logistics: {
+    1: 'Guest Name (auto)',
+    2: 'Event Title',
+  },
+  wedding_invite: {
+    1: 'Event Title',
+    2: 'Guest Name (auto)',
+    3: "Couple's Family Name",
+    4: 'Event Type (e.g. Church Wedding)',
+    5: "Couple's Names",
+    6: 'Ceremony Label (e.g. Church Ceremony)',
+    7: 'Date',
+    8: 'Time',
+    9: 'Venue',
+    10: 'Invitation Image (auto)',
+    11: 'QR Pass ID (auto)',
+  },
+  rsvp_wedding: {
+    1: 'Event Title',
+    2: 'Guest Name (auto)',
+    3: "Couple's Family Name",
+    4: 'Event Type (e.g. Traditional Wedding)',
+    5: "Couple's Names",
+    6: 'Date',
+    7: 'Time',
+    8: 'Venue',
+    9: 'Invitation Image (auto)',
+    10: 'RSVP Yes Link (auto)',
+    11: 'RSVP No Link (auto)',
+  },
+  rsvp_party: {
+    1: 'Event Title',
+    2: 'Guest Name (auto)',
+    3: 'Event Title',
+    4: 'Date',
+    5: 'Time',
+    6: 'Venue',
+    7: 'Invitation Image (auto)',
+    8: 'RSVP Yes Link (auto)',
+    9: 'RSVP No Link (auto)',
+  },
+  rsvp_form: {
+    1: 'Event Title',
+    2: 'Guest Name (auto)',
+    3: 'Event Title',
+    4: 'Date',
+    5: 'Time',
+    6: 'Venue',
+    7: 'Invitation Image (auto)',
+    8: 'RSVP Form Link (auto)',
+  },
 };
 
 export type MessageAudience =
@@ -92,6 +163,7 @@ export type WhatsAppTemplateSample = {
   supportsMediaHeader?: boolean;
   sampleParametersArray?: string[];
   sampleParameters?: Record<string, string>;
+  variableLabels?: Record<number, string>;
 };
 
 type BuilderProps = {
@@ -115,7 +187,10 @@ export const AUDIENCE_OPTIONS: { label: string; value: MessageAudience }[] = [
   { label: 'Specific Tag', value: 'tag' },
 ];
 
-const normalizeTagValue = (value: any) => String(value || '').replace(/\s+/g, ' ').trim();
+const normalizeTagValue = (value: any) =>
+  String(value || '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 export const normalizeMessageAudience = (value: any): MessageAudience => {
   if (value === 'non-responders') return 'pending';
@@ -138,9 +213,9 @@ export const getMessageAudienceLabel = (value: any, targetTag?: string | null) =
 };
 
 const createTrackingId = () =>
-  (globalThis.crypto && 'randomUUID' in globalThis.crypto
+  globalThis.crypto && 'randomUUID' in globalThis.crypto
     ? globalThis.crypto.randomUUID()
-    : `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`);
+    : `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -199,20 +274,16 @@ const normalizeTemplateVariables = (value: any): Record<string, string> | undefi
   if (!value || typeof value !== 'object') return undefined;
   const raw = value as Record<string, unknown>;
 
-  const normalized = Object.entries(raw).reduce<Record<string, string>>(
-    (acc, [key, entry]) => {
-      const index = Number.parseInt(key, 10);
-      if (!Number.isInteger(index) || index <= 0) return acc;
+  const normalized = Object.entries(raw).reduce<Record<string, string>>((acc, [key, entry]) => {
+    const index = Number.parseInt(key, 10);
+    if (!Number.isInteger(index) || index <= 0) return acc;
 
-      const trimmed =
-        typeof entry === 'string' ? entry.trim() : String(entry ?? '').trim();
-      if (!trimmed) return acc;
+    const trimmed = typeof entry === 'string' ? entry.trim() : String(entry ?? '').trim();
+    if (!trimmed) return acc;
 
-      acc[String(index)] = trimmed;
-      return acc;
-    },
-    {},
-  );
+    acc[String(index)] = trimmed;
+    return acc;
+  }, {});
 
   return Object.keys(normalized).length ? normalized : undefined;
 };
@@ -239,9 +310,7 @@ export const normalizeMessageSequence = (input: any): MessageSequenceItem[] => {
       url: typeof raw.attachment?.url === 'string' ? raw.attachment.url : '',
       filename: typeof raw.attachment?.filename === 'string' ? raw.attachment.filename : '',
       contentType:
-        typeof raw.attachment?.contentType === 'string'
-          ? raw.attachment.contentType
-          : '',
+        typeof raw.attachment?.contentType === 'string' ? raw.attachment.contentType : '',
       file: null,
     };
     return {
@@ -321,10 +390,16 @@ export const getDefaultMessageSequence = (
     buildItem('Follow Up', 14, 'pending', { bulkSms: { enabled: false } }),
     buildItem('Last Call', 21, 'pending', { whatsapp: { enabled: false } }),
     buildItem('Final Logistics', 28, 'all', { bulkSms: { enabled: false } }),
-    buildItem('Post Event Thanks', 31, 'responders', {
-      whatsapp: { enabled: false },
-      bulkSms: { enabled: false },
-    }, false),
+    buildItem(
+      'Post Event Thanks',
+      31,
+      'responders',
+      {
+        whatsapp: { enabled: false },
+        bulkSms: { enabled: false },
+      },
+      false
+    ),
   ];
 };
 
@@ -342,14 +417,13 @@ export const serializeMessageSequence = (
     const uploadKey = attachmentFile ? `sequenceAttachment_${item.trackingId}` : '';
     const attachmentUrl =
       typeof item.attachment?.url === 'string' ? item.attachment.url.trim() : '';
-    const attachment =
-      attachmentFile
-        ? {
-            uploadKey,
-            filename: attachmentFile.name,
-            ...(attachmentFile.type ? { contentType: attachmentFile.type } : {}),
-          }
-        : attachmentUrl.length > 0
+    const attachment = attachmentFile
+      ? {
+          uploadKey,
+          filename: attachmentFile.name,
+          ...(attachmentFile.type ? { contentType: attachmentFile.type } : {}),
+        }
+      : attachmentUrl.length > 0
         ? {
             url: attachmentUrl,
             ...(item.attachment.filename?.trim()
@@ -373,7 +447,7 @@ export const serializeMessageSequence = (
       channels: {
         email: {
           ...(raw.channels?.email || {}),
-          enabled: true,
+          enabled: item.channels.email?.enabled !== false,
           templateId: item.channels.email?.templateId,
         },
         whatsapp: {
@@ -535,7 +609,7 @@ export function MessageSequenceBuilder({
   const helperText = useMemo(
     () =>
       allowWhatsApp || allowSms
-        ? "Set per-step date, title, and body. For WhatsApp steps, SoftInvites sends approved template variables (not arbitrary body text), header media must be a public image URL (PNG/JPG/WEBP/GIF), and you can pick a WhatsApp template per step. Email is always enabled; toggle WhatsApp/SMS per step."
+        ? 'Set per-step date, title, and body. For WhatsApp steps, SoftInvites sends approved template variables (not arbitrary body text), header media must be a public image URL (PNG/JPG/WEBP/GIF), and you can pick a WhatsApp template per step. Email is always enabled; toggle WhatsApp/SMS per step.'
         : 'Set per-step date, title, and body. Attachment is optional (PNG/JPG/PDF). Email is always enabled.',
     [allowWhatsApp, allowSms]
   );
@@ -619,7 +693,7 @@ export function MessageSequenceBuilder({
           </Box>
         )}
 
-        {value.map((item, index) => (
+        {value.map((item, index) =>
           (() => {
             const selectedTemplateId = String(item.channels.whatsapp.templateId || '').trim();
             const selectedTemplateOption = selectedTemplateId
@@ -645,544 +719,599 @@ export function MessageSequenceBuilder({
                   .join('\n')
               : '';
 
-            const currentTemplateVariables = normalizeTemplateVariables(
-              item.channels.whatsapp.templateVariables
-            );
+            // Use raw (untrimmed) values for display so trailing spaces aren't
+            // stripped while the user is mid-typing. Normalization happens only
+            // at serialization time (serializeMessageSequence).
+            const currentTemplateVariables =
+              item.channels.whatsapp.templateVariables &&
+              typeof item.channels.whatsapp.templateVariables === 'object'
+                ? (item.channels.whatsapp.templateVariables as Record<string, string>)
+                : {};
 
             return (
-          <Box
-            key={item.trackingId}
-            draggable={!disabled}
-            onDragStart={handleDragStart(index)}
-            onDragOver={handleDragOver}
-            onDrop={handleDrop(index)}
-            onDragEnd={handleDragEnd}
-            sx={{
-              border: '1px solid',
-              borderColor: dragIndex === index ? 'primary.main' : 'divider',
-              borderRadius: 2,
-              p: 2,
-              bgcolor: dragIndex === index ? 'action.hover' : 'background.paper',
-            }}
-          >
-            <Stack spacing={2}>
-              <Stack direction="row" alignItems="center" justifyContent="space-between">
-                <Stack direction="row" alignItems="center" spacing={1}>
-                  <Tooltip title="Drag to reorder">
-                    <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'grab' }}>
-                      <Iconify icon="mdi:drag" width={20} />
-                    </Box>
-                  </Tooltip>
-                  <Typography variant="subtitle2">Step {index + 1}</Typography>
-                </Stack>
-                <IconButton
-                  size="small"
-                  color="error"
-                  disabled={disabled}
-                  onClick={() => requestDeleteStep(item.trackingId)}
-                >
-                  <Iconify icon="mdi:trash-can-outline" />
-                </IconButton>
-              </Stack>
-
-              <Grid container spacing={2}>
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    label="Message Name"
-                    value={item.messageName}
-                    onChange={(event) => {
-                      const next = value.map((entry, idx) =>
-                        idx === index ? { ...entry, messageName: event.target.value } : entry
-                      );
-                      onChange(next);
-                    }}
-                    fullWidth
-                    disabled={disabled}
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <TextField
-                    label="Message Title"
-                    value={item.messageTitle}
-                    onChange={(event) => {
-                      const next = value.map((entry, idx) =>
-                        idx === index ? { ...entry, messageTitle: event.target.value } : entry
-                      );
-                      onChange(next);
-                    }}
-                    fullWidth
-                    disabled={disabled}
-                  />
-                </Grid>
-                <Grid item xs={12} md={3}>
-                  <TextField
-                    label="Scheduled Date & Time"
-                    type="datetime-local"
-                    value={item.scheduledDate}
-                    onChange={(event) => {
-                      const next = value.map((entry, idx) =>
-                        idx === index ? { ...entry, scheduledDate: event.target.value } : entry
-                      );
-                      onChange(next);
-                    }}
-                    InputLabelProps={{ shrink: true }}
-                    error={!item.scheduledDate}
-                    helperText={!item.scheduledDate ? 'Required' : ''}
-                    fullWidth
-                    disabled={disabled}
-                  />
-                </Grid>
-                <Grid item xs={12} md={2}>
-                  <TextField
-                    select
-                    label="Audience"
-                    value={item.conditions.audienceType}
-                    onChange={(event) => {
-                      const next = value.map((entry, idx) =>
-                        idx === index
-                          ? {
-                              ...entry,
-                              conditions: {
-                                ...entry.conditions,
-                                audienceType: event.target.value as MessageAudience,
-                                targetTag:
-                                  event.target.value === 'tag' ? entry.conditions.targetTag : '',
-                              },
-                            }
-                          : entry
-                      );
-                      onChange(next);
-                    }}
-                    fullWidth
-                    disabled={disabled}
-                  >
-                    {AUDIENCE_OPTIONS.map((option) => (
-                      <MenuItem key={option.value} value={option.value}>
-                        {option.label}
-                      </MenuItem>
-                    ))}
-                  </TextField>
-                </Grid>
-                {item.conditions.audienceType === 'tag' && (
-                  <Grid item xs={12} md={4}>
-                    <Autocomplete
-                      freeSolo
-                      fullWidth
-                      options={tagOptions}
-                      value={item.conditions.targetTag}
-                      inputValue={item.conditions.targetTag}
-                      onChange={(_, newValue) => {
-                        const nextTag = normalizeTagValue(
-                          typeof newValue === 'string' ? newValue : newValue || ''
-                        );
-                        const next = value.map((entry, idx) =>
-                          idx === index
-                            ? {
-                                ...entry,
-                                conditions: {
-                                  ...entry.conditions,
-                                  targetTag: nextTag,
-                                },
-                              }
-                            : entry
-                        );
-                        onChange(next);
-                      }}
-                      onInputChange={(_, newInputValue) => {
-                        const next = value.map((entry, idx) =>
-                          idx === index
-                            ? {
-                                ...entry,
-                                conditions: {
-                                  ...entry.conditions,
-                                  targetTag: newInputValue,
-                                },
-                              }
-                            : entry
-                        );
-                        onChange(next);
-                      }}
-                      disabled={disabled}
-                      renderInput={(params) => (
-                        <TextField
-                          {...params}
-                          label="Recipient Tag"
-                          helperText={tagHelperText}
-                          fullWidth
-                        />
-                      )}
-                    />
-                  </Grid>
-                )}
-              </Grid>
-
-              <TextField
-                label="Email / SMS Message Body"
-                value={item.messageBody}
-                onChange={(event) => {
-                  const next = value.map((entry, idx) =>
-                    idx === index ? { ...entry, messageBody: event.target.value } : entry
-                  );
-                  onChange(next);
+              <Box
+                key={item.trackingId}
+                draggable={!disabled}
+                onDragStart={handleDragStart(index)}
+                onDragOver={handleDragOver}
+                onDrop={handleDrop(index)}
+                onDragEnd={handleDragEnd}
+                sx={{
+                  border: '1px solid',
+                  borderColor: dragIndex === index ? 'primary.main' : 'divider',
+                  borderRadius: 2,
+                  p: 2,
+                  bgcolor: dragIndex === index ? 'action.hover' : 'background.paper',
                 }}
-                multiline
-                minRows={3}
-                fullWidth
-                disabled={disabled}
-                helperText={
-                  allowWhatsApp && item.channels.whatsapp.enabled
-                    ? 'WhatsApp ignores this field and uses the selected template variables.'
-                    : undefined
-                }
-              />
-
-              <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
-                <Button component="label" variant="outlined" disabled={disabled}>
-                  Attach File
-                  <input
-                    hidden
-                    type="file"
-                    accept={attachmentAccept}
-                    onChange={(event) => {
-                      const selectedFile = event.target.files?.[0] || null;
-                      if (!selectedFile) return;
-                      const next = value.map((entry, idx) =>
-                        idx === index
-                          ? {
-                              ...entry,
-                              attachment: {
-                                ...entry.attachment,
-                                file: selectedFile,
-                                filename: selectedFile.name,
-                                contentType: selectedFile.type || '',
-                                url: '',
-                              },
-                            }
-                          : entry
-                      );
-                      onChange(next);
-                    }}
-                  />
-                </Button>
-                <TextField
-                  label="Attached File"
-                  value={getAttachmentDisplayName(item.attachment)}
-                  fullWidth
-                  InputProps={{ readOnly: true }}
-                  placeholder="No file selected"
-                />
-                {item.attachment.url && !item.attachment.file && (
-                  <Button
-                    variant="text"
-                    onClick={() => window.open(item.attachment.url, '_blank')}
-                  >
-                    View Current
-                  </Button>
-                )}
-                <Button
-                  color="warning"
-                  variant="text"
-                  disabled={disabled}
-                  onClick={() => requestClearAttachment(item.trackingId)}
-                >
-                  Clear
-                </Button>
-              </Stack>
-
-              <Stack direction="row" spacing={2}>
-                <TextField
-                  label="Email"
-                  value={item.channels.email.enabled ? 'Enabled' : 'Disabled'}
-                  size="small"
-                  InputProps={{ readOnly: true }}
-                  sx={{ width: 140 }}
-                />
-                <TextField
-                  label="WhatsApp"
-                  value={
-                    allowWhatsApp && item.channels.whatsapp.enabled ? 'Enabled' : 'Disabled'
-                  }
-                  size="small"
-                  InputProps={{ readOnly: true }}
-                  sx={{ width: 140 }}
-                />
-                <TextField
-                  label="SMS"
-                  value={allowSms && item.channels.bulkSms.enabled ? 'Enabled' : 'Disabled'}
-                  size="small"
-                  InputProps={{ readOnly: true }}
-                  sx={{ width: 140 }}
-                />
-              </Stack>
-
-              <Stack direction="row" spacing={2}>
-                <Button
-                  size="small"
-                  variant={item.channels.whatsapp.enabled ? 'contained' : 'outlined'}
-                  disabled={disabled || !allowWhatsApp}
-                  onClick={() => {
-                    const next = value.map((entry, idx) =>
-                      idx === index
-                        ? {
-                            ...entry,
-                            channels: {
-                              ...entry.channels,
-                              whatsapp: { ...entry.channels.whatsapp, enabled: !entry.channels.whatsapp.enabled },
-                            },
-                          }
-                        : entry
-                    );
-                    onChange(next);
-                  }}
-                >
-                  WhatsApp {item.channels.whatsapp.enabled ? 'On' : 'Off'}
-                </Button>
-                <Button
-                  size="small"
-                  variant={item.channels.bulkSms.enabled ? 'contained' : 'outlined'}
-                  disabled={disabled || !allowSms}
-                  onClick={() => {
-                    const next = value.map((entry, idx) =>
-                      idx === index
-                        ? {
-                            ...entry,
-                            channels: {
-                              ...entry.channels,
-                              bulkSms: { ...entry.channels.bulkSms, enabled: !entry.channels.bulkSms.enabled },
-                            },
-                          }
-                        : entry
-                    );
-                    onChange(next);
-                  }}
-                >
-                  SMS {item.channels.bulkSms.enabled ? 'On' : 'Off'}
-                </Button>
-              </Stack>
-
-              {allowWhatsApp && (
-                <TextField
-                  select
-                  label="WhatsApp Template"
-                  value={item.channels.whatsapp.templateId || ''}
-                  onChange={(event) => {
-                    const nextTemplateId = String(event.target.value || '').trim();
-                    const next = value.map((entry, idx) =>
-                      idx === index
-                        ? {
-                            ...entry,
-                            channels: {
-                              ...entry.channels,
-                              whatsapp: {
-                                ...entry.channels.whatsapp,
-                                templateId: nextTemplateId || undefined,
-                              },
-                            },
-                          }
-                        : entry
-                    );
-                    onChange(next);
-                  }}
-                  disabled={disabled || !item.channels.whatsapp.enabled}
-                  helperText={
-                    item.channels.whatsapp.enabled
-                      ? 'Pick a template for this step, or leave Default to use backend default.'
-                      : 'Enable WhatsApp for this step to choose a template.'
-                  }
-                  fullWidth
-                >
-                  <MenuItem value="">Default Template (Backend Config)</MenuItem>
-                  {(() => {
-                    const selectedTemplateMissing =
-                      selectedTemplateId && !whatsappTemplateOptionMap.has(selectedTemplateId);
-                    const options = selectedTemplateMissing
-                      ? [
-                          {
-                            id: selectedTemplateId,
-                            name: selectedTemplateId,
-                            displayName: `Selected template (unavailable): ${selectedTemplateId}`,
-                          },
-                          ...normalizedWhatsAppTemplateOptions,
-                        ]
-                      : normalizedWhatsAppTemplateOptions;
-
-                    return options.map((templateOption) => (
-                      <MenuItem key={templateOption.id} value={templateOption.id}>
-                        {templateOption.displayName || templateOption.name}
-                        {templateOption.category ? ` (${templateOption.category})` : ''}
-                      </MenuItem>
-                    ));
-                  })()}
-                </TextField>
-              )}
-
-              {allowWhatsApp &&
-                item.channels.whatsapp.enabled &&
-                selectedTemplateSample &&
-                selectedTemplateName && (
-                  <Box
-                    sx={{
-                      border: '1px solid',
-                      borderColor: 'divider',
-                      borderRadius: 2,
-                      p: 2,
-                      bgcolor: 'background.paper',
-                    }}
-                  >
-                    <Stack spacing={1}>
-                      <Typography variant="subtitle2">
-                        WhatsApp Template Preview: {selectedTemplateSample.title || selectedTemplateName}
-                      </Typography>
-                      {selectedTemplateSample.bodySkeleton && (
-                        <Typography variant="body2" color="text.secondary">
-                          {selectedTemplateSample.bodySkeleton}
-                        </Typography>
-                      )}
-                      {templateVariablesPreview && (
-                        <TextField
-                          label="Sample {{n}} map"
-                          value={templateVariablesPreview}
-                          InputProps={{ readOnly: true }}
-                          multiline
-                          minRows={4}
-                          fullWidth
-                        />
-                      )}
-                      {templateVariableCount > 0 && (
-                        <Box
-                          sx={{
-                            mt: 1,
-                            border: '1px dashed',
-                            borderColor: 'divider',
-                            borderRadius: 2,
-                            p: 2,
-                          }}
-                        >
-                          <Stack spacing={1}>
-                            <Typography variant="subtitle2">Template Variable Overrides</Typography>
-                            <Typography variant="caption" color="text.secondary">
-                              Leave fields blank to use automatic values from guest + event data.
-                              Only filled fields will override the backend mapping.
-                            </Typography>
-                            <Grid container spacing={2}>
-                              {Array.from({ length: templateVariableCount }).map((_, idx) => {
-                                const varIndex = idx + 1;
-                                const key = String(varIndex);
-                                const isLocked = lockedVariables.includes(varIndex);
-                                const sampleValue =
-                                  selectedTemplateSample.sampleParametersArray?.[idx] || '';
-                                const currentValue = currentTemplateVariables?.[key] || '';
-
-                                return (
-                                  <Grid item xs={12} md={6} key={key}>
-                                    <TextField
-                                      label={`{{${varIndex}}}${isLocked ? ' (auto)' : ''}`}
-                                      value={isLocked ? sampleValue : currentValue}
-                                      placeholder={sampleValue}
-                                      helperText={
-                                        isLocked
-                                          ? 'Auto-filled from guest/event data'
-                                          : sampleValue ? `Sample: ${sampleValue}` : undefined
-                                      }
-                                      fullWidth
-                                      disabled={disabled || isLocked}
-                                      sx={isLocked ? { opacity: 0.6 } : {}}
-                                      onChange={(event) => {
-                                        if (isLocked) return;
-                                        const nextRawValue = event.target.value;
-                                        const trimmed = String(nextRawValue || '').trim();
-                                        const next = value.map((entry, entryIndex) => {
-                                          if (entryIndex !== index) return entry;
-                                          const prevVars = normalizeTemplateVariables(
-                                            entry.channels.whatsapp.templateVariables
-                                          );
-                                          const nextVars: Record<string, string> = prevVars
-                                            ? { ...prevVars }
-                                            : {};
-                                          if (!trimmed) {
-                                            delete nextVars[key];
-                                          } else {
-                                            nextVars[key] = trimmed;
-                                          }
-                                          return {
-                                            ...entry,
-                                            channels: {
-                                              ...entry.channels,
-                                              whatsapp: {
-                                                ...entry.channels.whatsapp,
-                                                templateVariables:
-                                                  Object.keys(nextVars).length > 0 ? nextVars : undefined,
-                                              },
-                                            },
-                                          };
-                                        });
-                                        onChange(next);
-                                      }}
-                                    />
-                                  </Grid>
-                                );
-                              })}
-                            </Grid>
-                            <Box>
-                              <Button
-                                size="small"
-                                variant="outlined"
-                                disabled={disabled || !currentTemplateVariables}
-                                onClick={() => {
-                                  const next = value.map((entry, entryIndex) =>
-                                    entryIndex === index
-                                      ? {
-                                          ...entry,
-                                          channels: {
-                                            ...entry.channels,
-                                            whatsapp: {
-                                              ...entry.channels.whatsapp,
-                                              templateVariables: undefined,
-                                            },
-                                          },
-                                        }
-                                      : entry
-                                  );
-                                  onChange(next);
-                                }}
-                              >
-                                Clear Overrides
-                              </Button>
-                            </Box>
-                          </Stack>
+              >
+                <Stack spacing={2}>
+                  <Stack direction="row" alignItems="center" justifyContent="space-between">
+                    <Stack direction="row" alignItems="center" spacing={1}>
+                      <Tooltip title="Drag to reorder">
+                        <Box sx={{ display: 'flex', alignItems: 'center', cursor: 'grab' }}>
+                          <Iconify icon="mdi:drag" width={20} />
                         </Box>
-                      )}
-                      {selectedTemplateSample.supportsMediaHeader && (
-                        <Typography variant="caption" color="text.secondary">
-                          This template supports a media header. SoftInvites uses the event IV image by default (or the step image attachment if provided).
-                        </Typography>
-                      )}
+                      </Tooltip>
+                      <Typography variant="subtitle2">Step {index + 1}</Typography>
                     </Stack>
-                  </Box>
-                )}
+                    <IconButton
+                      size="small"
+                      color="error"
+                      disabled={disabled}
+                      onClick={() => requestDeleteStep(item.trackingId)}
+                    >
+                      <Iconify icon="mdi:trash-can-outline" />
+                    </IconButton>
+                  </Stack>
 
-              <FormControlLabel
-                control={
-                  <Switch
-                    checked={item.includeResponseButtons}
-                    disabled={disabled}
+                  <Grid container spacing={2}>
+                    <Grid item xs={12} md={3}>
+                      <TextField
+                        label="Message Name"
+                        value={item.messageName}
+                        onChange={(event) => {
+                          const next = value.map((entry, idx) =>
+                            idx === index ? { ...entry, messageName: event.target.value } : entry
+                          );
+                          onChange(next);
+                        }}
+                        fullWidth
+                        disabled={disabled}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={4}>
+                      <TextField
+                        label="Message Title"
+                        value={item.messageTitle}
+                        onChange={(event) => {
+                          const next = value.map((entry, idx) =>
+                            idx === index ? { ...entry, messageTitle: event.target.value } : entry
+                          );
+                          onChange(next);
+                        }}
+                        fullWidth
+                        disabled={disabled}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={3}>
+                      <TextField
+                        label="Scheduled Date & Time"
+                        type="datetime-local"
+                        value={item.scheduledDate}
+                        onChange={(event) => {
+                          const next = value.map((entry, idx) =>
+                            idx === index ? { ...entry, scheduledDate: event.target.value } : entry
+                          );
+                          onChange(next);
+                        }}
+                        InputLabelProps={{ shrink: true }}
+                        error={!item.scheduledDate}
+                        helperText={!item.scheduledDate ? 'Required' : ''}
+                        fullWidth
+                        disabled={disabled}
+                      />
+                    </Grid>
+                    <Grid item xs={12} md={2}>
+                      <TextField
+                        select
+                        label="Audience"
+                        value={item.conditions.audienceType}
+                        onChange={(event) => {
+                          const next = value.map((entry, idx) =>
+                            idx === index
+                              ? {
+                                  ...entry,
+                                  conditions: {
+                                    ...entry.conditions,
+                                    audienceType: event.target.value as MessageAudience,
+                                    targetTag:
+                                      event.target.value === 'tag'
+                                        ? entry.conditions.targetTag
+                                        : '',
+                                  },
+                                }
+                              : entry
+                          );
+                          onChange(next);
+                        }}
+                        fullWidth
+                        disabled={disabled}
+                      >
+                        {AUDIENCE_OPTIONS.map((option) => (
+                          <MenuItem key={option.value} value={option.value}>
+                            {option.label}
+                          </MenuItem>
+                        ))}
+                      </TextField>
+                    </Grid>
+                    {item.conditions.audienceType === 'tag' && (
+                      <Grid item xs={12} md={4}>
+                        <Autocomplete
+                          freeSolo
+                          fullWidth
+                          options={tagOptions}
+                          value={item.conditions.targetTag}
+                          inputValue={item.conditions.targetTag}
+                          onChange={(_, newValue) => {
+                            const nextTag = normalizeTagValue(
+                              typeof newValue === 'string' ? newValue : newValue || ''
+                            );
+                            const next = value.map((entry, idx) =>
+                              idx === index
+                                ? {
+                                    ...entry,
+                                    conditions: {
+                                      ...entry.conditions,
+                                      targetTag: nextTag,
+                                    },
+                                  }
+                                : entry
+                            );
+                            onChange(next);
+                          }}
+                          onInputChange={(_, newInputValue) => {
+                            const next = value.map((entry, idx) =>
+                              idx === index
+                                ? {
+                                    ...entry,
+                                    conditions: {
+                                      ...entry.conditions,
+                                      targetTag: newInputValue,
+                                    },
+                                  }
+                                : entry
+                            );
+                            onChange(next);
+                          }}
+                          disabled={disabled}
+                          renderInput={(params) => (
+                            <TextField
+                              {...params}
+                              label="Recipient Tag"
+                              helperText={tagHelperText}
+                              fullWidth
+                            />
+                          )}
+                        />
+                      </Grid>
+                    )}
+                  </Grid>
+
+                  <TextField
+                    label="Email / SMS Message Body"
+                    value={item.messageBody}
                     onChange={(event) => {
                       const next = value.map((entry, idx) =>
-                        idx === index
-                          ? { ...entry, includeResponseButtons: event.target.checked }
-                          : entry
+                        idx === index ? { ...entry, messageBody: event.target.value } : entry
                       );
                       onChange(next);
                     }}
+                    multiline
+                    minRows={3}
+                    fullWidth
+                    disabled={disabled}
+                    helperText={
+                      allowWhatsApp && item.channels.whatsapp.enabled
+                        ? 'WhatsApp ignores this field and uses the selected template variables.'
+                        : undefined
+                    }
                   />
-                }
-                label="Include 'Will you attend?' buttons in this message"
-              />
-            </Stack>
-          </Box>
+
+                  <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">
+                    <Button component="label" variant="outlined" disabled={disabled}>
+                      Attach File
+                      <input
+                        hidden
+                        type="file"
+                        accept={attachmentAccept}
+                        onChange={(event) => {
+                          const selectedFile = event.target.files?.[0] || null;
+                          if (!selectedFile) return;
+                          const next = value.map((entry, idx) =>
+                            idx === index
+                              ? {
+                                  ...entry,
+                                  attachment: {
+                                    ...entry.attachment,
+                                    file: selectedFile,
+                                    filename: selectedFile.name,
+                                    contentType: selectedFile.type || '',
+                                    url: '',
+                                  },
+                                }
+                              : entry
+                          );
+                          onChange(next);
+                        }}
+                      />
+                    </Button>
+                    <TextField
+                      label="Attached File"
+                      value={getAttachmentDisplayName(item.attachment)}
+                      fullWidth
+                      InputProps={{ readOnly: true }}
+                      placeholder="No file selected"
+                    />
+                    {item.attachment.url && !item.attachment.file && (
+                      <Button
+                        variant="text"
+                        onClick={() => window.open(item.attachment.url, '_blank')}
+                      >
+                        View Current
+                      </Button>
+                    )}
+                    <Button
+                      color="warning"
+                      variant="text"
+                      disabled={disabled}
+                      onClick={() => requestClearAttachment(item.trackingId)}
+                    >
+                      Clear
+                    </Button>
+                  </Stack>
+
+                  <Stack direction="row" spacing={2}>
+                    <TextField
+                      label="Email"
+                      value={item.channels.email.enabled ? 'Enabled' : 'Disabled'}
+                      size="small"
+                      InputProps={{ readOnly: true }}
+                      sx={{ width: 140 }}
+                    />
+                    <TextField
+                      label="WhatsApp"
+                      value={
+                        allowWhatsApp && item.channels.whatsapp.enabled ? 'Enabled' : 'Disabled'
+                      }
+                      size="small"
+                      InputProps={{ readOnly: true }}
+                      sx={{ width: 140 }}
+                    />
+                    <TextField
+                      label="SMS"
+                      value={allowSms && item.channels.bulkSms.enabled ? 'Enabled' : 'Disabled'}
+                      size="small"
+                      InputProps={{ readOnly: true }}
+                      sx={{ width: 140 }}
+                    />
+                  </Stack>
+
+                  <Stack direction="row" spacing={2}>
+                    <Button
+                      size="small"
+                      variant={item.channels.email.enabled !== false ? 'contained' : 'outlined'}
+                      disabled={disabled}
+                      onClick={() => {
+                        const next = value.map((entry, idx) =>
+                          idx === index
+                            ? {
+                                ...entry,
+                                channels: {
+                                  ...entry.channels,
+                                  email: {
+                                    ...entry.channels.email,
+                                    enabled: entry.channels.email?.enabled === false,
+                                  },
+                                },
+                              }
+                            : entry
+                        );
+                        onChange(next);
+                      }}
+                    >
+                      Email {item.channels.email.enabled !== false ? 'On' : 'Off'}
+                    </Button>
+                    <Button
+                      size="small"
+                      variant={item.channels.whatsapp.enabled ? 'contained' : 'outlined'}
+                      disabled={disabled || !allowWhatsApp}
+                      onClick={() => {
+                        const next = value.map((entry, idx) =>
+                          idx === index
+                            ? {
+                                ...entry,
+                                channels: {
+                                  ...entry.channels,
+                                  whatsapp: {
+                                    ...entry.channels.whatsapp,
+                                    enabled: !entry.channels.whatsapp.enabled,
+                                  },
+                                },
+                              }
+                            : entry
+                        );
+                        onChange(next);
+                      }}
+                    >
+                      WhatsApp {item.channels.whatsapp.enabled ? 'On' : 'Off'}
+                    </Button>
+                    <Button
+                      size="small"
+                      variant={item.channels.bulkSms.enabled ? 'contained' : 'outlined'}
+                      disabled={disabled || !allowSms}
+                      onClick={() => {
+                        const next = value.map((entry, idx) =>
+                          idx === index
+                            ? {
+                                ...entry,
+                                channels: {
+                                  ...entry.channels,
+                                  bulkSms: {
+                                    ...entry.channels.bulkSms,
+                                    enabled: !entry.channels.bulkSms.enabled,
+                                  },
+                                },
+                              }
+                            : entry
+                        );
+                        onChange(next);
+                      }}
+                    >
+                      SMS {item.channels.bulkSms.enabled ? 'On' : 'Off'}
+                    </Button>
+                  </Stack>
+
+                  {allowWhatsApp && (
+                    <TextField
+                      select
+                      label="WhatsApp Template"
+                      value={item.channels.whatsapp.templateId || ''}
+                      onChange={(event) => {
+                        const nextTemplateId = String(event.target.value || '').trim();
+                        const next = value.map((entry, idx) =>
+                          idx === index
+                            ? {
+                                ...entry,
+                                channels: {
+                                  ...entry.channels,
+                                  whatsapp: {
+                                    ...entry.channels.whatsapp,
+                                    templateId: nextTemplateId || undefined,
+                                  },
+                                },
+                              }
+                            : entry
+                        );
+                        onChange(next);
+                      }}
+                      disabled={disabled || !item.channels.whatsapp.enabled}
+                      helperText={
+                        item.channels.whatsapp.enabled
+                          ? 'Pick a template for this step, or leave Default to use backend default.'
+                          : 'Enable WhatsApp for this step to choose a template.'
+                      }
+                      fullWidth
+                    >
+                      <MenuItem value="">Default Template (Backend Config)</MenuItem>
+                      {(() => {
+                        const selectedTemplateMissing =
+                          selectedTemplateId && !whatsappTemplateOptionMap.has(selectedTemplateId);
+                        const options = selectedTemplateMissing
+                          ? [
+                              {
+                                id: selectedTemplateId,
+                                name: selectedTemplateId,
+                                displayName: `Selected template (unavailable): ${selectedTemplateId}`,
+                              },
+                              ...normalizedWhatsAppTemplateOptions,
+                            ]
+                          : normalizedWhatsAppTemplateOptions;
+
+                        return options.map((templateOption) => (
+                          <MenuItem key={templateOption.id} value={templateOption.id}>
+                            {templateOption.displayName || templateOption.name}
+                            {templateOption.category ? ` (${templateOption.category})` : ''}
+                          </MenuItem>
+                        ));
+                      })()}
+                    </TextField>
+                  )}
+
+                  {allowWhatsApp &&
+                    item.channels.whatsapp.enabled &&
+                    selectedTemplateSample &&
+                    selectedTemplateName && (
+                      <Box
+                        sx={{
+                          border: '1px solid',
+                          borderColor: 'divider',
+                          borderRadius: 2,
+                          p: 2,
+                          bgcolor: 'background.paper',
+                        }}
+                      >
+                        <Stack spacing={1}>
+                          <Typography variant="subtitle2">
+                            WhatsApp Template Preview:{' '}
+                            {selectedTemplateSample.title || selectedTemplateName}
+                          </Typography>
+                          {selectedTemplateSample.bodySkeleton && (
+                            <Typography variant="body2" color="text.secondary">
+                              {selectedTemplateSample.bodySkeleton}
+                            </Typography>
+                          )}
+                          {templateVariablesPreview && (
+                            <TextField
+                              label="Sample {{n}} map"
+                              value={templateVariablesPreview}
+                              InputProps={{ readOnly: true }}
+                              multiline
+                              minRows={4}
+                              fullWidth
+                            />
+                          )}
+                          {templateVariableCount > 0 && (
+                            <Box
+                              sx={{
+                                mt: 1,
+                                border: '1px dashed',
+                                borderColor: 'divider',
+                                borderRadius: 2,
+                                p: 2,
+                              }}
+                            >
+                              <Stack spacing={1}>
+                                <Typography variant="subtitle2">
+                                  Template Variable Overrides
+                                </Typography>
+                                <Typography variant="caption" color="text.secondary">
+                                  Leave fields blank to use automatic values from guest + event
+                                  data. Only filled fields will override the backend mapping.
+                                </Typography>
+                                <Grid container spacing={2}>
+                                  {Array.from({ length: templateVariableCount }).map((_, idx) => {
+                                    const varIndex = idx + 1;
+                                    const key = String(varIndex);
+                                    const isLocked = lockedVariables.includes(varIndex);
+                                    const sampleValue =
+                                      selectedTemplateSample.sampleParametersArray?.[idx] || '';
+                                    const currentValue = currentTemplateVariables?.[key] || '';
+                                    const descriptiveLabel =
+                                      selectedTemplateSample.variableLabels?.[varIndex] ||
+                                      VARIABLE_LABELS[selectedTemplateName]?.[varIndex];
+
+                                    return (
+	                                      <Grid item xs={12} md={6} key={key}>
+	                                        <TextField
+	                                          label={`{{${varIndex}}} — ${descriptiveLabel || (isLocked ? 'auto' : 'editable')}`}
+	                                          value={isLocked ? sampleValue : currentValue}
+	                                          placeholder={sampleValue || (descriptiveLabel ? `Enter ${descriptiveLabel}` : '')}
+                                          helperText={
+                                            isLocked
+                                              ? 'Auto-filled — cannot be overridden'
+                                              : descriptiveLabel
+                                                ? `Fill in: ${descriptiveLabel}`
+                                                : sampleValue
+                                                  ? `e.g. ${sampleValue}`
+                                                  : undefined
+                                          }
+	                                          fullWidth
+	                                          disabled={disabled || isLocked}
+	                                          sx={isLocked ? { opacity: 0.6 } : {}}
+	                                          onKeyDown={(event) => {
+	                                            // Prevent parent key handlers (e.g. keyboard navigation / shortcuts)
+	                                            // from swallowing the space key while typing template variables.
+	                                            event.stopPropagation();
+	                                          }}
+	                                          onChange={(event) => {
+	                                            if (isLocked) return;
+	                                            const nextRawValue = event.target.value;
+	                                            const next = value.map((entry, entryIndex) => {
+	                                              if (entryIndex !== index) return entry;
+                                              // Use raw (untrimmed) prev vars so spaces typed
+                                              // in other fields are not stripped mid-type.
+                                              const nextVars: Record<string, string> =
+                                                entry.channels.whatsapp.templateVariables &&
+                                                typeof entry.channels.whatsapp.templateVariables === 'object'
+                                                  ? { ...(entry.channels.whatsapp.templateVariables as Record<string, string>) }
+                                                  : {};
+                                              if (!nextRawValue) {
+                                                delete nextVars[key];
+                                              } else {
+                                                nextVars[key] = nextRawValue;
+                                              }
+                                              return {
+                                                ...entry,
+                                                channels: {
+                                                  ...entry.channels,
+                                                  whatsapp: {
+                                                    ...entry.channels.whatsapp,
+                                                    templateVariables:
+                                                      Object.keys(nextVars).length > 0
+                                                        ? nextVars
+                                                        : undefined,
+                                                  },
+                                                },
+                                              };
+                                            });
+                                            onChange(next);
+                                          }}
+                                        />
+                                      </Grid>
+                                    );
+                                  })}
+                                </Grid>
+                                <Box>
+                                  <Button
+                                    size="small"
+                                    variant="outlined"
+                                    disabled={disabled || Object.keys(currentTemplateVariables).length === 0}
+                                    onClick={() => {
+                                      const next = value.map((entry, entryIndex) =>
+                                        entryIndex === index
+                                          ? {
+                                              ...entry,
+                                              channels: {
+                                                ...entry.channels,
+                                                whatsapp: {
+                                                  ...entry.channels.whatsapp,
+                                                  templateVariables: undefined,
+                                                },
+                                              },
+                                            }
+                                          : entry
+                                      );
+                                      onChange(next);
+                                    }}
+                                  >
+                                    Clear Overrides
+                                  </Button>
+                                </Box>
+                              </Stack>
+                            </Box>
+                          )}
+                          {selectedTemplateSample.supportsMediaHeader && (
+                            <Typography variant="caption" color="text.secondary">
+                              This template supports a media header. SoftInvites uses the event IV
+                              image by default (or the step image attachment if provided).
+                            </Typography>
+                          )}
+                        </Stack>
+                      </Box>
+                    )}
+
+                  <FormControlLabel
+                    control={
+                      <Switch
+                        checked={item.includeResponseButtons}
+                        disabled={disabled}
+                        onChange={(event) => {
+                          const next = value.map((entry, idx) =>
+                            idx === index
+                              ? { ...entry, includeResponseButtons: event.target.checked }
+                              : entry
+                          );
+                          onChange(next);
+                        }}
+                      />
+                    }
+                    label="Include 'Will you attend?' buttons in this message"
+                  />
+                </Stack>
+              </Box>
             );
           })()
-        ))}
+        )}
 
         <Stack direction="row" justifyContent="flex-end">
           <Button variant="outlined" onClick={handleAdd} disabled={disabled || value.length >= 7}>

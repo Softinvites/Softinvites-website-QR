@@ -32,7 +32,7 @@ type WhatsAppTemplateSample = {
 interface WhatsAppSendDialogProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: (templateName: string, templateVariables?: Record<string, string> | null) => void;
+  onConfirm: (templateName: string, templateVariables?: Record<string, string> | null, redirectUrl?: string | null) => void;
   guestCount: number;
   loading: boolean;
   templateSamples?: WhatsAppTemplateSample[];
@@ -62,8 +62,78 @@ const LOCKED_VARIABLES: Record<string, number[]> = {
   rsvp_followup: [1, 6],
   rsvp_party: [2, 7, 8, 9],
   rsvp_wedding: [2, 9, 10, 11],
+  rsvp_form: [2, 7, 8],
   event_details_reminder: [1],
   logistics: [1],
+};
+
+const VARIABLE_LABELS: Record<string, Record<number, string>> = {
+  event_details_reminder: {
+    1: 'Guest Name (auto)',
+    2: 'Event Title',
+    3: 'Venue',
+    4: 'Date',
+    5: 'Time',
+  },
+  rsvp_followup: {
+    1: 'Guest Name (auto)',
+    2: 'Event Title',
+    3: 'Venue',
+    4: 'Date',
+    5: 'Time',
+    6: 'QR Pass URL (auto)',
+  },
+  logistics: {
+    1: 'Guest Name (auto)',
+    2: 'Event Title',
+  },
+  wedding_invite: {
+    1: 'Event Title',
+    2: 'Guest Name (auto)',
+    3: "Couple's Family Name",
+    4: 'Event Type (e.g. Church Wedding)',
+    5: "Couple's Names",
+    6: 'Ceremony Label (e.g. Church Ceremony)',
+    7: 'Date',
+    8: 'Time',
+    9: 'Venue',
+    10: 'Invitation Image (auto)',
+    11: 'QR Pass ID (auto)',
+  },
+  rsvp_wedding: {
+    1: 'Event Title',
+    2: 'Guest Name (auto)',
+    3: "Couple's Family Name",
+    4: 'Event Type (e.g. Traditional Wedding)',
+    5: "Couple's Names",
+    6: 'Date',
+    7: 'Time',
+    8: 'Venue',
+    9: 'Invitation Image (auto)',
+    10: 'RSVP Yes Link (auto)',
+    11: 'RSVP No Link (auto)',
+  },
+  rsvp_party: {
+    1: 'Event Title',
+    2: 'Guest Name (auto)',
+    3: 'Event Title',
+    4: 'Date',
+    5: 'Time',
+    6: 'Venue',
+    7: 'Invitation Image (auto)',
+    8: 'RSVP Yes Link (auto)',
+    9: 'RSVP No Link (auto)',
+  },
+  rsvp_form: {
+    1: 'Event Title',
+    2: 'Guest Name (auto)',
+    3: 'Event Title',
+    4: 'Date',
+    5: 'Time',
+    6: 'Venue',
+    7: 'Invitation Image (auto)',
+    8: 'RSVP Form Link (auto)',
+  },
 };
 
 const FALLBACK_TEMPLATE_SAMPLES: WhatsAppTemplateSample[] = [
@@ -71,22 +141,21 @@ const FALLBACK_TEMPLATE_SAMPLES: WhatsAppTemplateSample[] = [
     templateName: 'wedding_invite',
     title: 'Wedding Invite',
     category: 'marketing',
-    description:
-      'Wedding invitation with event IV as header image. Variables 2 (guest name), 10 (header image), and 11 (pass URL) are set automatically.',
+    description: 'Wedding invitation with event IV as header image. Variables 2 (guest name), 10 (header image), and 11 (pass URL) are set automatically.',
     expectedVariableCount: 11,
     buttonUrlVariableIndex: 11,
     sampleParametersArray: [
-      "Judith's Wedding", // {{1}}  event title
-      '(auto: guest name)', // {{2}}  locked
-      'Family of Judith', // {{3}}  host/family name
-      "Judith's Wedding", // {{4}}  ceremony type
-      'Judith & Stanley', // {{5}}  couple names
-      'Church Ceremony', // {{6}}  ceremony label
-      '20th July 2026', // {{7}}  date
-      '4:00 PM', // {{8}}  time
-      'Landmark Event Centre, Lagos', // {{9}}  venue
-      '(auto: event image S3 path)', // {{10}} locked
-      '(auto: pass URL suffix)', // {{11}} locked
+      "Judith's Wedding",
+      '(auto: guest name)',
+      'Family of Judith',
+      "Judith's Wedding",
+      'Judith & Stanley',
+      'Church Ceremony',
+      '20th July 2026',
+      '4:00 PM',
+      'Landmark Event Centre, Lagos',
+      '(auto: event image S3 path)',
+      '(auto: pass URL suffix)',
     ],
     supportsMediaHeader: false,
   },
@@ -95,7 +164,7 @@ const FALLBACK_TEMPLATE_SAMPLES: WhatsAppTemplateSample[] = [
     title: 'Event Reminder',
     category: 'utility',
     description: 'Event reminder template. Variable 1 (guest name) is set automatically.',
-    expectedVariableCount: 4,
+    expectedVariableCount: 5,
     buttonUrlVariableIndex: 0,
     sampleParametersArray: [
       '(auto: guest name)',
@@ -107,75 +176,33 @@ const FALLBACK_TEMPLATE_SAMPLES: WhatsAppTemplateSample[] = [
     supportsMediaHeader: false,
   },
   {
-    templateName: 'rsvp_followup',
-    title: 'RSVP Follow-Up',
-    category: 'utility',
-    description:
-      'Follow-up template with a dynamic pass button. Variables 1 (guest name) and 6 (pass URL) are set automatically.',
-    expectedVariableCount: 4,
-    buttonUrlVariableIndex: 6,
-    sampleParametersArray: [
-      '(auto: guest name)',
-      "Judith's Wedding",
-      'Lagos',
-      '20th July 2026',
-      '4:00 PM',
-      '(auto: pass URL)',
-    ],
-    supportsMediaHeader: false,
-  },
-  {
-    templateName: 'rsvp_party',
-    title: 'RSVP Party',
-    category: 'utility',
-    description: 'Party invitation with RSVP buttons and header image. Variables 2 (guest name), 7 (header image), 8 (Yes link) and 9 (No link) are set automatically.',
-    expectedVariableCount: 9,
-    buttonUrlVariableIndex: 8,
-    sampleParametersArray: [
-      "Judith's Birthday Party",        // {{1}} event title
-      '(auto: guest name)',              // {{2}} locked
-      "Judith's Birthday Party",        // {{3}} event type
-      "Judith's Birthday Party",        // {{4}} event name
-      '20th July 2026',                  // {{5}} date
-      '4:00 PM',                         // {{6}} time
-      '(auto: event image S3 path)',     // {{7}} locked
-      '(auto: rsvpId?status=yes)',       // {{8}} locked
-      '(auto: rsvpId?status=no)',        // {{9}} locked
-    ],
-    supportsMediaHeader: true,
-  },
-  {
-    templateName: 'rsvp_wedding',
-    title: 'RSVP Wedding',
-    category: 'utility',
-    description: 'Wedding invitation with RSVP buttons and header image. Variables 2 (guest name), 9 (header image), 10 (Yes link) and 11 (No link) are set automatically.',
-    expectedVariableCount: 11,
-    buttonUrlVariableIndex: 10,
-    sampleParametersArray: [
-      "Judith's Wedding",                // {{1}} event title
-      '(auto: guest name)',              // {{2}} locked
-      'Family of Judith',                // {{3}} host/family
-      'Traditional Wedding Reception',   // {{4}} ceremony type
-      'Judith & Stanley',                // {{5}} couple names
-      '20th July 2026',                  // {{6}} date
-      '4:00 PM',                         // {{7}} time
-      'Landmark Event Centre, Lagos',    // {{8}} venue
-      '(auto: event image S3 path)',     // {{9}} locked
-      '(auto: rsvpId?status=yes)',       // {{10}} locked
-      '(auto: rsvpId?status=no)',        // {{11}} locked
-    ],
-    supportsMediaHeader: true,
-  },
-  {
     templateName: 'logistics',
     title: 'Logistics',
     category: 'utility',
-    description:
-      'Utility template for logistics/support information. Variable 1 (guest name) is set automatically.',
+    description: 'Utility template for logistics/support information. Variable 1 (guest name) is set automatically.',
     expectedVariableCount: 2,
     buttonUrlVariableIndex: 0,
     sampleParametersArray: ['(auto: guest name)', "Judith's Wedding"],
     supportsMediaHeader: false,
+  },
+  {
+    templateName: 'rsvp_form',
+    title: 'RSVP Form (Media + Form Button)',
+    category: 'utility',
+    description: 'Party invitation with media header and RSVP form button. Guest name ({{2}}), header image ({{7}}), and form link ({{8}}) are auto-filled.',
+    expectedVariableCount: 8,
+    buttonUrlVariableIndex: 8,
+    sampleParametersArray: [
+      "Stanley's Party",
+      '(auto: guest name)',
+      "Stanley's Party",
+      '20th July 2026',
+      '4:00 PM',
+      'Landmark Event Centre, Lagos',
+      '(auto: event image S3 path)',
+      '(auto: RSVP form link)',
+    ],
+    supportsMediaHeader: true,
   },
 ];
 
@@ -193,6 +220,7 @@ export default function WhatsAppSendDialog({
   );
   const [templateName, setTemplateName] = useState('');
   const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
+  const [redirectUrl, setRedirectUrl] = useState('');
 
   useEffect(() => {
     if (!availableTemplates.length) return;
@@ -207,6 +235,7 @@ export default function WhatsAppSendDialog({
   useEffect(() => {
     // Avoid leaking overrides across different templates.
     setTemplateVariables({});
+    setRedirectUrl('');
   }, [templateName, open]);
 
   const selectedTemplate = useMemo(
@@ -216,10 +245,12 @@ export default function WhatsAppSendDialog({
 
   const handleConfirm = () => {
     if (!templateName) return;
-    onConfirm(templateName, normalizeTemplateVariables(templateVariables));
+    const trimmedRedirectUrl = redirectUrl.trim() || null;
+    onConfirm(templateName, normalizeTemplateVariables(templateVariables), trimmedRedirectUrl);
   };
 
   const lockedVariables = useMemo(() => LOCKED_VARIABLES[templateName] || [], [templateName]);
+  const variableLabels = useMemo(() => VARIABLE_LABELS[templateName] || {}, [templateName]);
 
   const templateVariableCount = useMemo(() => {
     if (!selectedTemplate) return 0;
@@ -313,33 +344,28 @@ export default function WhatsAppSendDialog({
                 const isLocked = lockedVariables.includes(varIndex);
                 const sampleValue = selectedTemplate.sampleParametersArray?.[idx] || '';
                 const currentValue = templateVariables[key] || '';
+                const descriptiveLabel = variableLabels[varIndex];
                 return (
                   <Grid item xs={12} md={6} key={key}>
                     <TextField
-                      label={`{{${varIndex}}}${isLocked ? ' (auto)' : ''}`}
+                      label={`{{${varIndex}}} — ${descriptiveLabel || (isLocked ? 'auto' : 'editable')}`}
                       value={isLocked ? sampleValue : currentValue}
-                      placeholder={isLocked ? sampleValue : sampleValue}
+                      placeholder={sampleValue || (descriptiveLabel ? `Enter ${descriptiveLabel}` : '')}
                       helperText={
                         isLocked
-                          ? `Auto-filled from guest/event data`
-                          : sampleValue
-                            ? `Sample: ${sampleValue}`
-                            : undefined
+                          ? 'Auto-filled — cannot be overridden'
+                          : descriptiveLabel
+                            ? `Fill in: ${descriptiveLabel}`
+                            : sampleValue
+                              ? `e.g. ${sampleValue}`
+                              : undefined
                       }
                       fullWidth
                       disabled={isLocked}
                       onChange={(event) => {
                         if (isLocked) return;
-                        const trimmed = String(event.target.value || '').trim();
-                        setTemplateVariables((prev) => {
-                          const next = { ...prev };
-                          if (!trimmed) {
-                            delete next[key];
-                          } else {
-                            next[key] = trimmed;
-                          }
-                          return next;
-                        });
+                        const raw = event.target.value;
+                        setTemplateVariables((prev) => ({ ...prev, [key]: raw }));
                       }}
                       sx={isLocked ? { opacity: 0.6 } : {}}
                     />
@@ -357,6 +383,19 @@ export default function WhatsAppSendDialog({
                 Clear Overrides
               </Button>
             </Box>
+          </Box>
+        )}
+
+        {templateName === 'rsvp_form' && (
+          <Box sx={{ mt: 2 }}>
+            <TextField
+              label="Optional Redirect URL"
+              value={redirectUrl}
+              onChange={(e) => setRedirectUrl(e.target.value)}
+              fullWidth
+              placeholder="https://example.com/my-form"
+              helperText="If filled, clicking RSVP HERE will redirect to this URL after loading the auto-generated form link."
+            />
           </Box>
         )}
       </DialogContent>

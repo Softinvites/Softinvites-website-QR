@@ -94,7 +94,11 @@ export function GuestView() {
           headers: { Authorization: `Bearer ${token}` },
         }
       );
-      setWhatsappTemplateSamples(response.data?.templates || []);
+      // Guest page: exclude all rsvp_ templates (RSVP admin only)
+      const all = response.data?.templates || [];
+      setWhatsappTemplateSamples(
+        all.filter((t: any) => !String(t?.templateName || '').toLowerCase().startsWith('rsvp_'))
+      );
     } catch (err) {
       console.warn('Could not fetch WhatsApp template samples:', err);
       setWhatsappTemplateSamples([]);
@@ -343,7 +347,8 @@ export function GuestView() {
 
   const handleConfirmBulkWhatsApp = async (
     templateName: string,
-    templateVariables?: Record<string, string> | null
+    templateVariables?: Record<string, string> | null,
+    redirectUrl?: string | null
   ) => {
     setLoading(true);
     setWhatsappSendOpen(false);
@@ -371,6 +376,7 @@ export function GuestView() {
           eventId: derivedEventId,
           templateName,
           ...(templateVariables ? { templateVariables } : {}),
+          ...(redirectUrl ? { redirectUrl } : {}),
         },
         {
           headers: {

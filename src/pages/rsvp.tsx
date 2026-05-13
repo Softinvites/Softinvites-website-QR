@@ -42,6 +42,7 @@ type RsvpFormSettings = {
 type RsvpFormResponse = {
   token: string;
   submitted: boolean;
+  redirectUrl?: string | null;
   event: {
     id: string;
     name: string;
@@ -331,6 +332,12 @@ export default function RsvpPage() {
   useEffect(() => {
     setDeviceSubmissionKey(getOrCreateDeviceSubmissionKey(token));
   }, [token]);
+
+  useEffect(() => {
+    if (payload?.redirectUrl) {
+      window.location.href = payload.redirectUrl;
+    }
+  }, [payload]);
 
   useEffect(() => {
     setDeviceEmailLocked(hasStoredSubmission(token, email));
@@ -740,38 +747,51 @@ function SuccessScreen({
 
   return (
     <div className="rsvp-success">
+      <div className="rsvp-success-confetti" aria-hidden="true">
+        {isYes ? '🎊 🎉 🎊' : ''}
+      </div>
+
       <div
         className="rsvp-success-icon"
         style={{ background: accentColor, color: accentTextColor }}
       >
-        {isYes ? '🎉' : '💌'}
+        {isYes ? '✓' : '💌'}
       </div>
 
       <h2 className="rsvp-success-title">
         {isYes ? "You're confirmed!" : "We'll miss you!"}
       </h2>
 
+      <div className="rsvp-success-badge" style={{ borderColor: accentColor, color: accentColor }}>
+        {isYes ? 'Attendance Confirmed ✓' : 'Response Received'}
+      </div>
+
       <p className="rsvp-success-msg">
         {isYes
-          ? `Thank you! Your attendance at ${eventName} has been confirmed.`
-          : `Thank you for letting us know. We hope to see you next time.`}
+          ? `Thank you! Your attendance at ${eventName} has been confirmed. We look forward to celebrating with you.`
+          : `Thank you for letting us know. We hope to see you at a future event.`}
       </p>
 
       {isYes && calendarUrl && (
-        <>
+        <div className="rsvp-success-calendar-wrap">
           <p className="rsvp-success-hint">
-            Save the event to your calendar so you don&apos;t miss it.
+            📌 Don&apos;t forget — save the event to your calendar.
           </p>
           <a
             href={calendarUrl}
             className="rsvp-calendar-btn"
             style={{ background: accentColor, color: accentTextColor }}
-            download
+            target="_blank"
+            rel="noreferrer"
           >
             📅 Add to Calendar
           </a>
-        </>
+        </div>
       )}
+
+      <p className="rsvp-success-footer">
+        Powered by <strong>SoftInvites</strong>
+      </p>
     </div>
   );
 }
