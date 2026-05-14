@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { API_BASE } from 'src/utils/apiBase';
 import Box from '@mui/material/Box';
 import Avatar from '@mui/material/Avatar';
@@ -53,6 +54,7 @@ export function UserTableRow({
   showActions,
   showOthersColumn,
 }: UserTableRowProps) {
+  const navigate = useNavigate();
   const token = localStorage.getItem('token');
   const [openPopover, setOpenPopover] = useState<HTMLButtonElement | null>(null);
   const [openDialog, setOpenDialog] = useState(false);
@@ -71,6 +73,12 @@ export function UserTableRow({
   const handleClosePopover = useCallback(() => {
     setOpenPopover(null);
   }, []);
+
+  const handleGoToRsvp = useCallback(() => {
+    localStorage.setItem('allRowIds', JSON.stringify([row.eventId]));
+    navigate('/rsvp-admin');
+    handleClosePopover();
+  }, [row.eventId, navigate, handleClosePopover]);
 
   const handleOpenEditDialog = useCallback(() => {
     setFullname(row.fullname);
@@ -339,6 +347,11 @@ export function UserTableRow({
               },
             }}
           >
+            <MenuItem onClick={handleGoToRsvp}>
+              <Iconify icon="solar:clipboard-list-bold" />
+              Go to RSVP
+            </MenuItem>
+
             <MenuItem onClick={handleOpenEditDialog}>
               <Iconify icon="solar:pen-bold" />
               Edit

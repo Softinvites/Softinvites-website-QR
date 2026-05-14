@@ -333,6 +333,8 @@ export default function RsvpPage() {
     setDeviceSubmissionKey(getOrCreateDeviceSubmissionKey(token));
   }, [token]);
 
+  const isRedirecting = Boolean(payload?.redirectUrl);
+
   useEffect(() => {
     if (payload?.redirectUrl) {
       window.location.href = payload.redirectUrl;
@@ -467,14 +469,14 @@ export default function RsvpPage() {
         <div className="rsvp-left">{leftContent}</div>
 
         <div className="rsvp-right">
-          {loading && <p className="rsvp-muted">Loading RSVP...</p>}
-          {!loading && error && <p className="rsvp-error">{error}</p>}
+          {(loading || isRedirecting) && <p className="rsvp-muted">{isRedirecting ? 'Redirecting...' : 'Loading RSVP...'}</p>}
+          {!loading && !isRedirecting && error && <p className="rsvp-error">{error}</p>}
 
-          {!loading && !error && payload && formInvalidated && (
+          {!loading && !isRedirecting && !error && payload && formInvalidated && (
             <p className="rsvp-error">This form is no longer receiving submissions.</p>
           )}
 
-          {!loading && !error && payload && !formInvalidated && submitted && (
+          {!loading && !isRedirecting && !error && payload && !formInvalidated && submitted && (
             <SuccessScreen
               status={submitted.status}
               rsvpId={submitted.rsvpId}
@@ -484,7 +486,7 @@ export default function RsvpPage() {
             />
           )}
 
-          {!loading && !error && payload && !formInvalidated && !submitted && (
+          {!loading && !isRedirecting && !error && payload && !formInvalidated && !submitted && (
             <form className="rsvp-form" onSubmit={handleSubmit}>
               <div className="rsvp-header">
                 <div className="rsvp-pill">RSVP</div>

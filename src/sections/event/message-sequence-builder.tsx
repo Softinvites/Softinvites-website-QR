@@ -116,6 +116,7 @@ export type MessageChannelConfig = {
   enabled: boolean;
   templateId?: string;
   templateVariables?: Record<string, string>;
+  redirectUrl?: string;
 };
 
 export type MessageAttachmentConfig = {
@@ -267,6 +268,10 @@ const normalizeChannel = (channel: any, fallbackEnabled = false): MessageChannel
   templateVariables:
     channel?.templateVariables && typeof channel.templateVariables === 'object'
       ? channel.templateVariables
+      : undefined,
+  redirectUrl:
+    typeof channel?.redirectUrl === 'string' && channel.redirectUrl.trim()
+      ? channel.redirectUrl.trim()
       : undefined,
 });
 
@@ -456,6 +461,9 @@ export const serializeMessageSequence = (
           templateId: item.channels.whatsapp?.templateId,
           ...(normalizedWhatsAppTemplateVariables
             ? { templateVariables: normalizedWhatsAppTemplateVariables }
+            : {}),
+          ...(item.channels.whatsapp?.redirectUrl?.trim()
+            ? { redirectUrl: item.channels.whatsapp.redirectUrl.trim() }
             : {}),
         },
         bulkSms: {
@@ -1278,6 +1286,36 @@ export function MessageSequenceBuilder({
                                   </Button>
                                 </Box>
                               </Stack>
+                            </Box>
+                          )}
+                          {selectedTemplateSample?.templateName === 'rsvp_form' && (
+                            <Box sx={{ mt: 1 }}>
+                              <TextField
+                                label="Optional Redirect URL"
+                                size="small"
+                                fullWidth
+                                disabled={disabled}
+                                value={item.channels.whatsapp.redirectUrl || ''}
+                                placeholder="https://example.com/my-form"
+                                helperText="If filled, guests who click the RSVP link will be redirected to this URL instead of the built-in form."
+                                onChange={(e) => {
+                                  const next = value.map((entry, entryIndex) =>
+                                    entryIndex === index
+                                      ? {
+                                          ...entry,
+                                          channels: {
+                                            ...entry.channels,
+                                            whatsapp: {
+                                              ...entry.channels.whatsapp,
+                                              redirectUrl: e.target.value,
+                                            },
+                                          },
+                                        }
+                                      : entry
+                                  );
+                                  onChange(next);
+                                }}
+                              />
                             </Box>
                           )}
                           {selectedTemplateSample.supportsMediaHeader && (

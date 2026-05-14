@@ -1,4 +1,4 @@
-import { useState, useRef, useEffect, useCallback } from 'react';
+import { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import { API_BASE } from 'src/utils/apiBase';
 import Box from '@mui/material/Box';
@@ -8,9 +8,13 @@ import Button from '@mui/material/Button';
 import TableBody from '@mui/material/TableBody';
 import Typography from '@mui/material/Typography';
 import TableContainer from '@mui/material/TableContainer';
-import { Grid } from '@mui/material';
+import { Grid, alpha } from '@mui/material';
 import TablePagination from '@mui/material/TablePagination';
 import Stack from '@mui/material/Stack';
+import TextField from '@mui/material/TextField';
+import MenuItem from '@mui/material/MenuItem';
+import Chip from '@mui/material/Chip';
+import { useTheme } from '@mui/material/styles';
 import { toast } from 'react-toastify';
 import { useNavigate } from 'react-router-dom';
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -31,6 +35,55 @@ import WhatsAppStatusDialog from './WhatsAppStatusDialog';
 import WhatsAppSendDialog from './WhatsAppSendDialog';
 import { AnalyticsWidgetSummary } from '../../overview/analytics-widget-summary';
 
+type EventCatalogRecord = {
+  _id: string;
+  name: string;
+  date: string;
+  location: string;
+  description?: string;
+  isActive?: boolean;
+  eventStatus?: 'active' | 'expired';
+};
+
+type EventStatusFilter = 'all' | 'active' | 'expired';
+
+const EVENT_EXPIRATION_GRACE_MS = 2 * 24 * 60 * 60 * 1000;
+
+const normalizeEventDateValue = (value?: string) =>
+  String(value || '').replace(/(\d+)(st|nd|rd|th)/gi, '$1');
+
+const getEventDateTimestamp = (value?: string) => {
+  const parsed = new Date(normalizeEventDateValue(value));
+  return Number.isNaN(parsed.getTime()) ? null : parsed.getTime();
+};
+
+const getEventStatusLabel = (event?: Partial<EventCatalogRecord> | null) => {
+  if (!event) return 'Active';
+  if (event.eventStatus === 'expired') return 'Expired';
+  const ts = getEventDateTimestamp(event.date);
+  if (ts && Date.now() > ts + EVENT_EXPIRATION_GRACE_MS) return 'Expired';
+  if (event.isActive === false) return 'Inactive';
+  return 'Active';
+};
+
+const matchesEventFilter = (event: Partial<EventCatalogRecord>, filter: EventStatusFilter) => {
+  if (filter === 'all') return true;
+  const status = getEventStatusLabel(event);
+  return filter === 'active' ? status === 'Active' : status === 'Expired';
+};
+
+const formatEventDate = (value?: string) => {
+  if (!value) return 'Date not set';
+  const parsed = new Date(normalizeEventDateValue(value));
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString(undefined, {
+    weekday: 'short',
+    month: 'long',
+    day: 'numeric',
+    year: 'numeric',
+  });
+};
+
 type WhatsAppTemplateSample = {
   templateName: string;
   title?: string;
@@ -43,6 +96,7 @@ type WhatsAppTemplateSample = {
 };
 
 export function GuestView() {
+  const theme = useTheme();
   const table = useTable();
   const [filterName, setFilterName] = useState('');
   const [users, setUsers] = useState<UserProps[]>([]);
@@ -54,6 +108,9 @@ export function GuestView() {
   const [batchDeleteModalOpen, setBatchDeleteModalOpen] = useState(false);
   const [isAdmin, setIsAdmin] = useState(false);
   const navigate = useNavigate();
+  const [events, setEvents] = useState<EventCatalogRecord[]>([]);
+  const [eventsLoading, setEventsLoading] = useState(false);
+  const [eventFilter, setEventFilter] = useState<EventStatusFilter>('all');
   const [analytics, setAnalytics] = useState({
     totalGuests: 0,
     checkedInGuests: 0,
@@ -84,6 +141,26 @@ export function GuestView() {
   const [whatsappSendOpen, setWhatsappSendOpen] = useState(false);
   const [whatsappTemplateSamples, setWhatsappTemplateSamples] = useState<WhatsAppTemplateSample[]>(
     []
+  );
+
+  const filteredEvents = useMemo(
+    () => events.filter((item) => matchesEventFilter(item, eventFilter)),
+    [events, eventFilter]
+  );
+
+  const eventFilterCounts = useMemo(
+    () =>
+      events.reduce(
+        (acc, item) => {
+          acc.all += 1;
+          const s = getEventStatusLabel(item);
+          if (s === 'Active') acc.active += 1;
+          if (s === 'Expired') acc.expired += 1;
+          return acc;
+        },
+        { all: 0, active: 0, expired: 0 }
+      ),
+    [events]
   );
 
   const fetchWhatsAppTemplateSamples = async (currentEventId: string, token: string) => {
@@ -431,136 +508,173 @@ export function GuestView() {
     }
   }
 
-  useEffect(() => {
-    const fetchUsers = async () => {
-      setLoading(true);
-      setError(null);
+  const loadGuestData = useCallback(async (currentEventId: string) => {
+    const token = localStorage.getItem('token');
+    if (!token) return;
+
+    setLoading(true);
+    setError(null);
+    setUsers([]);
+
+    try {
+      const response = await fetch(`${API_BASE}/guest/events-guest/${currentEventId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      if (!response.ok) throw new Error(response.statusText);
+
+      const data = await response.json();
+
+      if (!data?.guests || !Array.isArray(data.guests)) {
+        throw new Error('Invalid API response format');
+      }
+
+      const analyticsRes = await axios.get(
+        `${API_BASE}/guest/event-analytics/${currentEventId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setAnalytics(analyticsRes.data);
+
+      fetchWhatsAppStats(currentEventId);
+      fetchWhatsAppTemplateSamples(currentEventId, token);
 
       try {
-        const urlParams = new URLSearchParams(window.location.search);
-        const tokenFromUrl = urlParams.get('token');
-        const tokenFromStorage = localStorage.getItem('token');
-        const token = tokenFromStorage || tokenFromUrl;
-
-        if (!token) {
-          setError('No token found. Please log in again.');
-          setLoading(false);
-          return;
-        }
-
-        // Determine if this is an admin (has localStorage token)
-        setIsAdmin(!!tokenFromStorage);
-
-        let currentEventId: string | null = null;
-
-        if (tokenFromStorage) {
-          // For admin - get eventId from localStorage
-          const eventIdArray = localStorage.getItem('allRowIds');
-          if (eventIdArray) {
-            try {
-              const parsedIds = JSON.parse(eventIdArray);
-              currentEventId =
-                Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
-            } catch (err) {
-              console.error('Error parsing event IDs:', err);
-            }
-          }
-        } else {
-          // For temporary users - get eventId and email from token
-          const decoded = tryDecodeToken(token);
-          if (decoded) {
-            currentEventId = decoded?.eventId || decoded?.event?._id;
-            setUserEmail(decoded?.email || null);
-
-            if (!currentEventId) {
-              console.warn("Token payload doesn't contain event ID:", decoded);
-            }
-          }
-        }
-
-        setEventId(currentEventId);
-
-        if (!currentEventId) {
-          setError("No valid event ID found. Please ensure you're using a valid invitation link.");
-          setLoading(false);
-          return;
-        }
-
-        // If token came from URL and we don't have one in storage, store it
-        if (tokenFromUrl && !tokenFromStorage) {
-          localStorage.setItem('token', tokenFromUrl);
-        }
-
-        const response = await fetch(`${API_BASE}/guest/events-guest/${currentEventId}`, {
+        const eventRes = await axios.get(`${API_BASE}/events/events/${currentEventId}`, {
           headers: { Authorization: `Bearer ${token}` },
         });
-
-        if (!response.ok) {
-          throw new Error(response.statusText);
+        if (eventRes.data?.event) {
+          setEventName(eventRes.data.event.name || 'Event Report');
+          setEventDate(eventRes.data.event.date || '');
         }
-
-        const data = await response.json();
-
-        if (!data?.guests || !Array.isArray(data.guests)) {
-          throw new Error('Invalid API response format');
-        }
-
-        const analyticsRes = await axios.get(
-          `${API_BASE}/guest/event-analytics/${currentEventId}`,
-          {
-            headers: { Authorization: `Bearer ${token}` },
-          }
-        );
-        setAnalytics(analyticsRes.data);
-
-        // Fetch WhatsApp statistics
-        fetchWhatsAppStats(currentEventId);
-        fetchWhatsAppTemplateSamples(currentEventId, token);
-
-        // Get event details for report
-        try {
-          const eventRes = await axios.get(`${API_BASE}/events/events/${currentEventId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          });
-          if (eventRes.data?.event) {
-            setEventName(eventRes.data.event.name || 'Event Report');
-            setEventDate(eventRes.data.event.date || '');
-          }
-        } catch (eventErr) {
-          console.warn('Could not fetch event details:', eventErr);
-        }
-
-        const formattedData: UserProps[] = data.guests.map((guest: any) => ({
-          id: guest._id,
-          _id: guest._id,
-          fullname: guest.fullname,
-          TableNo: guest.TableNo,
-          email: guest.email,
-          phone: guest.phone,
-          createdAt: new Date(guest.createdAt).toLocaleDateString(),
-          checkedInAt: guest.checkedInAt,
-          others: guest.others || '',
-          status: guest.status,
-          qrCode: guest.qrCode,
-        }));
-
-        setUsers(formattedData);
-      } catch (err: any) {
-        setError(err.message || 'Failed to load guests');
-      } finally {
-        setLoading(false);
+      } catch (eventErr) {
+        console.warn('Could not fetch event details:', eventErr);
       }
-    };
 
-    fetchUsers();
+      const formattedData: UserProps[] = data.guests.map((guest: any) => ({
+        id: guest._id,
+        _id: guest._id,
+        fullname: guest.fullname,
+        TableNo: guest.TableNo,
+        email: guest.email,
+        phone: guest.phone,
+        createdAt: new Date(guest.createdAt).toLocaleDateString(),
+        checkedInAt: guest.checkedInAt,
+        others: guest.others || '',
+        status: guest.status,
+        qrCode: guest.qrCode,
+        eventId: currentEventId,
+      }));
 
+      setUsers(formattedData);
+    } catch (err: any) {
+      setError(err.message || 'Failed to load guests');
+    } finally {
+      setLoading(false);
+    }
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const handleSelectEvent = useCallback(
+    (nextEventId: string) => {
+      if (!nextEventId) return;
+      setEventId(nextEventId);
+      setFilterName('');
+      localStorage.setItem('allRowIds', JSON.stringify([nextEventId]));
+      loadGuestData(nextEventId);
+    },
+    [loadGuestData]
+  );
+
+  useEffect(() => {
     const timer = setTimeout(() => {
       localStorage.removeItem('token');
       navigate('/sign-in');
     }, 1800000);
 
+    const urlParams = new URLSearchParams(window.location.search);
+    const tokenFromUrl = urlParams.get('token');
+    const tokenFromStorage = localStorage.getItem('token');
+    const token = tokenFromStorage || tokenFromUrl;
+
+    if (!token) {
+      setError('No token found. Please log in again.');
+      return () => clearTimeout(timer);
+    }
+
+    setIsAdmin(!!tokenFromStorage);
+
+    if (tokenFromStorage) {
+      // Admin: load all events catalog then pick preferred
+      const loadEventsCatalog = async () => {
+        setEventsLoading(true);
+        try {
+          const storedIds = localStorage.getItem('allRowIds');
+          let preferredEventId: string | null = null;
+          if (storedIds) {
+            try {
+              const parsed = JSON.parse(storedIds);
+              preferredEventId = Array.isArray(parsed) && parsed.length ? parsed[0] : null;
+            } catch {
+              preferredEventId = null;
+            }
+          }
+
+          const eventsRes = await axios.get(`${API_BASE}/events/events`, {
+            headers: { Authorization: `Bearer ${tokenFromStorage}` },
+          });
+          const nextEvents: EventCatalogRecord[] = Array.isArray(eventsRes.data?.events)
+            ? eventsRes.data.events
+            : [];
+          setEvents(nextEvents);
+
+          if (!nextEvents.length) {
+            setError('No events available yet.');
+            return;
+          }
+
+          const nextEventId =
+            (preferredEventId && nextEvents.some((item) => item._id === preferredEventId)
+              ? preferredEventId
+              : null) ||
+            nextEvents.find((item) => getEventStatusLabel(item) === 'Active')?._id ||
+            nextEvents[0]?._id ||
+            null;
+
+          if (!nextEventId) {
+            setError('No events available yet.');
+            return;
+          }
+
+          setEventId(nextEventId);
+          localStorage.setItem('allRowIds', JSON.stringify([nextEventId]));
+          await loadGuestData(nextEventId);
+        } catch (err: any) {
+          setError(err?.response?.data?.message || 'Failed to load events');
+        } finally {
+          setEventsLoading(false);
+        }
+      };
+
+      loadEventsCatalog();
+    } else {
+      // Temporary user: get eventId from token
+      if (tokenFromUrl && !tokenFromStorage) {
+        localStorage.setItem('token', tokenFromUrl);
+      }
+      const decoded = tryDecodeToken(token);
+      if (decoded) {
+        const currentEventId = decoded?.eventId || decoded?.event?._id;
+        setUserEmail(decoded?.email || null);
+        if (currentEventId) {
+          setEventId(currentEventId);
+          loadGuestData(currentEventId);
+        } else {
+          setError("No valid event ID found. Please ensure you're using a valid invitation link.");
+        }
+      }
+    }
+
     return () => clearTimeout(timer);
-  }, [navigate]);
+  }, [navigate, loadGuestData]);
 
   const dataFiltered: UserProps[] = applyFilter({
     inputData: users,
@@ -831,6 +945,34 @@ export function GuestView() {
                     Send WhatsApp
                   </Button>
                 </Grid>
+
+                <Grid item xs={6} md={2.4}>
+                  <Button
+                    variant="contained"
+                    startIcon={<Iconify icon="solar:clipboard-list-bold" />}
+                    onClick={() => {
+                      if (eventId) {
+                        localStorage.setItem('allRowIds', JSON.stringify([eventId]));
+                      }
+                      navigate('/rsvp-admin');
+                    }}
+                    sx={{
+                      backgroundColor: '#1976d2',
+                      '&:hover': {
+                        backgroundColor: '#115293',
+                      },
+                      color: '#fff',
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                      letterSpacing: '0.2px',
+                      textTransform: 'none',
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      height: { xs: '52px', sm: '40px', md: '48px' },
+                    }}
+                  >
+                    Go to RSVP
+                  </Button>
+                </Grid>
               </>
             )}
 
@@ -872,6 +1014,90 @@ export function GuestView() {
           </Grid>
         </Stack>
       </Box>
+
+      {/* Event Switcher — admin only */}
+      {isAdmin && events.length > 0 && (
+        <Card
+          sx={{
+            p: 2,
+            mb: 3,
+            border: `1px solid ${alpha(theme.palette.primary.main, 0.12)}`,
+          }}
+        >
+          <Stack
+            direction={{ xs: 'column', sm: 'row' }}
+            alignItems={{ xs: 'flex-start', sm: 'center' }}
+            spacing={2}
+          >
+            <Typography variant="subtitle2" sx={{ whiteSpace: 'nowrap', minWidth: 100 }}>
+              Browse Events
+            </Typography>
+
+            <Stack direction="row" spacing={1}>
+              {(['all', 'active', 'expired'] as EventStatusFilter[]).map((f) => (
+                <Button
+                  key={f}
+                  size="small"
+                  variant={eventFilter === f ? 'contained' : 'outlined'}
+                  color={f === 'active' ? 'success' : f === 'expired' ? 'error' : 'primary'}
+                  onClick={() => setEventFilter(f)}
+                  sx={{ textTransform: 'none', minWidth: 0 }}
+                >
+                  {f === 'all'
+                    ? `All (${eventFilterCounts.all})`
+                    : f === 'active'
+                      ? `Active (${eventFilterCounts.active})`
+                      : `Expired (${eventFilterCounts.expired})`}
+                </Button>
+              ))}
+            </Stack>
+
+            <TextField
+              select
+              size="small"
+              label="Event"
+              value={eventId || ''}
+              onChange={(e) => handleSelectEvent(e.target.value)}
+              disabled={eventsLoading || !filteredEvents.length}
+              sx={{ minWidth: 280, flexGrow: 1 }}
+              helperText={
+                filteredEvents.length
+                  ? `${filteredEvents.length} of ${events.length} events`
+                  : eventFilter === 'active'
+                    ? 'No active events'
+                    : eventFilter === 'expired'
+                      ? 'No expired events'
+                      : 'No events'
+              }
+            >
+              {filteredEvents.map((item) => (
+                <MenuItem key={item._id} value={item._id}>
+                  <Stack spacing={0.25}>
+                    <Typography variant="body2" fontWeight={600}>
+                      {item.name}
+                    </Typography>
+                    <Typography variant="caption" color="text.secondary">
+                      {`${formatEventDate(item.date)} • ${item.location || 'Venue not set'} • ${getEventStatusLabel(item)}`}
+                    </Typography>
+                  </Stack>
+                </MenuItem>
+              ))}
+            </TextField>
+
+            {eventId && (
+              <Chip
+                size="small"
+                label={getEventStatusLabel(events.find((e) => e._id === eventId))}
+                color={
+                  getEventStatusLabel(events.find((e) => e._id === eventId)) === 'Active'
+                    ? 'success'
+                    : 'error'
+                }
+              />
+            )}
+          </Stack>
+        </Card>
+      )}
 
       <Grid container spacing={3} sx={{ mb: 4 }}>
         <Grid xs={12} sm={6} md={4}>
