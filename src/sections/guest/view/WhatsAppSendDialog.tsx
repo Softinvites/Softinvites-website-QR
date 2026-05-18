@@ -27,6 +27,8 @@ type WhatsAppTemplateSample = {
   sampleParametersArray?: string[];
   sampleParameters?: Record<string, string>;
   supportsMediaHeader?: boolean;
+  variableLabels?: Record<number, string>;
+  lockedVariableIndexes?: number[];
 };
 
 interface WhatsAppSendDialogProps {
@@ -249,8 +251,24 @@ export default function WhatsAppSendDialog({
     onConfirm(templateName, normalizeTemplateVariables(templateVariables), trimmedRedirectUrl);
   };
 
-  const lockedVariables = useMemo(() => LOCKED_VARIABLES[templateName] || [], [templateName]);
-  const variableLabels = useMemo(() => VARIABLE_LABELS[templateName] || {}, [templateName]);
+  // DB-stored templates carry their own lockedVariableIndexes + variableLabels
+  // from the backend, so new templates work without code changes here.
+  const lockedVariables = useMemo(
+    () =>
+      selectedTemplate?.lockedVariableIndexes &&
+      selectedTemplate.lockedVariableIndexes.length > 0
+        ? selectedTemplate.lockedVariableIndexes
+        : LOCKED_VARIABLES[templateName] || [],
+    [selectedTemplate, templateName]
+  );
+  const variableLabels = useMemo(
+    () =>
+      selectedTemplate?.variableLabels &&
+      Object.keys(selectedTemplate.variableLabels).length > 0
+        ? selectedTemplate.variableLabels
+        : VARIABLE_LABELS[templateName] || {},
+    [selectedTemplate, templateName]
+  );
 
   const templateVariableCount = useMemo(() => {
     if (!selectedTemplate) return 0;

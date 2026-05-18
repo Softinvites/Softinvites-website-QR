@@ -165,6 +165,9 @@ export type WhatsAppTemplateSample = {
   sampleParametersArray?: string[];
   sampleParameters?: Record<string, string>;
   variableLabels?: Record<number, string>;
+  // Sent by the backend for DB-stored templates so newly created templates
+  // automatically use the right locked / auto rules without code changes.
+  lockedVariableIndexes?: number[];
 };
 
 type BuilderProps = {
@@ -715,7 +718,14 @@ export function MessageSequenceBuilder({
               Number(selectedTemplateSample?.expectedVariableCount || 0) || 0,
               selectedTemplateSample?.sampleParametersArray?.length || 0
             );
-            const lockedVariables = LOCKED_VARIABLES[selectedTemplateName] || [];
+            // Prefer the backend-provided lockedVariableIndexes (set for DB
+            // templates) so new templates work without code changes. Fall
+            // back to the legacy hardcoded map for the original templates.
+            const lockedVariables =
+              selectedTemplateSample?.lockedVariableIndexes &&
+              selectedTemplateSample.lockedVariableIndexes.length > 0
+                ? selectedTemplateSample.lockedVariableIndexes
+                : LOCKED_VARIABLES[selectedTemplateName] || [];
             const attachmentAccept =
               allowWhatsApp && item.channels.whatsapp.enabled
                 ? '.png,.jpg,.jpeg,.webp,.gif,image/png,image/jpeg,image/webp,image/gif'

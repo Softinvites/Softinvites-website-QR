@@ -737,73 +737,40 @@ export function RsvpAdminView() {
           prev.map((item) => (item._id === nextEvent?._id ? { ...item, ...nextEvent } : item))
         );
         try {
-          const templatesRes = await axios.get(
-            `${API_BASE}/events/events/${currentEventId}/whatsapp/templates`,
-            {
-              headers: { Authorization: `Bearer ${token}` },
-            }
-          );
-          if (loadRequestRef.current === requestId) {
-            const normalized = normalizeWhatsAppTemplateOptions(templatesRes.data?.templates);
-
-            // Always upsert recommended templates so new templates (rsvp_party, rsvp_wedding)
-            // are added to existing events automatically.
-            try {
-              const upsertRes = await axios.post(
-                `${API_BASE}/events/events/${currentEventId}/whatsapp/templates`,
-                { useRecommended: true, provider: 'twilio', upsert: true },
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-              console.log('[RSVP Admin] Template upsert result:', upsertRes.data);
-            } catch (populateError: any) {
-              console.warn('[RSVP Admin] Unable to upsert WhatsApp templates:', populateError?.response?.data || populateError?.message);
-            }
-
-            // Always fetch fresh after upsert attempt
-            try {
-              const refreshed = await axios.get(
-                `${API_BASE}/events/events/${currentEventId}/whatsapp/templates`,
-                { headers: { Authorization: `Bearer ${token}` } }
-              );
-              console.log('[RSVP Admin] Templates fetched:', refreshed.data?.templates?.map((t: any) => t.name));
-              if (loadRequestRef.current === requestId) {
-                // RSVP admin page: only show templates starting with "rsvp_"
-                const all = normalizeWhatsAppTemplateOptions(refreshed.data?.templates);
-                const rsvpOnly = all.filter((t) => t.name.toLowerCase().startsWith('rsvp_'));
-                console.log('[RSVP Admin] rsvp_ templates:', rsvpOnly.map((t) => t.name));
-                setWhatsappTemplateOptions(rsvpOnly);
-              }
-            } catch (refreshError: any) {
-              console.warn('[RSVP Admin] Unable to refresh WhatsApp templates:', refreshError?.response?.data || refreshError?.message);
-              if (loadRequestRef.current === requestId) {
-                setWhatsappTemplateOptions(
-                  normalized.filter((t) => t.name.toLowerCase().startsWith('rsvp_'))
-                );
-              }
-            }
-          }
-        } catch (templateError) {
-          console.warn('Unable to fetch WhatsApp templates for message builder:', templateError);
-          if (loadRequestRef.current === requestId) {
-            setWhatsappTemplateOptions([]);
-          }
-        }
-        try {
+          // Single source of truth: /whatsapp/template-samples returns the
+          // recommended SoftInvites templates AND any DB-stored Content
+          // Manager templates (approved/pending/received). The guest page
+          // uses the same endpoint, so newly created templates show up here
+          // without an extra registration step.
           const samplesRes = await axios.get(
             `${API_BASE}/events/events/${currentEventId}/whatsapp/template-samples`,
             { headers: { Authorization: `Bearer ${token}` } }
           );
           if (loadRequestRef.current === requestId) {
-            // RSVP admin: only show rsvp_ template samples
-            const allSamples = samplesRes.data?.templates || [];
-            setWhatsappTemplateSamples(
-              allSamples.filter((t: any) => String(t?.templateName || '').toLowerCase().startsWith('rsvp_'))
+            const allSamples: any[] = Array.isArray(samplesRes.data?.templates)
+              ? samplesRes.data.templates
+              : [];
+            // RSVP admin only surfaces rsvp_* templates (the rest belong to
+            // the guest page).
+            const rsvpSamples = allSamples.filter((t) =>
+              String(t?.templateName || '').toLowerCase().startsWith('rsvp_')
+            );
+            setWhatsappTemplateSamples(rsvpSamples);
+            setWhatsappTemplateOptions(
+              rsvpSamples.map((t) => ({
+                id: String(t.templateName),
+                name: String(t.templateName),
+                displayName:
+                  String(t.title || t.templateName).trim() || String(t.templateName),
+                category: String(t.category || '').toUpperCase() || undefined,
+              }))
             );
           }
         } catch (samplesError) {
           console.warn('Unable to fetch WhatsApp template samples:', samplesError);
           if (loadRequestRef.current === requestId) {
             setWhatsappTemplateSamples([]);
+            setWhatsappTemplateOptions([]);
           }
         }
         if (nextEvent?.servicePackage !== 'invitation-only') {

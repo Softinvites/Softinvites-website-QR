@@ -23,6 +23,7 @@ export const RsvpPage = lazy(() => import('src/pages/rsvp'));
 export const RsvpRespondPage = lazy(() => import('src/pages/rsvp-respond'));
 export const RsvpPreferencesPage = lazy(() => import('src/pages/rsvp-preferences'));
 export const RsvpAdminPage = lazy(() => import('src/pages/rsvp-admin'));
+export const WhatsAppTemplatesPage = lazy(() => import('src/pages/whatsapp-templates'));
 
 export const Page404 = lazy(() => import('src/pages/page-not-found'));
 
@@ -70,6 +71,7 @@ export function Router() {
 
             { path: 'guest', element: <GuestPage /> },
             { path: 'rsvp-admin', element: <RsvpAdminPage /> },
+            { path: 'whatsapp-templates', element: <WhatsAppTemplatesPage /> },
             { path: 'change-password', element: <ChangePassword /> },
             { path: 'profile', element: <Profile /> },
           ],
