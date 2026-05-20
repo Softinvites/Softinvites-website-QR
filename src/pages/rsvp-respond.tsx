@@ -3,7 +3,7 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE } from 'src/utils/apiBase';
 
-type Stage = 'loading' | 'submitting' | 'success' | 'error';
+type Stage = 'loading' | 'submitting' | 'success' | 'error' | 'already';
 
 export default function RsvpRespondPage() {
   const { rsvpId } = useParams<{ rsvpId: string }>();
@@ -15,6 +15,9 @@ export default function RsvpRespondPage() {
   const [eventName, setEventName] = useState('');
   const [rsvpCalendarId, setRsvpCalendarId] = useState('');
   const [hasEmail, setHasEmail] = useState(true);
+  // The status actually recorded on the server (may differ from the URL
+  // param if the guest already responded with the opposite answer).
+  const [recordedStatus, setRecordedStatus] = useState<'yes' | 'no' | ''>('');
 
   // Email save state
   const [email, setEmail] = useState('');
@@ -39,6 +42,15 @@ export default function RsvpRespondPage() {
         setEventName(res.data?.eventName || '');
         setRsvpCalendarId(res.data?.rsvpId || rsvpId!);
         setHasEmail(!!res.data?.hasEmail);
+        // One-click lock: the guest already responded — show locked screen
+        // with the response that's actually on record.
+        if (res.data?.alreadySubmitted) {
+          setRecordedStatus(
+            res.data?.attendanceStatus === 'no' ? 'no' : 'yes'
+          );
+          setStage('already');
+          return;
+        }
         setStage('success');
       } catch (err: any) {
         const code = err?.response?.status;
@@ -180,6 +192,33 @@ export default function RsvpRespondPage() {
           <div style={{ ...iconStyle, background: '#c62828' }}>⚠️</div>
           <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>Something went wrong</h2>
           <p style={{ color: '#6b7280', fontSize: 15 }}>{errorMsg}</p>
+        </div>
+      </div>
+    );
+  }
+
+  // One-click lock — the guest has already responded; response is final.
+  if (stage === 'already') {
+    const recordedYes = recordedStatus === 'yes';
+    const lockAccent = recordedYes ? '#2e7d32' : '#c62828';
+    return (
+      <div style={{ ...containerStyle, background: '#f0f4f8' }}>
+        <div style={cardStyle}>
+          <div style={{ ...iconStyle, background: lockAccent }}>🔒</div>
+          <h2 style={{ margin: '0 0 8px', fontSize: 24, color: '#1f2937' }}>
+            Response already submitted
+          </h2>
+          <p style={{ color: '#6b7280', fontSize: 15, margin: '0 0 4px' }}>
+            You have already responded to the invitation
+            {eventName ? ` for ${eventName}` : ''}.
+          </p>
+          <div style={{ fontWeight: 700, color: lockAccent, fontSize: 16, margin: '16px 0' }}>
+            Your response: {recordedYes ? 'YES — Attending' : 'NO — Unable to attend'}
+          </div>
+          <p style={{ color: '#9ca3af', fontSize: 13, marginTop: 14 }}>
+            RSVP responses are final and cannot be changed. If this is a mistake,
+            please contact the event host.
+          </p>
         </div>
       </div>
     );

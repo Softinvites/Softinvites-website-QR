@@ -30,6 +30,8 @@ export type UserProps = {
   _id: string;
   phone: string;
   createdAt: string;
+  // Raw ISO createdAt — used for date-range filtering when sending WhatsApp.
+  createdAtRaw?: string;
   checkedInAt?: string;
   others: string;
   email: string;

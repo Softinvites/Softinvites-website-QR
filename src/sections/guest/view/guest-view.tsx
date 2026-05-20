@@ -425,7 +425,8 @@ export function GuestView() {
   const handleConfirmBulkWhatsApp = async (
     templateName: string,
     templateVariables?: Record<string, string> | null,
-    redirectUrl?: string | null
+    redirectUrl?: string | null,
+    guestIds?: string[] | null
   ) => {
     setLoading(true);
     setWhatsappSendOpen(false);
@@ -454,6 +455,9 @@ export function GuestView() {
           templateName,
           ...(templateVariables ? { templateVariables } : {}),
           ...(redirectUrl ? { redirectUrl } : {}),
+          // When guestIds is provided (checkbox selection or date filter),
+          // send only to those guests. Omitted = send to all (default).
+          ...(guestIds && guestIds.length > 0 ? { guestIds } : {}),
         },
         {
           headers: {
@@ -558,6 +562,7 @@ export function GuestView() {
         email: guest.email,
         phone: guest.phone,
         createdAt: new Date(guest.createdAt).toLocaleDateString(),
+        createdAtRaw: guest.createdAt,
         checkedInAt: guest.checkedInAt,
         others: guest.others || '',
         status: guest.status,
@@ -1259,6 +1264,8 @@ export function GuestView() {
         guestCount={getGuestsWithPhone()}
         loading={loading}
         templateSamples={whatsappTemplateSamples}
+        guests={users}
+        selectedGuestIds={table.selected}
       />
     </DashboardContent>
   );

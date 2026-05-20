@@ -14,6 +14,10 @@ import {
   Alert,
   Grid,
   TextField,
+  RadioGroup,
+  Radio,
+  FormControlLabel,
+  Divider,
 } from '@mui/material';
 import { Iconify } from 'src/components/iconify/iconify';
 
@@ -31,13 +35,27 @@ type WhatsAppTemplateSample = {
   lockedVariableIndexes?: number[];
 };
 
+type DialogGuest = {
+  id: string;
+  phone?: string;
+  createdAtRaw?: string;
+};
+
 interface WhatsAppSendDialogProps {
   open: boolean;
   onClose: () => void;
-  onConfirm: (templateName: string, templateVariables?: Record<string, string> | null, redirectUrl?: string | null) => void;
+  onConfirm: (
+    templateName: string,
+    templateVariables?: Record<string, string> | null,
+    redirectUrl?: string | null,
+    guestIds?: string[] | null
+  ) => void;
   guestCount: number;
   loading: boolean;
   templateSamples?: WhatsAppTemplateSample[];
+  // Full guest list (for date-range filtering) + checkbox-selected ids.
+  guests?: DialogGuest[];
+  selectedGuestIds?: string[];
 }
 
 const normalizeTemplateVariables = (value: any): Record<string, string> | null => {
@@ -215,6 +233,8 @@ export default function WhatsAppSendDialog({
   guestCount,
   loading,
   templateSamples = [],
+  guests = [],
+  selectedGuestIds = [],
 }: WhatsAppSendDialogProps) {
   const availableTemplates = useMemo(
     () => (templateSamples.length ? templateSamples : FALLBACK_TEMPLATE_SAMPLES),
@@ -223,6 +243,49 @@ export default function WhatsAppSendDialog({
   const [templateName, setTemplateName] = useState('');
   const [templateVariables, setTemplateVariables] = useState<Record<string, string>>({});
   const [redirectUrl, setRedirectUrl] = useState('');
+
+  // Recipient targeting: all / checkbox-selected / created-date range.
+  const [recipientMode, setRecipientMode] = useState<'all' | 'selected' | 'date'>('all');
+  const [dateFrom, setDateFrom] = useState('');
+  const [dateTo, setDateTo] = useState('');
+
+  // Reset targeting each time the dialog opens. Default to "selected" when
+  // the admin already ticked guests in the table, otherwise "all".
+  useEffect(() => {
+    if (!open) return;
+    setRecipientMode(selectedGuestIds.length > 0 ? 'selected' : 'all');
+    setDateFrom('');
+    setDateTo('');
+  }, [open, selectedGuestIds.length]);
+
+  const guestsWithPhone = useMemo(
+    () => guests.filter((g) => !!(g.phone && g.phone.trim())),
+    [guests]
+  );
+
+  // Guests whose createdAt falls within the chosen range (inclusive).
+  const dateFilteredIds = useMemo(() => {
+    if (!dateFrom && !dateTo) return [];
+    const fromTs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : -Infinity;
+    const toTs = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : Infinity;
+    return guestsWithPhone
+      .filter((g) => {
+        if (!g.createdAtRaw) return false;
+        const ts = new Date(g.createdAtRaw).getTime();
+        return Number.isFinite(ts) && ts >= fromTs && ts <= toTs;
+      })
+      .map((g) => g.id);
+  }, [guestsWithPhone, dateFrom, dateTo]);
+
+  // Effective recipient ids — null means "all guests" (backend default).
+  const effectiveGuestIds = useMemo<string[] | null>(() => {
+    if (recipientMode === 'selected') return selectedGuestIds;
+    if (recipientMode === 'date') return dateFilteredIds;
+    return null;
+  }, [recipientMode, selectedGuestIds, dateFilteredIds]);
+
+  const effectiveCount =
+    recipientMode === 'all' ? guestCount : effectiveGuestIds?.length || 0;
 
   useEffect(() => {
     if (!availableTemplates.length) return;
@@ -247,8 +310,14 @@ export default function WhatsAppSendDialog({
 
   const handleConfirm = () => {
     if (!templateName) return;
+    if (recipientMode !== 'all' && effectiveCount === 0) return;
     const trimmedRedirectUrl = redirectUrl.trim() || null;
-    onConfirm(templateName, normalizeTemplateVariables(templateVariables), trimmedRedirectUrl);
+    onConfirm(
+      templateName,
+      normalizeTemplateVariables(templateVariables),
+      trimmedRedirectUrl,
+      effectiveGuestIds
+    );
   };
 
   // DB-stored templates carry their own lockedVariableIndexes + variableLabels
@@ -288,9 +357,80 @@ export default function WhatsAppSendDialog({
       </DialogTitle>
 
       <DialogContent>
-        <Alert severity="info" sx={{ mb: 2 }}>
-          You are about to send WhatsApp messages to {guestCount} guests with phone numbers.
+        <Alert
+          severity={recipientMode !== 'all' && effectiveCount === 0 ? 'warning' : 'info'}
+          sx={{ mb: 2 }}
+        >
+          {recipientMode === 'all' &&
+            `You are about to send WhatsApp messages to all ${guestCount} guests with phone numbers.`}
+          {recipientMode === 'selected' &&
+            `You are about to send WhatsApp messages to ${effectiveCount} selected guest${
+              effectiveCount === 1 ? '' : 's'
+            }.`}
+          {recipientMode === 'date' &&
+            (effectiveCount > 0
+              ? `You are about to send WhatsApp messages to ${effectiveCount} guest${
+                  effectiveCount === 1 ? '' : 's'
+                } added in the selected date range.`
+              : 'No guests with phone numbers fall within the selected date range.')}
         </Alert>
+
+        {/* RECIPIENTS */}
+        <Divider textAlign="left" sx={{ mb: 1 }}>
+          <Typography variant="overline" color="text.secondary">
+            Recipients
+          </Typography>
+        </Divider>
+        <FormControl fullWidth>
+          <RadioGroup
+            value={recipientMode}
+            onChange={(e) => setRecipientMode(e.target.value as 'all' | 'selected' | 'date')}
+          >
+            <FormControlLabel
+              value="all"
+              control={<Radio size="small" />}
+              label={`All guests with phone (${guestCount})`}
+            />
+            <FormControlLabel
+              value="selected"
+              control={<Radio size="small" />}
+              disabled={selectedGuestIds.length === 0}
+              label={
+                selectedGuestIds.length > 0
+                  ? `Selected guests (${selectedGuestIds.length})`
+                  : 'Selected guests (tick guests in the table first)'
+              }
+            />
+            <FormControlLabel
+              value="date"
+              control={<Radio size="small" />}
+              label="Guests added within a date range"
+            />
+          </RadioGroup>
+        </FormControl>
+
+        {recipientMode === 'date' && (
+          <Box sx={{ display: 'flex', gap: 2, mt: 1, mb: 1 }}>
+            <TextField
+              type="date"
+              label="From"
+              size="small"
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              value={dateFrom}
+              onChange={(e) => setDateFrom(e.target.value)}
+            />
+            <TextField
+              type="date"
+              label="To"
+              size="small"
+              fullWidth
+              InputLabelProps={{ shrink: true }}
+              value={dateTo}
+              onChange={(e) => setDateTo(e.target.value)}
+            />
+          </Box>
+        )}
 
         <FormControl fullWidth sx={{ mt: 2 }}>
           <InputLabel>Message Template</InputLabel>
@@ -425,13 +565,15 @@ export default function WhatsAppSendDialog({
         <Button
           onClick={handleConfirm}
           variant="contained"
-          disabled={loading}
+          disabled={loading || (recipientMode !== 'all' && effectiveCount === 0)}
           sx={{
             bgcolor: '#25D366',
             '&:hover': { bgcolor: '#128C7E' },
           }}
         >
-          {loading ? 'Sending...' : `Send to ${guestCount} Guests`}
+          {loading
+            ? 'Sending...'
+            : `Send to ${effectiveCount} Guest${effectiveCount === 1 ? '' : 's'}`}
         </Button>
       </DialogActions>
     </Dialog>
