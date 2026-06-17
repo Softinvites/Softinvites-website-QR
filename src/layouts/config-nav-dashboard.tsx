@@ -17,11 +17,11 @@ export const navData = [
     path: '/event',
     icon: icon('ic-user'),
   },
-  // {
-  //   title: 'WhatsApp Templates',
-  //   path: '/whatsapp-templates',
-  //   icon: icon('ic-cart'),
-  // },
+  {
+    title: 'WhatsApp Templates',
+    path: '/whatsapp-templates',
+    icon: icon('ic-cart'),
+  },
 
     {
     title: 'Change Password',
