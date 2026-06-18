@@ -100,7 +100,8 @@ export function GuestView() {
   const table = useTable();
   const [filterName, setFilterName] = useState('');
   const [users, setUsers] = useState<UserProps[]>([]);
-  const [loading, setLoading] = useState(false);
+  const [guestLoading, setGuestLoading] = useState(false);
+  const [backgroundLoading, setBackgroundLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -188,7 +189,7 @@ export function GuestView() {
       return;
     }
 
-    setLoading(true);
+    setGuestLoading(true);
     try {
       const token = localStorage.getItem('token');
       if (!token) {
@@ -220,7 +221,7 @@ export function GuestView() {
       console.error('Error deleting selected guests:', err);
       toast.error(err.response?.data?.message || 'Failed to delete selected guests');
     } finally {
-      setLoading(false);
+      setGuestLoading(false);
       setBatchDeleteModalOpen(false);
     }
   };
@@ -257,7 +258,7 @@ export function GuestView() {
   };
 
   const handleDelete = async () => {
-    setLoading(true);
+    setGuestLoading(true);
     try {
       const token = localStorage.getItem('token');
       const eventIdArray = localStorage.getItem('allRowIds');
@@ -290,13 +291,13 @@ export function GuestView() {
       console.error('Error deleting guests:', err);
       toast.error('Failed to delete guests');
     } finally {
-      setLoading(false);
+      setGuestLoading(false);
       setDeleteModalOpen(false);
     }
   };
 
   const handleDownloadAllQRCodes = async () => {
-    setLoading(true);
+    setGuestLoading(true);
     try {
       const token = localStorage.getItem('token');
       const eventIdArray = localStorage.getItem('allRowIds');
@@ -329,12 +330,12 @@ export function GuestView() {
       console.error('Error downloading QR codes:', err);
       toast.error('Failed to download QR codes');
     } finally {
-      setLoading(false);
+      setGuestLoading(false);
     }
   };
 
   const handleBatchDownloadQRCodes = async (startDate: string, endDate: string) => {
-    setLoading(true);
+    setGuestLoading(true);
     try {
       const token = localStorage.getItem('token');
       const eventIdArray = localStorage.getItem('allRowIds');
@@ -372,12 +373,12 @@ export function GuestView() {
       console.error('Error downloading batch QR codes:', err);
       toast.error('Failed to download batch QR codes');
     } finally {
-      setLoading(false);
+      setGuestLoading(false);
     }
   };
 
   const handleResendEmails = async () => {
-    setLoading(true);
+    setGuestLoading(true);
     try {
       const token = localStorage.getItem('token');
       const eventIdArray = localStorage.getItem('allRowIds');
@@ -409,7 +410,7 @@ export function GuestView() {
       console.error('Error resending emails:', err);
       toast.error(err.response?.data?.message || 'Failed to start email resend job');
     } finally {
-      setLoading(false);
+      setGuestLoading(false);
     }
   };
 
@@ -428,7 +429,7 @@ export function GuestView() {
     redirectUrl?: string | null,
     guestIds?: string[] | null
   ) => {
-    setLoading(true);
+    setGuestLoading(true);
     setWhatsappSendOpen(false);
 
     try {
@@ -480,7 +481,7 @@ export function GuestView() {
       console.error('Error sending bulk WhatsApp:', err);
       toast.error(err.response?.data?.message || 'Failed to send WhatsApp messages');
     } finally {
-      setLoading(false);
+      setGuestLoading(false);
     }
   };
 
@@ -518,10 +519,12 @@ export function GuestView() {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    setLoading(true);
     if (page === 1) {
+      setGuestLoading(true);
       setError(null);
       setUsers([]);
+    } else {
+      setBackgroundLoading(true);
     }
 
     try {
@@ -558,11 +561,11 @@ export function GuestView() {
 
       const totalPages = data.pagination?.totalPages ?? 1;
       if (page < totalPages) {
-        // Load next page in background without blocking UI
         setTimeout(() => loadGuestData(currentEventId, page + 1), 0);
+      } else {
+        setBackgroundLoading(false);
       }
 
-      // Only fetch supporting data on the first page
       if (page === 1) {
         axios
           .get(`${API_BASE}/guest/event-analytics/${currentEventId}`, {
@@ -587,9 +590,10 @@ export function GuestView() {
           .catch(() => {});
       }
     } catch (err: any) {
-      setError(err.message || 'Failed to load guests');
+      if (page === 1) setError(err.message || 'Failed to load guests');
+      setBackgroundLoading(false);
     } finally {
-      setLoading(false);
+      if (page === 1) setGuestLoading(false);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -924,7 +928,7 @@ export function GuestView() {
                     color="secondary"
                     startIcon={<Iconify icon="material-symbols:mail" />}
                     onClick={handleResendEmails}
-                    disabled={loading}
+                    disabled={guestLoading}
                     sx={{
                       backgroundColor: '#ff5722',
                       '&:hover': {
@@ -947,7 +951,7 @@ export function GuestView() {
                     variant="contained"
                     startIcon={<Iconify icon="logos:whatsapp-icon" />}
                     onClick={handleSendBulkWhatsApp}
-                    disabled={loading}
+                    disabled={guestLoading}
                     sx={{
                       backgroundColor: '#25D366',
                       '&:hover': {
@@ -1207,7 +1211,7 @@ export function GuestView() {
                 ]}
               />
               <TableBody>
-                {loading ? (
+                {guestLoading ? (
                   <Typography sx={{ p: 3 }}>Loading...</Typography>
                 ) : error ? (
                   <Typography color="error" sx={{ p: 3 }}>
@@ -1259,7 +1263,7 @@ export function GuestView() {
         handleClose={() => setBatchDeleteModalOpen(false)}
         handleConfirm={handleBatchDelete}
         selectedCount={table.selected.length}
-        loading={loading}
+        loading={guestLoading}
       />
 
       {/* WhatsApp Status Dialog */}
