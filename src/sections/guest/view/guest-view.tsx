@@ -512,18 +512,23 @@ export function GuestView() {
     }
   }
 
-  const loadGuestData = useCallback(async (currentEventId: string) => {
+  const GUEST_PAGE_LIMIT = 100;
+
+  const loadGuestData = useCallback(async (currentEventId: string, page = 1) => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
     setLoading(true);
-    setError(null);
-    setUsers([]);
+    if (page === 1) {
+      setError(null);
+      setUsers([]);
+    }
 
     try {
-      const response = await fetch(`${API_BASE}/guest/events-guest/${currentEventId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const response = await fetch(
+        `${API_BASE}/guest/events-guest/${currentEventId}?page=${page}&limit=${GUEST_PAGE_LIMIT}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
 
       if (!response.ok) throw new Error(response.statusText);
 
@@ -531,27 +536,6 @@ export function GuestView() {
 
       if (!data?.guests || !Array.isArray(data.guests)) {
         throw new Error('Invalid API response format');
-      }
-
-      const analyticsRes = await axios.get(
-        `${API_BASE}/guest/event-analytics/${currentEventId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
-      setAnalytics(analyticsRes.data);
-
-      fetchWhatsAppStats(currentEventId);
-      fetchWhatsAppTemplateSamples(currentEventId, token);
-
-      try {
-        const eventRes = await axios.get(`${API_BASE}/events/events/${currentEventId}`, {
-          headers: { Authorization: `Bearer ${token}` },
-        });
-        if (eventRes.data?.event) {
-          setEventName(eventRes.data.event.name || 'Event Report');
-          setEventDate(eventRes.data.event.date || '');
-        }
-      } catch (eventErr) {
-        console.warn('Could not fetch event details:', eventErr);
       }
 
       const formattedData: UserProps[] = data.guests.map((guest: any) => ({
@@ -570,7 +554,38 @@ export function GuestView() {
         eventId: currentEventId,
       }));
 
-      setUsers(formattedData);
+      setUsers((prev) => (page === 1 ? formattedData : [...prev, ...formattedData]));
+
+      const totalPages = data.pagination?.totalPages ?? 1;
+      if (page < totalPages) {
+        // Load next page in background without blocking UI
+        setTimeout(() => loadGuestData(currentEventId, page + 1), 0);
+      }
+
+      // Only fetch supporting data on the first page
+      if (page === 1) {
+        axios
+          .get(`${API_BASE}/guest/event-analytics/${currentEventId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          .then((res) => setAnalytics(res.data))
+          .catch(() => {});
+
+        fetchWhatsAppStats(currentEventId);
+        fetchWhatsAppTemplateSamples(currentEventId, token);
+
+        axios
+          .get(`${API_BASE}/events/events/${currentEventId}`, {
+            headers: { Authorization: `Bearer ${token}` },
+          })
+          .then((res) => {
+            if (res.data?.event) {
+              setEventName(res.data.event.name || 'Event Report');
+              setEventDate(res.data.event.date || '');
+            }
+          })
+          .catch(() => {});
+      }
     } catch (err: any) {
       setError(err.message || 'Failed to load guests');
     } finally {
