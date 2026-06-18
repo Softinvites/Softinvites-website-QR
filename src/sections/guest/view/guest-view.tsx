@@ -521,22 +521,35 @@ export function GuestView() {
     setUsers([]);
 
     try {
-      const response = await fetch(`${API_BASE}/guest/events-guest/${currentEventId}`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const limit = 200;
+      let page = 1;
+      let allGuests: any[] = [];
+      let totalPages = 1;
 
-      if (!response.ok) throw new Error(response.statusText);
+      do {
+        const response = await fetch(
+          `${API_BASE}/guest/events-guest/${currentEventId}?page=${page}&limit=${limit}`,
+          { headers: { Authorization: `Bearer ${token}` } }
+        );
 
-      const data = await response.json();
+        if (!response.ok) throw new Error(response.statusText);
 
-      if (!data?.guests || !Array.isArray(data.guests)) {
-        throw new Error('Invalid API response format');
-      }
+        const data = await response.json();
 
-      const analyticsRes = await axios.get(
-        `${API_BASE}/guest/event-analytics/${currentEventId}`,
-        { headers: { Authorization: `Bearer ${token}` } }
-      );
+        if (!data?.guests || !Array.isArray(data.guests)) {
+          throw new Error('Invalid API response format');
+        }
+
+        allGuests = allGuests.concat(data.guests);
+        totalPages = data.pagination?.totalPages ?? 1;
+        page += 1;
+      } while (page <= totalPages);
+
+      const [analyticsRes] = await Promise.all([
+        axios.get(`${API_BASE}/guest/event-analytics/${currentEventId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
       setAnalytics(analyticsRes.data);
 
       fetchWhatsAppStats(currentEventId);
@@ -554,7 +567,7 @@ export function GuestView() {
         console.warn('Could not fetch event details:', eventErr);
       }
 
-      const formattedData: UserProps[] = data.guests.map((guest: any) => ({
+      const formattedData: UserProps[] = allGuests.map((guest: any) => ({
         id: guest._id,
         _id: guest._id,
         fullname: guest.fullname,
