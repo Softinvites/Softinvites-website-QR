@@ -101,7 +101,6 @@ export function GuestView() {
   const [filterName, setFilterName] = useState('');
   const [users, setUsers] = useState<UserProps[]>([]);
   const [guestLoading, setGuestLoading] = useState(false);
-  const [backgroundLoading, setBackgroundLoading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
@@ -317,18 +316,47 @@ export function GuestView() {
 
       const response = await axios.get(`${API_BASE}/guest/download-all-qrcode/${derivedEventId}`, {
         headers: { Authorization: `Bearer ${token}` },
-        timeout: 300000,
+        timeout: 30000,
       });
 
-      if (response.data?.zipDownloadLink) {
-        window.location.href = response.data.zipDownloadLink;
-        toast.success('QR codes download started!');
-      } else {
+      const { zipDownloadLink, async: isAsync, guestCount } = response.data;
+
+      if (!zipDownloadLink) {
         toast.error('Download link not available');
+        return;
       }
-    } catch (err) {
+
+      if (isAsync) {
+        toast.info(
+          `Generating ZIP for ${guestCount} guests — this takes 1–3 minutes. Download will start automatically.`,
+          { autoClose: 8000 }
+        );
+        const started = Date.now();
+        const poll = async () => {
+          try {
+            await axios.head(zipDownloadLink, { timeout: 10000 });
+            window.location.href = zipDownloadLink;
+            toast.success('ZIP is ready — downloading now!');
+          } catch {
+            if (Date.now() - started < 300000) {
+              setTimeout(poll, 10000);
+            } else {
+              toast.error('ZIP generation timed out. Please try again.');
+            }
+          }
+        };
+        setTimeout(poll, 15000);
+      } else {
+        window.location.href = zipDownloadLink;
+        toast.success('QR codes download started!');
+      }
+    } catch (err: any) {
       console.error('Error downloading QR codes:', err);
-      toast.error('Failed to download QR codes');
+      const msg =
+        err.response?.data?.error ||
+        err.response?.data?.message ||
+        (err.code === 'ECONNABORTED' ? 'Request timed out — try again or use Batch Download' : 'Failed to download QR codes');
+      toast.error(msg);
     } finally {
       setGuestLoading(false);
     }
@@ -513,87 +541,63 @@ export function GuestView() {
     }
   }
 
-  const GUEST_PAGE_LIMIT = 100;
-
-  const loadGuestData = useCallback(async (currentEventId: string, page = 1) => {
+  const loadGuestData = useCallback(async (currentEventId: string) => {
     const token = localStorage.getItem('token');
     if (!token) return;
 
-    if (page === 1) {
-      setGuestLoading(true);
-      setError(null);
-      setUsers([]);
-    } else {
-      setBackgroundLoading(true);
-    }
+    setGuestLoading(true);
+    setError(null);
+    setUsers([]);
 
     try {
-      const response = await fetch(
-        `${API_BASE}/guest/events-guest/${currentEventId}?page=${page}&limit=${GUEST_PAGE_LIMIT}`,
-        { headers: { Authorization: `Bearer ${token}` } }
+      const [guestRes, analyticsRes, eventRes] = await Promise.allSettled([
+        fetch(`${API_BASE}/guest/events-guest/${currentEventId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_BASE}/guest/event-analytics/${currentEventId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+        axios.get(`${API_BASE}/events/events/${currentEventId}`, {
+          headers: { Authorization: `Bearer ${token}` },
+        }),
+      ]);
+
+      if (guestRes.status === 'rejected') throw new Error(guestRes.reason?.message || 'Failed to load guests');
+      if (!guestRes.value.ok) throw new Error(guestRes.value.statusText);
+
+      const data = await guestRes.value.json();
+      if (!data?.guests || !Array.isArray(data.guests)) throw new Error('Invalid API response format');
+
+      setUsers(
+        data.guests.map((guest: any) => ({
+          id: guest._id,
+          _id: guest._id,
+          fullname: guest.fullname,
+          TableNo: guest.TableNo,
+          email: guest.email,
+          phone: guest.phone,
+          createdAt: new Date(guest.createdAt).toLocaleDateString(),
+          createdAtRaw: guest.createdAt,
+          checkedInAt: guest.checkedInAt,
+          others: guest.others || '',
+          status: guest.status,
+          qrCode: guest.qrCode,
+          eventId: currentEventId,
+        }))
       );
 
-      if (!response.ok) throw new Error(response.statusText);
-
-      const data = await response.json();
-
-      if (!data?.guests || !Array.isArray(data.guests)) {
-        throw new Error('Invalid API response format');
+      if (analyticsRes.status === 'fulfilled') setAnalytics(analyticsRes.value.data);
+      if (eventRes.status === 'fulfilled' && eventRes.value.data?.event) {
+        setEventName(eventRes.value.data.event.name || 'Event Report');
+        setEventDate(eventRes.value.data.event.date || '');
       }
 
-      const formattedData: UserProps[] = data.guests.map((guest: any) => ({
-        id: guest._id,
-        _id: guest._id,
-        fullname: guest.fullname,
-        TableNo: guest.TableNo,
-        email: guest.email,
-        phone: guest.phone,
-        createdAt: new Date(guest.createdAt).toLocaleDateString(),
-        createdAtRaw: guest.createdAt,
-        checkedInAt: guest.checkedInAt,
-        others: guest.others || '',
-        status: guest.status,
-        qrCode: guest.qrCode,
-        eventId: currentEventId,
-      }));
-
-      setUsers((prev) => (page === 1 ? formattedData : [...prev, ...formattedData]));
-
-      const totalPages = data.pagination?.totalPages ?? 1;
-      if (page < totalPages) {
-        setTimeout(() => loadGuestData(currentEventId, page + 1), 0);
-      } else {
-        setBackgroundLoading(false);
-      }
-
-      if (page === 1) {
-        axios
-          .get(`${API_BASE}/guest/event-analytics/${currentEventId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-          .then((res) => setAnalytics(res.data))
-          .catch(() => {});
-
-        fetchWhatsAppStats(currentEventId);
-        fetchWhatsAppTemplateSamples(currentEventId, token);
-
-        axios
-          .get(`${API_BASE}/events/events/${currentEventId}`, {
-            headers: { Authorization: `Bearer ${token}` },
-          })
-          .then((res) => {
-            if (res.data?.event) {
-              setEventName(res.data.event.name || 'Event Report');
-              setEventDate(res.data.event.date || '');
-            }
-          })
-          .catch(() => {});
-      }
+      fetchWhatsAppStats(currentEventId);
+      fetchWhatsAppTemplateSamples(currentEventId, token);
     } catch (err: any) {
-      if (page === 1) setError(err.message || 'Failed to load guests');
-      setBackgroundLoading(false);
+      setError(err.message || 'Failed to load guests');
     } finally {
-      if (page === 1) setGuestLoading(false);
+      setGuestLoading(false);
     }
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -1281,7 +1285,7 @@ export function GuestView() {
         onClose={() => setWhatsappSendOpen(false)}
         onConfirm={handleConfirmBulkWhatsApp}
         guestCount={getGuestsWithPhone()}
-        loading={loading}
+        loading={guestLoading}
         templateSamples={whatsappTemplateSamples}
         guests={users}
         selectedGuestIds={table.selected}
