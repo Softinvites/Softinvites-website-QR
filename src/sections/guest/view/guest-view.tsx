@@ -225,6 +225,8 @@ export function GuestView() {
     }
   };
 
+  const [forceResend, setForceResend] = useState(false);
+
   const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
@@ -232,6 +234,7 @@ export function GuestView() {
       formData.append('file', file);
       if (eventId) formData.append('eventId', eventId);
       if (userEmail) formData.append('userEmail', userEmail);
+      formData.append('forceResend', String(forceResend));
 
       try {
         const token = localStorage.getItem('token');
@@ -244,7 +247,8 @@ export function GuestView() {
 
         console.log('Response from backend:', response.data);
 
-        toast.success(response.data.message || 'CSV imported successfully');
+        toast.success(response.data.message || 'Import started successfully');
+        setForceResend(false);
       } catch (err: any) {
         console.error('Error importing CSV:', err);
         toast.error(err.response?.data?.message || 'CSV import failed');
@@ -781,11 +785,28 @@ export function GuestView() {
                       height: { xs: '52px', sm: '40px', md: '48px' },
                     }}
                   >
-                    Import Guest
+                    {forceResend ? 'Force Re-Import' : 'Import Guest'}
                   </Button>
+                  <Box sx={{ mt: 0.5, display: 'flex', alignItems: 'center', gap: 0.5 }}>
+                    <input
+                      type="checkbox"
+                      id="forceResendCheck"
+                      checked={forceResend}
+                      onChange={(e) => setForceResend(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    <Typography
+                      component="label"
+                      htmlFor="forceResendCheck"
+                      variant="caption"
+                      sx={{ cursor: 'pointer', color: forceResend ? 'error.main' : 'text.secondary' }}
+                    >
+                      Force re-send duplicates
+                    </Typography>
+                  </Box>
                   <input
                     type="file"
-                    accept=".csv"
+                    accept=".csv,.xlsx,.xls"
                     ref={fileInputRef}
                     onChange={handleFileChange}
                     style={{ display: 'none' }}
