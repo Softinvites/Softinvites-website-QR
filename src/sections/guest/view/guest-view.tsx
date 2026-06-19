@@ -334,9 +334,18 @@ export function GuestView() {
         const started = Date.now();
         const poll = async () => {
           try {
-            await axios.head(zipDownloadLink, { timeout: 10000 });
-            window.location.href = zipDownloadLink;
-            toast.success('ZIP is ready — downloading now!');
+            const pollRes = await axios.get(`${API_BASE}/guest/zip-ready/${derivedEventId}`, {
+              headers: { Authorization: `Bearer ${token}` },
+              timeout: 10000,
+            });
+            if (pollRes.data?.ready && pollRes.data?.zipDownloadLink) {
+              window.location.href = pollRes.data.zipDownloadLink;
+              toast.success('ZIP is ready — downloading now!');
+            } else if (Date.now() - started < 300000) {
+              setTimeout(poll, 10000);
+            } else {
+              toast.error('ZIP generation timed out. Please try again.');
+            }
           } catch {
             if (Date.now() - started < 300000) {
               setTimeout(poll, 10000);
