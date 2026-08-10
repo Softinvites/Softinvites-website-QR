@@ -37,7 +37,9 @@ import type { UserProps } from '../user-table-row'; // Import the new modal
 const EVENT_EXPIRATION_GRACE_MS = 2 * 24 * 60 * 60 * 1000;
 
 const getEventStatus = (event: any): UserProps['status'] => {
-  const cleanedDate = String(event?.date || '').replace(/(\d+)(st|nd|rd|th)/g, '$1');
+  const rawDate = String(event?.date || '');
+  const firstDate = rawDate.split(/[$&,\u2013\u2014-]/)[0].trim();
+  const cleanedDate = firstDate.replace(/(\d+)(st|nd|rd|th)/g, '$1');
   const eventDate = new Date(cleanedDate);
   const hasValidDate = !Number.isNaN(eventDate.getTime());
   const isExpired = hasValidDate
