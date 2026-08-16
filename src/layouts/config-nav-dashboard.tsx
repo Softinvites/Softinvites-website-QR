@@ -8,8 +8,11 @@ const icon = (name: string) => (
 
 export const navData = [
   {
+    // '/home', not '/'. On softinvite.com the root belongs to the brand site,
+    // so '/' would leave the app on a refresh or open-in-new-tab. Pointing here
+    // also makes the active-state highlight work, since the page really is /home.
     title: 'Dashboard',
-    path: '/',
+    path: '/home',
     icon: icon('ic-analytics'),
   },
   {

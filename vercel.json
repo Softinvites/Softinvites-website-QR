@@ -1,51 +1,6 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "redirects": [
-    { "source": "/login", "destination": "/sign-in", "permanent": false },
-    { "source": "/signin", "destination": "/sign-in", "permanent": false },
-    { "source": "/dashboard", "destination": "/home", "permanent": false }
-  ],
   "rewrites": [
-    {
-      "source": "/",
-      "destination": "https://softinvites-web.vercel.app/"
-    },
-    {
-      "source": "/about",
-      "destination": "https://softinvites-web.vercel.app/about"
-    },
-    {
-      "source": "/services",
-      "destination": "https://softinvites-web.vercel.app/services"
-    },
-    {
-      "source": "/work",
-      "destination": "https://softinvites-web.vercel.app/work"
-    },
-    {
-      "source": "/testimonials",
-      "destination": "https://softinvites-web.vercel.app/testimonials"
-    },
-    {
-      "source": "/contact",
-      "destination": "https://softinvites-web.vercel.app/contact"
-    },
-    {
-      "source": "/site-assets/:path*",
-      "destination": "https://softinvites-web.vercel.app/site-assets/:path*"
-    },
-    {
-      "source": "/media/:path*",
-      "destination": "https://softinvites-web.vercel.app/media/:path*"
-    },
-    {
-      "source": "/sitemap.xml",
-      "destination": "https://softinvites-web.vercel.app/sitemap.xml"
-    },
-    {
-      "source": "/robots.txt",
-      "destination": "https://softinvites-web.vercel.app/robots.txt"
-    },
     {
       "source": "/(.*)",
       "destination": "/"

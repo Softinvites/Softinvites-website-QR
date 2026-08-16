@@ -13,7 +13,6 @@ import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
 import Divider from '@mui/material/Divider';
 import TableRow from '@mui/material/TableRow';
-import MenuItem from '@mui/material/MenuItem';
 import TableBody from '@mui/material/TableBody';
 import TableCell from '@mui/material/TableCell';
 import TableHead from '@mui/material/TableHead';
@@ -33,6 +32,14 @@ import { API_BASE } from 'src/utils/apiBase';
 
 // ----------------------------------------------------------------------
 
+type Reply = {
+  body: string;
+  subject: string;
+  sentAt: string;
+  delivered: boolean;
+  error?: string | null;
+};
+
 type Enquiry = {
   _id: string;
   name: string;
@@ -44,12 +51,24 @@ type Enquiry = {
   guestCount?: string;
   services: string[];
   message?: string;
+  /** System-managed: new → read on open → responded once a reply is sent. */
   status: 'new' | 'read' | 'responded' | 'archived';
   adminNotes?: string;
+  replies?: Reply[];
+  lastRepliedAt?: string | null;
   notified: boolean;
   notificationError?: string | null;
   createdAt: string;
 };
+
+/** Surfaces the real server message instead of a minified axios error. */
+const errorText = (err: any, fallback: string) =>
+  err?.response?.data?.message ||
+  err?.response?.data?.errors?.[0]?.message ||
+  (typeof err?.response?.data === 'string' ? err.response.data : null) ||
+  (err?.response?.status ? `${fallback} (HTTP ${err.response.status})` : null) ||
+  err?.message ||
+  fallback;
 
 type Counts = Record<string, number>;
 
@@ -92,6 +111,11 @@ export function EnquiriesView() {
   const [selected, setSelected] = useState<Enquiry | null>(null);
   const [notes, setNotes] = useState('');
   const [saving, setSaving] = useState(false);
+  const [replyBody, setReplyBody] = useState('');
+  const [replySubject, setReplySubject] = useState('');
+  const [sendingReply, setSendingReply] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState<Enquiry | null>(null);
+  const [deleting, setDeleting] = useState(false);
 
   const token = localStorage.getItem('token');
   const authHeaders = useMemo(() => ({ Authorization: `Bearer ${token}` }), [token]);
@@ -117,7 +141,7 @@ export function EnquiriesView() {
       setPages(res.data?.pagination?.pages || 1);
       setTotal(res.data?.pagination?.total || 0);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to load enquiries');
+      toast.error(errorText(err, 'Failed to load enquiries'));
     } finally {
       setLoading(false);
     }
@@ -130,11 +154,18 @@ export function EnquiriesView() {
   const openEnquiry = async (enquiry: Enquiry) => {
     setSelected(enquiry);
     setNotes(enquiry.adminNotes || '');
+    setReplyBody('');
+    setReplySubject(`Re: your ${enquiry.eventType} enquiry — SoftInvites`);
 
-    // Opening marks it read server-side; reflect that locally without a refetch.
-    if (enquiry.status === 'new') {
-      try {
-        await axios.get(`${API_BASE}/contact/${enquiry._id}`, { headers: authHeaders });
+    // Opening marks it read server-side. Fetch the full record so replies load.
+    try {
+      const res = await axios.get(`${API_BASE}/contact/${enquiry._id}`, {
+        headers: authHeaders,
+      });
+      const full: Enquiry = res.data?.message;
+      if (full) setSelected(full);
+
+      if (enquiry.status === 'new') {
         setEnquiries((prev) =>
           prev.map((row) => (row._id === enquiry._id ? { ...row, status: 'read' } : row))
         );
@@ -143,38 +174,69 @@ export function EnquiriesView() {
           new: Math.max(0, (prev.new || 1) - 1),
           read: (prev.read || 0) + 1,
         }));
-      } catch {
-        // Non-fatal — the detail dialog is already populated from the list row.
       }
+    } catch {
+      // Non-fatal — the dialog is already populated from the list row.
     }
   };
 
-  const updateEnquiry = async (
-    id: string,
-    patch: { status?: Enquiry['status']; adminNotes?: string }
-  ) => {
+  /** Internal notes only. Status is driven by what happens, not set by hand. */
+  const saveNotes = async (id: string) => {
     setSaving(true);
     try {
-      await axios.patch(`${API_BASE}/contact/${id}`, patch, { headers: authHeaders });
-      toast.success('Enquiry updated');
+      await axios.patch(
+        `${API_BASE}/contact/${id}`,
+        { adminNotes: notes },
+        { headers: authHeaders }
+      );
+      toast.success('Notes saved');
       setSelected(null);
       loadEnquiries();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to update enquiry');
+      toast.error(errorText(err, 'Failed to save notes'));
     } finally {
       setSaving(false);
     }
   };
 
-  const deleteEnquiry = async (id: string) => {
-    if (!window.confirm('Delete this enquiry permanently?')) return;
+  const sendReply = async (id: string) => {
+    if (!replyBody.trim()) {
+      toast.error('Write a message before sending');
+      return;
+    }
+    setSendingReply(true);
     try {
-      await axios.delete(`${API_BASE}/contact/${id}`, { headers: authHeaders });
+      const res = await axios.post(
+        `${API_BASE}/contact/${id}/reply`,
+        { body: replyBody, subject: replySubject, includeOriginal: true },
+        { headers: authHeaders }
+      );
+      toast.success('Reply sent');
+      setReplyBody('');
+      if (res.data?.data) setSelected(res.data.data);
+      loadEnquiries();
+    } catch (err: any) {
+      toast.error(errorText(err, 'Failed to send reply'));
+    } finally {
+      setSendingReply(false);
+    }
+  };
+
+  const deleteEnquiry = async () => {
+    if (!confirmDelete) return;
+    setDeleting(true);
+    try {
+      await axios.delete(`${API_BASE}/contact/${confirmDelete._id}`, {
+        headers: authHeaders,
+      });
       toast.success('Enquiry deleted');
+      setConfirmDelete(null);
       setSelected(null);
       loadEnquiries();
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to delete enquiry');
+      toast.error(errorText(err, 'Failed to delete enquiry'));
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -193,7 +255,7 @@ export function EnquiriesView() {
       link.remove();
       window.URL.revokeObjectURL(url);
     } catch (err: any) {
-      toast.error(err?.response?.data?.message || 'Failed to export enquiries');
+      toast.error(errorText(err, 'Failed to export enquiries'));
     }
   };
 
@@ -331,7 +393,7 @@ export function EnquiriesView() {
                         <IconButton
                           onClick={(event) => {
                             event.stopPropagation();
-                            deleteEnquiry(enquiry._id);
+                            setConfirmDelete(enquiry);
                           }}
                         >
                           <Iconify icon="solar:trash-bin-trash-bold" />
@@ -412,27 +474,87 @@ export function EnquiriesView() {
                   </Typography>
                 )}
 
+                {/* ------------------------------------------- Reply thread */}
+                {selected.replies && selected.replies.length > 0 && (
+                  <>
+                    <Divider />
+                    <Field label={`Replies sent (${selected.replies.length})`}>
+                      <Stack spacing={1.5} sx={{ mt: 1 }}>
+                        {selected.replies.map((reply) => (
+                          <Box
+                            key={reply.sentAt}
+                            sx={{
+                              p: 1.5,
+                              borderRadius: 1,
+                              bgcolor: 'background.neutral',
+                              borderLeft: 2,
+                              borderColor: reply.delivered ? 'success.main' : 'error.main',
+                            }}
+                          >
+                            <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                              {formatDate(reply.sentAt)}
+                              {!reply.delivered && ` — failed: ${reply.error}`}
+                            </Typography>
+                            <Typography
+                              variant="body2"
+                              sx={{ mt: 0.5, whiteSpace: 'pre-wrap' }}
+                            >
+                              {reply.body}
+                            </Typography>
+                          </Box>
+                        ))}
+                      </Stack>
+                    </Field>
+                  </>
+                )}
+
+                {/* ---------------------------------------- Reply composer */}
                 <Divider />
 
-                <TextField
-                  select
-                  fullWidth
-                  size="small"
-                  label="Status"
-                  value={selected.status}
-                  onChange={(event) =>
-                    setSelected({
-                      ...selected,
-                      status: event.target.value as Enquiry['status'],
-                    })
-                  }
-                >
-                  {['new', 'read', 'responded', 'archived'].map((option) => (
-                    <MenuItem key={option} value={option} sx={{ textTransform: 'capitalize' }}>
-                      {option}
-                    </MenuItem>
-                  ))}
-                </TextField>
+                <Box>
+                  <Typography variant="subtitle2" sx={{ mb: 1.5 }}>
+                    Reply to {selected.name}
+                  </Typography>
+                  <Stack spacing={1.5}>
+                    <TextField
+                      fullWidth
+                      size="small"
+                      label="Subject"
+                      value={replySubject}
+                      onChange={(event) => setReplySubject(event.target.value)}
+                    />
+                    <TextField
+                      fullWidth
+                      multiline
+                      rows={5}
+                      size="small"
+                      placeholder={`Dear ${selected.name},\n\nThank you for reaching out…`}
+                      value={replyBody}
+                      onChange={(event) => setReplyBody(event.target.value)}
+                    />
+                    <Box display="flex" alignItems="center" gap={1.5}>
+                      <Button
+                        variant="contained"
+                        disabled={sendingReply || !replyBody.trim()}
+                        startIcon={
+                          sendingReply ? (
+                            <CircularProgress size={16} color="inherit" />
+                          ) : (
+                            <Iconify icon="solar:plain-bold" />
+                          )
+                        }
+                        onClick={() => sendReply(selected._id)}
+                      >
+                        {sendingReply ? 'Sending…' : 'Send reply'}
+                      </Button>
+                      <Typography variant="caption" sx={{ color: 'text.disabled' }}>
+                        Sent from info@softinvite.com to {selected.email}
+                      </Typography>
+                    </Box>
+                  </Stack>
+                </Box>
+
+                <Divider />
 
                 <TextField
                   fullWidth
@@ -440,6 +562,7 @@ export function EnquiriesView() {
                   rows={3}
                   size="small"
                   label="Internal notes"
+                  helperText="Only visible here — never sent to the enquirer."
                   value={notes}
                   onChange={(event) => setNotes(event.target.value)}
                 />
@@ -449,33 +572,55 @@ export function EnquiriesView() {
             <DialogActions>
               <Button
                 color="error"
-                onClick={() => deleteEnquiry(selected._id)}
+                onClick={() => setConfirmDelete(selected)}
                 sx={{ mr: 'auto' }}
               >
                 Delete
               </Button>
-              <Button
-                href={`mailto:${selected.email}?subject=${encodeURIComponent(
-                  `Re: your ${selected.eventType} enquiry — SoftInvites`
-                )}`}
-              >
-                Reply by email
+              <Button color="inherit" onClick={() => setSelected(null)}>
+                Close
               </Button>
               <Button
                 variant="contained"
                 disabled={saving}
-                onClick={() =>
-                  updateEnquiry(selected._id, {
-                    status: selected.status,
-                    adminNotes: notes,
-                  })
-                }
+                onClick={() => saveNotes(selected._id)}
               >
-                Save
+                {saving ? 'Saving…' : 'Save notes'}
               </Button>
             </DialogActions>
           </>
         )}
+      </Dialog>
+
+      {/* --------------------------------------------- Delete confirmation */}
+      <Dialog
+        open={!!confirmDelete}
+        onClose={() => !deleting && setConfirmDelete(null)}
+        maxWidth="xs"
+        fullWidth
+      >
+        <DialogTitle>Delete this enquiry?</DialogTitle>
+        <DialogContent>
+          <Typography variant="body2" sx={{ color: 'text.secondary' }}>
+            {confirmDelete?.name}&rsquo;s enquiry about{' '}
+            <strong>{confirmDelete?.eventType}</strong> will be permanently removed,
+            including any replies already sent. This cannot be undone.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button color="inherit" disabled={deleting} onClick={() => setConfirmDelete(null)}>
+            Cancel
+          </Button>
+          <Button
+            color="error"
+            variant="contained"
+            disabled={deleting}
+            startIcon={deleting ? <CircularProgress size={16} color="inherit" /> : null}
+            onClick={deleteEnquiry}
+          >
+            {deleting ? 'Deleting…' : 'Delete permanently'}
+          </Button>
+        </DialogActions>
       </Dialog>
     </DashboardContent>
   );
