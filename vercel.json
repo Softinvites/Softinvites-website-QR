@@ -1,14 +1,10 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-
-  "//": "This project keeps softinvite.com. The marketing site (softinvites-web) is a SEPARATE Vercel project, proxied in on the paths below — so guest-facing RSVP links (/r/*, /rsvp/*) keep being served directly by this app, exactly as they are today. Nothing about them changes. Replace MARKETING_HOST below with the marketing project's production URL.",
-
   "redirects": [
     { "source": "/login", "destination": "/sign-in", "permanent": false },
     { "source": "/signin", "destination": "/sign-in", "permanent": false },
     { "source": "/dashboard", "destination": "/home", "permanent": false }
   ],
-
   "rewrites": [
     {
       "source": "/",
@@ -51,12 +47,6 @@
       "destination": "https://softinvites-web.vercel.app/robots.txt"
     },
     {
-      "source": "/favicon.svg",
-      "destination": "https://softinvites-web.vercel.app/favicon.svg"
-    },
-
-    {
-      "//": "SPA fallback for this app. MUST stay last — it matches everything.",
       "source": "/(.*)",
       "destination": "/"
     }
