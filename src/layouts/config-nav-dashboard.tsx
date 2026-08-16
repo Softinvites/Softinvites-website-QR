@@ -23,6 +23,12 @@ export const navData = [
   //   icon: icon('ic-cart'),
   // },
 
+  {
+    title: 'Enquiries',
+    path: '/enquiries',
+    icon: icon('ic-blog'),
+  },
+
     {
     title: 'Change Password',
     path: '/change-password',
