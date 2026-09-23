@@ -106,6 +106,9 @@ type RsvpFormSettings = {
   commentsLabel: string;
   commentsPlaceholder: string;
   submitLabel: string;
+  /** Event-level default. When set, every RSVP link for this event
+   *  forwards to this URL instead of the built-in form. */
+  externalFormUrl: string;
   customFields: RsvpCustomField[];
 };
 
@@ -135,6 +138,7 @@ const defaultRsvpFormSettings: RsvpFormSettings = {
   commentsLabel: 'Additional Comments',
   commentsPlaceholder: '',
   submitLabel: 'Submit',
+  externalFormUrl: '',
   customFields: [],
 };
 
@@ -183,6 +187,8 @@ const normalizeRsvpFormSettings = (settings: any): RsvpFormSettings => ({
   ...(settings || {}),
   isInvalidated: settings?.isInvalidated === true,
   submitLabel: 'Submit',
+  externalFormUrl:
+    typeof settings?.externalFormUrl === 'string' ? settings.externalFormUrl.trim() : '',
   customFields: Array.isArray(settings?.customFields)
     ? settings.customFields.map((field: any, index: number) => normalizeCustomField(field, index))
     : [],
@@ -2252,12 +2258,26 @@ export function RsvpAdminView() {
                 fullWidth
               />
               <TextField
-                label="Optional Redirect URL"
+                label="Optional Redirect URL (this link only)"
                 value={formLinkRedirectUrl}
                 onChange={(e) => setFormLinkRedirectUrl(e.target.value)}
                 placeholder="https://example.com/my-form"
                 disabled={!eventId || mode === 'invitation-only'}
-                helperText="Optional. If filled, clicking the RSVP form link will redirect to this URL after the auto-generated form loads."
+                helperText="Optional. Applies only to the link generated below, and overrides the event-wide external form URL."
+                fullWidth
+              />
+              <TextField
+                label="External RSVP Form URL (whole event)"
+                value={rsvpFormSettings.externalFormUrl}
+                onChange={(e) =>
+                  setRsvpFormSettings((prev) => ({
+                    ...prev,
+                    externalFormUrl: e.target.value,
+                  }))
+                }
+                placeholder="https://forms.gle/your-client-form"
+                disabled={!eventId || mode === 'invitation-only'}
+                helperText="Optional. Set once and every RSVP link for this event — WhatsApp sends, scheduled messages and generated links — forwards guests here instead of the built-in form. Save RSVP form settings to apply."
                 fullWidth
               />
               <Stack direction={{ xs: 'column', md: 'row' }} spacing={2} alignItems="center">

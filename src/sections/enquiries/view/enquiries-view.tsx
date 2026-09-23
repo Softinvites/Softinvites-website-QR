@@ -175,8 +175,18 @@ export function EnquiriesView() {
           read: (prev.read || 0) + 1,
         }));
       }
-    } catch {
-      // Non-fatal — the dialog is already populated from the list row.
+    } catch (err: any) {
+      // 404 means the row is stale — deleted in another tab or session. Close
+      // the dialog and resync rather than showing a record that no longer exists.
+      if (err?.response?.status === 404) {
+        toast.error('That enquiry no longer exists. Refreshing the list.');
+        setSelected(null);
+        loadEnquiries();
+        return;
+      }
+      // Any other failure is non-fatal: the dialog already has the list row's
+      // data, it just won't show the reply history.
+      toast.error(errorText(err, 'Could not load the full enquiry'));
     }
   };
 
@@ -184,7 +194,9 @@ export function EnquiriesView() {
   const saveNotes = async (id: string) => {
     setSaving(true);
     try {
-      await axios.patch(
+      // PUT, not PATCH: API Gateway's CORS allowedMethods omitted PATCH, so its
+      // preflight was rejected before the Lambda ever ran. The API accepts both.
+      await axios.put(
         `${API_BASE}/contact/${id}`,
         { adminNotes: notes },
         { headers: authHeaders }

@@ -47,9 +47,13 @@ type AutoSource =
   | 'event_date'
   | 'event_time'
   | 'event_venue'
+  | 'guest_table_no'
   | 'event_signoff'
   | 'event_iv'
   | 'header_media_path'
+  // Legacy. No longer offered in the picker (WhatsApp URL buttons take a
+  // suffix appended to a fixed base, so a full URL is never usable), but kept
+  // so templates approved before that change still load and typecheck.
   | 'qr_pass_url'
   | 'qr_pass_suffix'
   | 'rsvp_id_raw'
@@ -114,11 +118,11 @@ const AUTO_SOURCE_OPTIONS: { value: AutoSource; label: string }[] = [
   { value: 'event_date', label: 'Event Date (auto)' },
   { value: 'event_time', label: 'Event Time (auto)' },
   { value: 'event_venue', label: 'Event Venue (auto)' },
+  { value: 'guest_table_no', label: 'Guest Table No (auto)' },
   { value: 'event_signoff', label: 'Event Signoff (auto)' },
   { value: 'event_iv', label: 'Event IV / Image URL (auto)' },
   { value: 'header_media_path', label: 'Header Media S3 Path (auto)' },
-  { value: 'qr_pass_url', label: 'QR Pass URL — full (auto)' },
-  { value: 'qr_pass_suffix', label: 'QR Pass URL — suffix only (auto)' },
+  { value: 'qr_pass_suffix', label: 'QR Pass URL suffix (auto)' },
   { value: 'rsvp_id_raw', label: 'RSVP ID — raw (auto)' },
   { value: 'rsvp_yes_link', label: 'RSVP Yes Link (auto)' },
   { value: 'rsvp_no_link', label: 'RSVP No Link (auto)' },
