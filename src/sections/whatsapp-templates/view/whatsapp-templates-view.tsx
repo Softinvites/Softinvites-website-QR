@@ -45,6 +45,10 @@ type AutoSource =
   | 'guest_name'
   | 'event_title'
   | 'event_date'
+  // Legacy. No longer offered in the picker: there is no time field on the
+  // event, so this only ever parsed a time back out of event.date and gave
+  // "TBA" when the date had none. Map time variables to 'manual' and enter
+  // the time per send. Kept so existing templates still load.
   | 'event_time'
   | 'event_venue'
   | 'guest_table_no'
@@ -116,7 +120,6 @@ const AUTO_SOURCE_OPTIONS: { value: AutoSource; label: string }[] = [
   { value: 'guest_name', label: 'Guest Name (auto)' },
   { value: 'event_title', label: 'Event Title (auto)' },
   { value: 'event_date', label: 'Event Date (auto)' },
-  { value: 'event_time', label: 'Event Time (auto)' },
   { value: 'event_venue', label: 'Event Venue (auto)' },
   { value: 'guest_table_no', label: 'Guest Table No (auto)' },
   { value: 'event_signoff', label: 'Event Signoff (auto)' },
