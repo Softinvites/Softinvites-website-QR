@@ -156,75 +156,14 @@ const VARIABLE_LABELS: Record<string, Record<number, string>> = {
   },
 };
 
-const FALLBACK_TEMPLATE_SAMPLES: WhatsAppTemplateSample[] = [
-  {
-    templateName: 'wedding_invite',
-    title: 'Wedding Invite',
-    category: 'marketing',
-    description: 'Wedding invitation with event IV as header image. Variables 2 (guest name), 10 (header image), and 11 (pass URL) are set automatically.',
-    expectedVariableCount: 11,
-    buttonUrlVariableIndex: 11,
-    sampleParametersArray: [
-      "Judith's Wedding",
-      '(auto: guest name)',
-      'Family of Judith',
-      "Judith's Wedding",
-      'Judith & Stanley',
-      'Church Ceremony',
-      '20th July 2026',
-      '4:00 PM',
-      'Landmark Event Centre, Lagos',
-      '(auto: event image S3 path)',
-      '(auto: pass URL suffix)',
-    ],
-    supportsMediaHeader: false,
-  },
-  {
-    templateName: 'event_details_reminder',
-    title: 'Event Reminder',
-    category: 'utility',
-    description: 'Event reminder template. Variable 1 (guest name) is set automatically.',
-    expectedVariableCount: 5,
-    buttonUrlVariableIndex: 0,
-    sampleParametersArray: [
-      '(auto: guest name)',
-      "Judith's Wedding",
-      'Lagos State',
-      '20th July 2026',
-      '4:00 PM',
-    ],
-    supportsMediaHeader: false,
-  },
-  {
-    templateName: 'logistics',
-    title: 'Logistics',
-    category: 'utility',
-    description: 'Utility template for logistics/support information. Variable 1 (guest name) is set automatically.',
-    expectedVariableCount: 2,
-    buttonUrlVariableIndex: 0,
-    sampleParametersArray: ['(auto: guest name)', "Judith's Wedding"],
-    supportsMediaHeader: false,
-  },
-  {
-    templateName: 'rsvp_form',
-    title: 'RSVP Form (Media + Form Button)',
-    category: 'utility',
-    description: 'Party invitation with media header and RSVP form button. Guest name ({{2}}), header image ({{7}}), and form link ({{8}}) are auto-filled.',
-    expectedVariableCount: 8,
-    buttonUrlVariableIndex: 8,
-    sampleParametersArray: [
-      "Stanley's Party",
-      '(auto: guest name)',
-      "Stanley's Party",
-      '20th July 2026',
-      '4:00 PM',
-      'Landmark Event Centre, Lagos',
-      '(auto: event image S3 path)',
-      '(auto: RSVP form link)',
-    ],
-    supportsMediaHeader: true,
-  },
-];
+/**
+ * Intentionally empty. Only templates built in the WhatsApp Template Manager
+ * are offered, and those arrive from /template-samples. Hardcoded fallbacks
+ * used to list wedding_invite, event_details_reminder, logistics, rsvp_form
+ * and friends even when they no longer matched anything sendable, so the
+ * dialog now shows nothing rather than something that may not exist.
+ */
+const FALLBACK_TEMPLATE_SAMPLES: WhatsAppTemplateSample[] = [];
 
 export default function WhatsAppSendDialog({
   open,
@@ -432,21 +371,29 @@ export default function WhatsAppSendDialog({
           </Box>
         )}
 
-        <FormControl fullWidth sx={{ mt: 2 }}>
-          <InputLabel>Message Template</InputLabel>
-          <Select
-            value={templateName}
-            label="Message Template"
-            onChange={(e) => setTemplateName(e.target.value)}
-          >
-            {availableTemplates.map((template) => (
-              <MenuItem key={template.templateName} value={template.templateName}>
-                {template.title || template.templateName}
-                {template.category ? ` (${template.category})` : ''}
-              </MenuItem>
-            ))}
-          </Select>
-        </FormControl>
+        {availableTemplates.length === 0 ? (
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            No approved message templates are available for this event. Create one in
+            WhatsApp Templates and submit it for approval — only templates built there
+            can be sent.
+          </Alert>
+        ) : (
+          <FormControl fullWidth sx={{ mt: 2 }}>
+            <InputLabel>Message Template</InputLabel>
+            <Select
+              value={templateName}
+              label="Message Template"
+              onChange={(e) => setTemplateName(e.target.value)}
+            >
+              {availableTemplates.map((template) => (
+                <MenuItem key={template.templateName} value={template.templateName}>
+                  {template.title || template.templateName}
+                  {template.category ? ` (${template.category})` : ''}
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+        )}
 
         {selectedTemplate && (
           <Box sx={{ mt: 2, p: 1.5, borderRadius: 1, bgcolor: 'background.neutral' }}>
