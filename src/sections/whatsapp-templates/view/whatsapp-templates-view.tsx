@@ -927,32 +927,34 @@ export function WhatsAppTemplatesView() {
                     sx={{ mb: 1 }}
                   >
                     <Typography variant="subtitle1">Buttons</Typography>
-                    {(templateType === 'quick-reply' ||
-                      templateType === 'call-to-action') && (
-                      <Button
-                        size="small"
-                        variant="text"
-                        startIcon={<Iconify icon="mingcute:add-line" />}
-                        onClick={() =>
-                          setButtons((prev) => [
-                            ...prev,
-                            templateType === 'quick-reply'
-                              ? { type: 'QUICK_REPLY', title: '' }
-                              : { type: 'URL', title: '', url: '' },
-                          ])
-                        }
-                        disabled={buttons.length >= 3}
-                      >
-                        Add button
-                      </Button>
-                    )}
+                    {/* Previously hidden for the 'card' type, which made a
+                        two-button card (e.g. Yes / No RSVP) impossible to
+                        build even though the section itself was visible. */}
+                    <Button
+                      size="small"
+                      variant="text"
+                      startIcon={<Iconify icon="mingcute:add-line" />}
+                      onClick={() =>
+                        setButtons((prev) => [
+                          ...prev,
+                          templateType === 'quick-reply'
+                            ? { type: 'QUICK_REPLY', title: '' }
+                            : { type: 'URL', title: '', url: '' },
+                        ])
+                      }
+                      disabled={buttons.length >= 3}
+                    >
+                      Add button
+                    </Button>
                   </Stack>
                   <Stack spacing={2}>
                     {buttons.map((b, idx) => (
                       <Card
                         key={idx}
                         variant="outlined"
-                        sx={{ p: 2, position: 'relative' }}
+                        // pt leaves room for the duplicate/remove icons pinned
+                        // top-right so they never sit over the Button text field.
+                        sx={{ p: 2, pt: 5, position: 'relative' }}
                       >
                         <Stack spacing={1.5}>
                           <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
@@ -1033,18 +1035,49 @@ export function WhatsAppTemplatesView() {
                               helperText="E.164 format"
                             />
                           )}
-                          {buttons.length > 1 && (
-                            <IconButton
-                              size="small"
-                              color="error"
-                              sx={{ position: 'absolute', top: 4, right: 4 }}
-                              onClick={() =>
-                                setButtons((prev) => prev.filter((_, i) => i !== idx))
+                          <Stack
+                            direction="row"
+                            spacing={0.5}
+                            sx={{ position: 'absolute', top: 4, right: 4 }}
+                          >
+                            <Tooltip
+                              title={
+                                buttons.length >= 3
+                                  ? 'Maximum of 3 buttons'
+                                  : 'Duplicate this button'
                               }
                             >
-                              <Iconify icon="solar:trash-bin-trash-bold" />
-                            </IconButton>
-                          )}
+                              {/* span keeps the tooltip working while disabled */}
+                              <span>
+                                <IconButton
+                                  size="small"
+                                  disabled={buttons.length >= 3}
+                                  onClick={() =>
+                                    setButtons((prev) => [
+                                      ...prev.slice(0, idx + 1),
+                                      { ...prev[idx] },
+                                      ...prev.slice(idx + 1),
+                                    ])
+                                  }
+                                >
+                                  <Iconify icon="solar:copy-bold" />
+                                </IconButton>
+                              </span>
+                            </Tooltip>
+                            {buttons.length > 1 && (
+                              <Tooltip title="Remove this button">
+                                <IconButton
+                                  size="small"
+                                  color="error"
+                                  onClick={() =>
+                                    setButtons((prev) => prev.filter((_, i) => i !== idx))
+                                  }
+                                >
+                                  <Iconify icon="solar:trash-bin-trash-bold" />
+                                </IconButton>
+                              </Tooltip>
+                            )}
+                          </Stack>
                         </Stack>
                       </Card>
                     ))}
