@@ -779,15 +779,49 @@ function SuccessScreen({
           <p className="rsvp-success-hint">
             📌 Don&apos;t forget — save the event to your calendar.
           </p>
+          {/*
+            Google Calendar first: guests almost always arrive from WhatsApp,
+            whose in-app browser ignores Content-Disposition and renders the
+            .ics as plain text instead of downloading it. A redirect to Google
+            Calendar opens correctly in every webview.
+          */}
           <a
-            href={calendarUrl}
+            href={`${calendarUrl}?format=google`}
             className="rsvp-calendar-btn"
             style={{ background: accentColor, color: accentTextColor }}
             target="_blank"
             rel="noreferrer"
           >
-            📅 Add to Calendar
+            📅 Add to Google Calendar
           </a>
+          <button
+            type="button"
+            className="rsvp-calendar-btn rsvp-calendar-btn--secondary"
+            onClick={async () => {
+              // Fetch as a blob so the download works cross-origin; the
+              // `download` attribute alone is ignored on cross-origin hrefs.
+              try {
+                const res = await fetch(calendarUrl);
+                if (!res.ok) throw new Error('Calendar download failed');
+                const blob = await res.blob();
+                const objectUrl = URL.createObjectURL(
+                  new Blob([blob], { type: 'text/calendar' })
+                );
+                const link = document.createElement('a');
+                link.href = objectUrl;
+                link.download = 'event.ics';
+                document.body.appendChild(link);
+                link.click();
+                link.remove();
+                URL.revokeObjectURL(objectUrl);
+              } catch {
+                // Webviews that block blob downloads still get the raw link.
+                window.open(calendarUrl, '_blank', 'noopener,noreferrer');
+              }
+            }}
+          >
+            Apple / Outlook (.ics)
+          </button>
         </div>
       )}
 

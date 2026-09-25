@@ -389,3 +389,21 @@
   transform: translateY(-2px);
   box-shadow: 0 14px 32px rgba(0,0,0,0.35);
 }
+
+/* Secondary .ics option — quieter than the Google Calendar primary, and
+   styled as a button since it is one (blob download, not a plain href). */
+.rsvp-calendar-btn--secondary {
+  margin-top: 10px;
+  background: transparent;
+  color: inherit;
+  border: 1px solid currentColor;
+  opacity: 0.75;
+  box-shadow: none;
+  cursor: pointer;
+  font-family: inherit;
+}
+
+.rsvp-calendar-btn--secondary:hover {
+  opacity: 1;
+  box-shadow: none;
+}
