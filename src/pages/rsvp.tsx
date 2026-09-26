@@ -128,10 +128,19 @@ const createInitialResponses = (fields: RsvpCustomField[]) =>
 const RSVP_FORM_DEVICE_KEY_PREFIX = 'softinvite:rsvp-form-device:';
 const RSVP_FORM_SUBMISSION_PREFIX = 'softinvite:rsvp-form-submission:';
 const DUPLICATE_SUBMISSION_MESSAGE =
-  'This form has already been submitted on this device for this email address.';
+  'This form has already been submitted on this device for this name. If you are responding for someone else, enter their name instead.';
 
 function normalizeEmailAddress(value: string) {
   return value.trim().toLowerCase();
+}
+
+/**
+ * Submissions are tracked per guest NAME, not per email. Families and couples
+ * routinely share one address, and keying on email meant the first person to
+ * respond locked everyone else on that device out of the form.
+ */
+function normalizeGuestNameKey(value: string) {
+  return value.replace(/\s+/g, ' ').trim().toLowerCase();
 }
 
 function createSubmissionKey() {
@@ -145,8 +154,8 @@ function getDeviceKeyStorageKey(token: string) {
   return `${RSVP_FORM_DEVICE_KEY_PREFIX}${token}`;
 }
 
-function getSubmissionStorageKey(token: string, email: string) {
-  return `${RSVP_FORM_SUBMISSION_PREFIX}${token}:${normalizeEmailAddress(email)}`;
+function getSubmissionStorageKey(token: string, guestName: string) {
+  return `${RSVP_FORM_SUBMISSION_PREFIX}${token}:${normalizeGuestNameKey(guestName)}`;
 }
 
 function getOrCreateDeviceSubmissionKey(token: string) {
@@ -165,24 +174,29 @@ function getOrCreateDeviceSubmissionKey(token: string) {
   }
 }
 
-function hasStoredSubmission(token: string, email: string) {
-  const normalizedEmail = normalizeEmailAddress(email);
-  if (typeof window === 'undefined' || !token || !normalizedEmail) return false;
+function hasStoredSubmission(token: string, guestName: string) {
+  const normalizedName = normalizeGuestNameKey(guestName);
+  if (typeof window === 'undefined' || !token || !normalizedName) return false;
   try {
-    return Boolean(window.localStorage.getItem(getSubmissionStorageKey(token, normalizedEmail)));
+    return Boolean(window.localStorage.getItem(getSubmissionStorageKey(token, normalizedName)));
   } catch {
     return false;
   }
 }
 
-function storeSubmission(token: string, email: string, submissionKey: string, rsvpId?: string) {
-  const normalizedEmail = normalizeEmailAddress(email);
-  if (typeof window === 'undefined' || !token || !normalizedEmail) return;
+function storeSubmission(
+  token: string,
+  guestName: string,
+  submissionKey: string,
+  rsvpId?: string
+) {
+  const normalizedName = normalizeGuestNameKey(guestName);
+  if (typeof window === 'undefined' || !token || !normalizedName) return;
   try {
     window.localStorage.setItem(
-      getSubmissionStorageKey(token, normalizedEmail),
+      getSubmissionStorageKey(token, normalizedName),
       JSON.stringify({
-        email: normalizedEmail,
+        guestName: normalizedName,
         rsvpId: rsvpId || null,
         submissionKey: submissionKey || null,
         submittedAt: new Date().toISOString(),
@@ -273,7 +287,7 @@ export default function RsvpPage() {
   const [error, setError] = useState<string | null>(null);
   const [payload, setPayload] = useState<RsvpFormResponse | null>(null);
   const [deviceSubmissionKey, setDeviceSubmissionKey] = useState('');
-  const [deviceEmailLocked, setDeviceEmailLocked] = useState(false);
+  const [deviceNameLocked, setDeviceNameLocked] = useState(false);
   const [submitted, setSubmitted] = useState<{ status: AttendanceStatus; rsvpId: string } | null>(null);
 
   const [guestName, setGuestName] = useState('');
@@ -342,8 +356,8 @@ export default function RsvpPage() {
   }, [payload]);
 
   useEffect(() => {
-    setDeviceEmailLocked(hasStoredSubmission(token, email));
-  }, [token, email]);
+    setDeviceNameLocked(hasStoredSubmission(token, guestName));
+  }, [token, guestName]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -358,10 +372,6 @@ export default function RsvpPage() {
     }
     if (!guestName.trim()) {
       toast.error('Please enter your name');
-      return;
-    }
-    if (!email.trim()) {
-      toast.error('Please enter your email');
       return;
     }
     if (!phone.trim()) {
@@ -384,7 +394,7 @@ export default function RsvpPage() {
       toast.error(`Please complete "${missingRequiredField.label}"`);
       return;
     }
-    if (deviceEmailLocked) {
+    if (deviceNameLocked) {
       toast.error(DUPLICATE_SUBMISSION_MESSAGE);
       return;
     }
@@ -408,15 +418,17 @@ export default function RsvpPage() {
         submissionKey: deviceSubmissionKey || undefined,
         responses: responsePayload,
       });
-      storeSubmission(token, email, deviceSubmissionKey, data?.rsvp?.id);
+      storeSubmission(token, guestName, deviceSubmissionKey, data?.rsvp?.id);
       setSubmitted({ status: (attendanceEnabled ? status : 'yes') as AttendanceStatus, rsvpId: data?.rsvp?.id || '' });
     } catch (err: any) {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         toast.error('No internet connection. Please try again when you are online.');
       } else {
         const message = err?.response?.data?.message || 'Failed to submit RSVP';
-        if (message === DUPLICATE_SUBMISSION_MESSAGE) {
-          setDeviceEmailLocked(true);
+        // Match loosely: the server's duplicate wording is not byte-identical
+        // to the client copy, and an exact compare silently failed to lock.
+        if (/already been submitted on this device/i.test(String(message))) {
+          setDeviceNameLocked(true);
         }
         toast.error(message);
       }
@@ -522,7 +534,6 @@ export default function RsvpPage() {
                   disabled={submitting}
                   placeholder={formSettings.emailPlaceholder}
                   onChange={(e) => setEmail(e.target.value)}
-                  required
                 />
               </label>
 
@@ -707,14 +718,14 @@ export default function RsvpPage() {
                 />
               </label>
 
-              {deviceEmailLocked && normalizeEmailAddress(email) && (
+              {deviceNameLocked && normalizeGuestNameKey(guestName) && (
                 <p className="rsvp-warning">{DUPLICATE_SUBMISSION_MESSAGE}</p>
               )}
 
               <button
                 type="submit"
                 className="rsvp-submit"
-                disabled={submitting || deviceEmailLocked}
+                disabled={submitting || deviceNameLocked}
               >
                 {submitting ? 'Submitting...' : 'Submit'}
               </button>
