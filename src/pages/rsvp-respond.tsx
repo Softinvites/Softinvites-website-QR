@@ -12,6 +12,7 @@ export default function RsvpRespondPage() {
 
   const [stage, setStage] = useState<Stage>('loading');
   const [errorMsg, setErrorMsg] = useState('');
+  const [errorTitle, setErrorTitle] = useState('Something went wrong');
   const [eventName, setEventName] = useState('');
   const [rsvpCalendarId, setRsvpCalendarId] = useState('');
   const [hasEmail, setHasEmail] = useState(true);
@@ -59,8 +60,13 @@ export default function RsvpRespondPage() {
       } catch (err: any) {
         const code = err?.response?.status;
         if (code === 404) {
+          // The guest record behind this link was replaced (e.g. the guest
+          // list was re-imported), so the link no longer points anywhere.
           setStage('error');
-          setErrorMsg('RSVP not found. This link may be invalid or expired.');
+          setErrorTitle('This link is no longer active');
+          setErrorMsg(
+            'This invitation link has been replaced. Please use the most recent invitation message sent to you, or contact the event organiser to confirm your response.'
+          );
         } else {
           // Fallback: treat as success (old HTML behaviour)
           setRsvpCalendarId(rsvpId!);
@@ -194,7 +200,7 @@ export default function RsvpRespondPage() {
       <div style={containerStyle}>
         <div style={cardStyle}>
           <div style={{ ...iconStyle, background: '#c62828' }}>⚠️</div>
-          <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>Something went wrong</h2>
+          <h2 style={{ margin: '0 0 8px', fontSize: 24 }}>{errorTitle}</h2>
           <p style={{ color: '#6b7280', fontSize: 15 }}>{errorMsg}</p>
         </div>
       </div>
