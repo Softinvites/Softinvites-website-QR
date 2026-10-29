@@ -3,12 +3,15 @@ import { useParams, useSearchParams } from 'react-router-dom';
 import axios from 'axios';
 import { API_BASE } from 'src/utils/apiBase';
 
-type Stage = 'loading' | 'submitting' | 'success' | 'error' | 'already';
+type Stage = 'loading' | 'confirm' | 'submitting' | 'success' | 'error' | 'already';
 
 export default function RsvpRespondPage() {
   const { rsvpId } = useParams<{ rsvpId: string }>();
   const [searchParams] = useSearchParams();
-  const status = (searchParams.get('status') || '') as 'yes' | 'no' | '';
+  // The button the guest tapped in their email/WhatsApp. It only preselects
+  // the confirm step — nothing is recorded until they press a button here.
+  const linkStatus = (searchParams.get('status') || '') as 'yes' | 'no' | '';
+  const [status, setStatus] = useState<'yes' | 'no' | ''>(linkStatus);
 
   const [stage, setStage] = useState<Stage>('loading');
   const [errorMsg, setErrorMsg] = useState('');
@@ -32,16 +35,19 @@ export default function RsvpRespondPage() {
   const isYes = status === 'yes';
 
   useEffect(() => {
-    if (!rsvpId || !status) {
+    if (!rsvpId || !linkStatus) {
       setStage('error');
       setErrorMsg('Invalid RSVP link — missing required information.');
       return;
     }
 
-    const tryRespond = async () => {
+    // Read-only lookup. Mail scanners and link-preview bots open these links
+    // automatically; recording the answer on load let them RSVP "yes" for
+    // guests who never tapped anything.
+    const loadRsvp = async () => {
       try {
         const res = await axios.get(
-          `${API_BASE}/rsvp/respond/${rsvpId}?status=${encodeURIComponent(status)}&format=json`
+          `${API_BASE}/rsvp/respond/${rsvpId}?status=${encodeURIComponent(linkStatus)}&format=json`
         );
         setEventName(res.data?.eventName || '');
         setRsvpCalendarId(res.data?.rsvpId || rsvpId!);
@@ -56,7 +62,7 @@ export default function RsvpRespondPage() {
           setStage('already');
           return;
         }
-        setStage('success');
+        setStage('confirm');
       } catch (err: any) {
         const code = err?.response?.status;
         if (code === 404) {
@@ -68,16 +74,37 @@ export default function RsvpRespondPage() {
             'This invitation link has been replaced. Please use the most recent invitation message sent to you, or contact the event organiser to confirm your response.'
           );
         } else {
-          // Fallback: treat as success (old HTML behaviour)
-          setRsvpCalendarId(rsvpId!);
-          setHasEmail(false);
-          setStage('success');
+          setStage('error');
+          setErrorMsg(
+            'We could not load your invitation. Please check your connection and open the link again.'
+          );
         }
       }
     };
 
-    tryRespond();
-  }, [rsvpId, status]);
+    loadRsvp();
+  }, [rsvpId, linkStatus]);
+
+  const handleConfirm = async (choice: 'yes' | 'no') => {
+    setStatus(choice);
+    setStage('submitting');
+    try {
+      const res = await axios.post(`${API_BASE}/rsvp/respond/${rsvpId}`, { status: choice });
+      setHasEmail(!!res.data?.hasEmail);
+      if (res.data?.alreadySubmitted) {
+        setRecordedStatus(res.data?.attendanceStatus === 'no' ? 'no' : 'yes');
+        setStage('already');
+        return;
+      }
+      setStage('success');
+    } catch (err: any) {
+      setStage('error');
+      setErrorMsg(
+        err?.response?.data?.message ||
+          'We could not record your response. Please check your connection and try again.'
+      );
+    }
+  };
 
   const handleSaveEmail = async () => {
     const trimmed = email.trim().toLowerCase();
@@ -189,7 +216,48 @@ export default function RsvpRespondPage() {
     return (
       <div style={containerStyle}>
         <div style={cardStyle}>
-          <p style={{ color: '#6b7280', fontSize: 15 }}>Updating your RSVP...</p>
+          <p style={{ color: '#6b7280', fontSize: 15 }}>
+            {stage === 'loading' ? 'Loading your invitation...' : 'Updating your RSVP...'}
+          </p>
+        </div>
+      </div>
+    );
+  }
+
+  if (stage === 'confirm') {
+    const choiceBtn = (choice: 'yes' | 'no', label: string, color: string) => (
+      <button
+        key={choice}
+        type="button"
+        onClick={() => handleConfirm(choice)}
+        style={{
+          ...btnStyle,
+          background: color,
+          marginTop: 12,
+          opacity: choice === linkStatus ? 1 : 0.75,
+        }}
+      >
+        {label}
+      </button>
+    );
+    const yesBtn = choiceBtn('yes', '✅ YES, I WILL ATTEND', '#2e7d32');
+    const noBtn = choiceBtn('no', '❌ UNABLE TO ATTEND', '#c62828');
+    return (
+      <div style={{ ...containerStyle, background: '#f0f4f8' }}>
+        <div style={cardStyle}>
+          <h2 style={{ margin: '0 0 8px', fontSize: 24, color: '#1f2937' }}>Confirm your RSVP</h2>
+          <p style={{ color: '#6b7280', fontSize: 15, margin: '0 0 8px' }}>
+            {linkGuestName ? (
+              <>
+                Hi <strong>{linkGuestName}</strong>, please
+              </>
+            ) : (
+              'Please'
+            )}{' '}
+            confirm your response{eventName ? ` for ${eventName}` : ''}. Responses are final once
+            submitted.
+          </p>
+          {linkStatus === 'no' ? [noBtn, yesBtn] : [yesBtn, noBtn]}
         </div>
       </div>
     );
