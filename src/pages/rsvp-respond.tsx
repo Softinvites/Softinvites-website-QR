@@ -8,8 +8,10 @@ type Stage = 'loading' | 'confirm' | 'submitting' | 'success' | 'error' | 'alrea
 export default function RsvpRespondPage() {
   const { rsvpId } = useParams<{ rsvpId: string }>();
   const [searchParams] = useSearchParams();
-  // The button the guest tapped in their email/WhatsApp. It only preselects
-  // the confirm step — nothing is recorded until they press a button here.
+  // From the link in the email/WhatsApp message. Tapping the header image in
+  // WhatsApp also opens the first button's link (the "yes" one), so this does
+  // not tell us what the guest wants: the confirm step treats both answers
+  // alike and nothing is recorded until they press a button here.
   const linkStatus = (searchParams.get('status') || '') as 'yes' | 'no' | '';
   const [status, setStatus] = useState<'yes' | 'no' | ''>(linkStatus);
 
@@ -22,6 +24,7 @@ export default function RsvpRespondPage() {
   // Whose invitation this link is — shared inboxes make it easy to open
   // someone else's message, and naming them is what makes the page actionable.
   const [linkGuestName, setLinkGuestName] = useState('');
+  const [eventImage, setEventImage] = useState('');
   // The status actually recorded on the server (may differ from the URL
   // param if the guest already responded with the opposite answer).
   const [recordedStatus, setRecordedStatus] = useState<'yes' | 'no' | ''>('');
@@ -53,6 +56,7 @@ export default function RsvpRespondPage() {
         setRsvpCalendarId(res.data?.rsvpId || rsvpId!);
         setHasEmail(!!res.data?.hasEmail);
         setLinkGuestName(res.data?.guestName || '');
+        setEventImage(res.data?.eventImage || '');
         // One-click lock: the guest already responded — show locked screen
         // with the response that's actually on record.
         if (res.data?.alreadySubmitted) {
@@ -234,18 +238,23 @@ export default function RsvpRespondPage() {
           ...btnStyle,
           background: color,
           marginTop: 12,
-          opacity: choice === linkStatus ? 1 : 0.75,
         }}
       >
         {label}
       </button>
     );
-    const yesBtn = choiceBtn('yes', '✅ YES, I WILL ATTEND', '#2e7d32');
-    const noBtn = choiceBtn('no', '❌ UNABLE TO ATTEND', '#c62828');
     return (
       <div style={{ ...containerStyle, background: '#f0f4f8' }}>
         <div style={cardStyle}>
-          <h2 style={{ margin: '0 0 8px', fontSize: 24, color: '#1f2937' }}>Confirm your RSVP</h2>
+          {eventImage && (
+            <img
+              src={eventImage}
+              alt="Invitation"
+              style={{ width: '100%', borderRadius: 12, marginBottom: 16 }}
+              onError={() => setEventImage('')}
+            />
+          )}
+          <h2 style={{ margin: '0 0 8px', fontSize: 24, color: '#1f2937' }}>Will you attend?</h2>
           <p style={{ color: '#6b7280', fontSize: 15, margin: '0 0 8px' }}>
             {linkGuestName ? (
               <>
@@ -254,10 +263,11 @@ export default function RsvpRespondPage() {
             ) : (
               'Please'
             )}{' '}
-            confirm your response{eventName ? ` for ${eventName}` : ''}. Responses are final once
+            choose your response{eventName ? ` for ${eventName}` : ''}. Responses are final once
             submitted.
           </p>
-          {linkStatus === 'no' ? [noBtn, yesBtn] : [yesBtn, noBtn]}
+          {choiceBtn('yes', '✅ YES, I WILL ATTEND', '#2e7d32')}
+          {choiceBtn('no', '❌ UNABLE TO ATTEND', '#c62828')}
         </div>
       </div>
     );

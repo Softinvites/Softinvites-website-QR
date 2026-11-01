@@ -82,6 +82,7 @@ type TemplateButton = {
   title: string;
   url?: string;
   phone?: string;
+  id?: string;
 };
 
 type ContentTemplate = {
@@ -268,7 +269,8 @@ export function WhatsAppTemplatesView() {
         body,
         headerType === 'text' ? headerText : '',
         headerType === 'media' ? headerMediaUrl : '',
-        ...buttons.map((b) => b.url || '')
+        ...buttons.map((b) => b.url || ''),
+        ...buttons.map((b) => b.id || '')
       ),
     [body, headerType, headerText, headerMediaUrl, buttons]
   );
@@ -419,6 +421,7 @@ export function WhatsAppTemplatesView() {
           url: b.type === 'URL' ? (b.url || '').trim() : undefined,
           phone:
             b.type === 'PHONE_NUMBER' ? (b.phone || '').trim() : undefined,
+          id: b.type === 'QUICK_REPLY' ? (b.id || '').trim() : undefined,
         }));
 
       const payload = {
@@ -480,7 +483,8 @@ export function WhatsAppTemplatesView() {
     const detected = collectVariableIndexes(
       t.bodyText,
       t.headerType === 'text' ? t.headerText : '',
-      ...(t.buttons || []).map((b) => b.url || '')
+      ...(t.buttons || []).map((b) => b.url || ''),
+      ...(t.buttons || []).map((b) => b.id || '')
     );
     const existing = new Map(
       (t.variableDefinitions || []).map((d) => [d.index, d])
@@ -1018,6 +1022,23 @@ export function WhatsAppTemplatesView() {
                               }}
                             />
                           )}
+                          {b.type === 'QUICK_REPLY' && (
+                            <TextField
+                              size="small"
+                              label="Button ID (optional)"
+                              value={b.id || ''}
+                              onChange={(e) =>
+                                setButtons((prev) =>
+                                  prev.map((row, i) =>
+                                    i === idx ? { ...row, id: e.target.value } : row
+                                  )
+                                )
+                              }
+                              fullWidth
+                              placeholder="{{N}}"
+                              helperText="For RSVP buttons, use a variable set to RSVP Yes Link / RSVP No Link. The answer is then recorded in one tap, and tapping the image opens the image."
+                            />
+                          )}
                           {b.type === 'PHONE_NUMBER' && (
                             <TextField
                               size="small"
@@ -1508,6 +1529,7 @@ export function WhatsAppTemplatesView() {
                         <Chip size="small" label={b.type} sx={{ mr: 1, height: 18 }} />
                         {b.title}
                         {b.url ? ` → ${b.url}` : ''}
+                        {b.id ? ` (id: ${b.id})` : ''}
                         {b.phone ? ` ☎ ${b.phone}` : ''}
                       </Typography>
                     ))}
