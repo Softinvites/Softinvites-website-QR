@@ -311,6 +311,8 @@ export type UserProps = {
   rsvpDeadline?: string;
   eventEndDate?: string;
   customMessageSequence?: any;
+  emailSenderMode?: 'softinvites' | 'event' | 'custom';
+  emailSenderName?: string;
 };
 
 type UserTableRowProps = {
@@ -343,6 +345,11 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     !!row.channelConfig?.whatsapp?.enabled
   );
   const [editEnableSms, setEditEnableSms] = useState(!!row.channelConfig?.bulkSms?.enabled);
+  // Sender name on this event's guest emails; the address stays info@softinvite.com.
+  const [editEmailSenderMode, setEditEmailSenderMode] = useState<
+    'softinvites' | 'event' | 'custom'
+  >(row.emailSenderMode || 'softinvites');
+  const [editEmailSenderName, setEditEmailSenderName] = useState(row.emailSenderName || '');
 
   useEffect(() => {
     const storedIds = JSON.parse(localStorage.getItem('allRowIds') || '[]');
@@ -382,6 +389,8 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       formData.append('location', editLocation);
       formData.append('description', editDescription);
       formData.append('servicePackage', editEventMode);
+      formData.append('emailSenderMode', editEmailSenderMode);
+      formData.append('emailSenderName', editEmailSenderName.trim());
 
       const channelConfig = {
         email: { enabled: true, required: true, trackingEnabled: true },
@@ -445,6 +454,8 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     editEventMode,
     editEnableWhatsApp,
     editEnableSms,
+    editEmailSenderMode,
+    editEmailSenderName,
     handleCloseDialog,
   ]);
 
@@ -656,6 +667,38 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
                 label="Enable SMS"
               />
             </>
+          )}
+          <TextField
+            margin="dense"
+            label="Email Sender Name"
+            select
+            fullWidth
+            value={editEmailSenderMode}
+            onChange={(e) =>
+              setEditEmailSenderMode(e.target.value as 'softinvites' | 'event' | 'custom')
+            }
+            helperText={`Guests will see emails from "${
+              editEmailSenderMode === 'event'
+                ? editName.trim() || 'the event title'
+                : editEmailSenderMode === 'custom'
+                  ? editEmailSenderName.trim() || 'SoftInvites'
+                  : 'SoftInvites'
+            }"`}
+          >
+            <MenuItem value="softinvites">SoftInvites</MenuItem>
+            <MenuItem value="event">Event title</MenuItem>
+            <MenuItem value="custom">Custom name</MenuItem>
+          </TextField>
+          {editEmailSenderMode === 'custom' && (
+            <TextField
+              margin="dense"
+              label="Custom sender name"
+              fullWidth
+              value={editEmailSenderName}
+              onChange={(e) => setEditEmailSenderName(e.target.value)}
+              inputProps={{ maxLength: 70 }}
+              placeholder="e.g. The Odunsi & Cole Family"
+            />
           )}
           <Typography variant="subtitle1" sx={{ mt: 2 }}>
             Replace Invitation Image (JPEG/PNG/WEBP):

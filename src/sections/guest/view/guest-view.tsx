@@ -33,6 +33,7 @@ import DeleteConfirmModal from './DeleteConfirmModal';
 import BatchDeleteModal from './BatchDeleteModal';
 import WhatsAppStatusDialog from './WhatsAppStatusDialog';
 import WhatsAppSendDialog from './WhatsAppSendDialog';
+import EmailSendDialog from './EmailSendDialog';
 import { AnalyticsWidgetSummary } from '../../overview/analytics-widget-summary';
 
 type EventCatalogRecord = {
@@ -139,6 +140,7 @@ export function GuestView() {
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const [whatsappStatusOpen, setWhatsappStatusOpen] = useState(false);
   const [whatsappSendOpen, setWhatsappSendOpen] = useState(false);
+  const [emailSendOpen, setEmailSendOpen] = useState(false);
   const [whatsappTemplateSamples, setWhatsappTemplateSamples] = useState<WhatsAppTemplateSample[]>(
     []
   );
@@ -418,7 +420,7 @@ export function GuestView() {
     }
   };
 
-  const handleResendEmails = async () => {
+  const handleSendEmails = async (guestIds: string[] | null) => {
     setGuestLoading(true);
     try {
       const token = localStorage.getItem('token');
@@ -439,17 +441,18 @@ export function GuestView() {
 
       const response = await axios.post(
         `${API_BASE}/guest/resend-all-emails/${derivedEventId}`,
-        {},
+        guestIds ? { guestIds } : {},
         {
           headers: { Authorization: `Bearer ${token}` },
           timeout: 30000,
         }
       );
 
-      toast.success(response.data?.message || 'Email resend job started successfully!');
+      toast.success(response.data?.message || 'Sending emails started!');
+      setEmailSendOpen(false);
     } catch (err: any) {
-      console.error('Error resending emails:', err);
-      toast.error(err.response?.data?.message || 'Failed to start email resend job');
+      console.error('Error sending emails:', err);
+      toast.error(err.response?.data?.message || 'Failed to start sending emails');
     } finally {
       setGuestLoading(false);
     }
@@ -961,7 +964,7 @@ export function GuestView() {
                     variant="contained"
                     color="secondary"
                     startIcon={<Iconify icon="material-symbols:mail" />}
-                    onClick={handleResendEmails}
+                    onClick={() => setEmailSendOpen(true)}
                     disabled={guestLoading}
                     sx={{
                       backgroundColor: '#ff5722',
@@ -976,7 +979,7 @@ export function GuestView() {
                       height: { xs: '52px', sm: '40px', md: '48px' },
                     }}
                   >
-                    Resend Emails
+                    Send Emails
                   </Button>
                 </Grid>
 
@@ -1310,6 +1313,14 @@ export function GuestView() {
       )}
 
       {/* WhatsApp Send Dialog */}
+      <EmailSendDialog
+        open={emailSendOpen}
+        onClose={() => setEmailSendOpen(false)}
+        onConfirm={handleSendEmails}
+        loading={guestLoading}
+        guests={users}
+        selectedGuestIds={table.selected}
+      />
       <WhatsAppSendDialog
         open={whatsappSendOpen}
         onClose={() => setWhatsappSendOpen(false)}
