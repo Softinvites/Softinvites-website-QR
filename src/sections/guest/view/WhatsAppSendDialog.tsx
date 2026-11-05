@@ -205,8 +205,9 @@ export default function WhatsAppSendDialog({
   // Guests whose createdAt falls within the chosen range (inclusive).
   const dateFilteredIds = useMemo(() => {
     if (!dateFrom && !dateTo) return [];
-    const fromTs = dateFrom ? new Date(`${dateFrom}T00:00:00`).getTime() : -Infinity;
-    const toTs = dateTo ? new Date(`${dateTo}T23:59:59.999`).getTime() : Infinity;
+    // Values are "YYYY-MM-DDTHH:mm" in local time; "To" includes that whole minute.
+    const fromTs = dateFrom ? new Date(dateFrom).getTime() : -Infinity;
+    const toTs = dateTo ? new Date(dateTo).getTime() + 59_999 : Infinity;
     return guestsWithPhone
       .filter((g) => {
         if (!g.createdAtRaw) return false;
@@ -310,8 +311,8 @@ export default function WhatsAppSendDialog({
             (effectiveCount > 0
               ? `You are about to send WhatsApp messages to ${effectiveCount} guest${
                   effectiveCount === 1 ? '' : 's'
-                } added in the selected date range.`
-              : 'No guests with phone numbers fall within the selected date range.')}
+                } added in the selected time range.`
+              : 'No guests with phone numbers were added in the selected time range.')}
         </Alert>
 
         {/* RECIPIENTS */}
@@ -343,31 +344,51 @@ export default function WhatsAppSendDialog({
             <FormControlLabel
               value="date"
               control={<Radio size="small" />}
-              label="Guests added within a date range"
+              label="Guests added within a date & time range"
             />
           </RadioGroup>
         </FormControl>
 
         {recipientMode === 'date' && (
-          <Box sx={{ display: 'flex', gap: 2, mt: 1, mb: 1 }}>
-            <TextField
-              type="date"
-              label="From"
-              size="small"
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-              value={dateFrom}
-              onChange={(e) => setDateFrom(e.target.value)}
-            />
-            <TextField
-              type="date"
-              label="To"
-              size="small"
-              fullWidth
-              InputLabelProps={{ shrink: true }}
-              value={dateTo}
-              onChange={(e) => setDateTo(e.target.value)}
-            />
+          <Box sx={{ mt: 1, mb: 1 }}>
+            <Box sx={{ display: 'flex', gap: 2, flexWrap: 'wrap' }}>
+              <TextField
+                type="datetime-local"
+                label="Added from"
+                size="small"
+                sx={{ flex: '1 1 200px' }}
+                InputLabelProps={{ shrink: true }}
+                value={dateFrom}
+                onChange={(e) => setDateFrom(e.target.value)}
+              />
+              <TextField
+                type="datetime-local"
+                label="Added to"
+                size="small"
+                sx={{ flex: '1 1 200px' }}
+                InputLabelProps={{ shrink: true }}
+                value={dateTo}
+                onChange={(e) => setDateTo(e.target.value)}
+              />
+            </Box>
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+              <Button
+                size="small"
+                variant="outlined"
+                onClick={() => {
+                  const now = new Date();
+                  const pad = (n: number) => String(n).padStart(2, '0');
+                  const day = `${now.getFullYear()}-${pad(now.getMonth() + 1)}-${pad(now.getDate())}`;
+                  setDateFrom(`${day}T00:00`);
+                  setDateTo(`${day}T${pad(now.getHours())}:${pad(now.getMinutes())}`);
+                }}
+              >
+                Today
+              </Button>
+              <Typography variant="caption" color="text.secondary">
+                Uses the time each guest was added. Leave either end empty for no limit.
+              </Typography>
+            </Box>
           </Box>
         )}
 

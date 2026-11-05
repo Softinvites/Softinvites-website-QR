@@ -122,19 +122,11 @@ export function UserTableRow({
         throw new Error(result?.message || `Failed to update guest: ${response.status}`);
       }
 
-      if (email && result?.emailSent === false) {
-        toast.warning(result?.emailError || 'Guest was updated, but the email was not sent.', {
-          position: 'top-right',
-          autoClose: 5000,
-          onClose: () => window.location.reload(),
-        });
-      } else {
-        toast.success('Edited successfully!', {
-          position: 'top-right',
-          autoClose: 3000,
-          onClose: () => window.location.reload(),
-        });
-      }
+      toast.success('Edited successfully!', {
+        position: 'top-right',
+        autoClose: 3000,
+        onClose: () => window.location.reload(),
+      });
     } catch (error: any) {
       console.error('Error editing guest:', error);
       toast.error(error.message || 'Failed to edit guest.', {
