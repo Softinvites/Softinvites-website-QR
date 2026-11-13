@@ -1,6 +1,7 @@
 import './rsvp.css';
 
 import type { FormEvent } from 'react';
+import type { RsvpCustomField } from 'src/utils/rsvp-form';
 
 import axios from 'axios';
 import { toast } from 'react-toastify';
@@ -9,35 +10,11 @@ import { useParams } from 'react-router-dom';
 import { useMemo, useState, useEffect } from 'react';
 
 import { API_BASE } from 'src/utils/apiBase';
+import { fieldIsVisible, normalizeRsvpFormSettings } from 'src/utils/rsvp-form';
 
 type AttendanceStatus = 'yes' | 'no';
-type RsvpCustomFieldType = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'number';
-type RsvpCustomField = {
-  id: string;
-  label: string;
-  type: RsvpCustomFieldType;
-  required: boolean;
-  placeholder: string;
-  options: string[];
-};
 type CustomResponseValue = string | string[];
-type RsvpFormSettings = {
-  guestNameLabel: string;
-  guestNamePlaceholder: string;
-  emailLabel: string;
-  emailPlaceholder: string;
-  phoneLabel: string;
-  phonePlaceholder: string;
-  attendanceEnabled: boolean;
-  isInvalidated: boolean;
-  attendanceLabel: string;
-  attendanceYesLabel: string;
-  attendanceNoLabel: string;
-  commentsLabel: string;
-  commentsPlaceholder: string;
-  submitLabel: string;
-  customFields: RsvpCustomField[];
-};
+type PlusOne = { name: string; phone: string; email: string };
 
 type RsvpFormResponse = {
   token: string;
@@ -50,11 +27,6 @@ type RsvpFormResponse = {
     location?: string;
     iv?: string;
     description?: string;
-    rsvpBgColor?: string;
-    rsvpAccentColor?: string;
-    qrCodeBgColor?: string;
-    qrCodeCenterColor?: string;
-    qrCodeEdgeColor?: string;
     rsvpFormSettings?: Record<string, any>;
     servicePackage?: string;
     channelConfig?: Record<string, any>;
@@ -64,66 +36,25 @@ type RsvpFormResponse = {
   };
 };
 
-const SUPPORTED_CUSTOM_FIELD_TYPES = new Set<RsvpCustomFieldType>([
-  'text',
-  'textarea',
-  'select',
-  'radio',
-  'checkbox',
-  'number',
-]);
-
-const defaultFormSettings: RsvpFormSettings = {
-  guestNameLabel: 'Guest Name',
-  guestNamePlaceholder: '',
-  emailLabel: 'Email',
-  emailPlaceholder: '',
-  phoneLabel: 'Phone Number',
-  phonePlaceholder: '',
-  attendanceEnabled: true,
-  isInvalidated: false,
-  attendanceLabel: 'Will you attend?',
-  attendanceYesLabel: 'YES, I WILL ATTEND',
-  attendanceNoLabel: 'UNABLE TO ATTEND',
-  commentsLabel: 'Additional Comments',
-  commentsPlaceholder: '',
-  submitLabel: 'Submit',
-  customFields: [],
-};
-
-const customFieldNeedsOptions = (type: RsvpCustomFieldType) =>
-  type === 'select' || type === 'radio' || type === 'checkbox';
-
-const normalizeCustomFields = (value: any): RsvpCustomField[] => {
-  if (!Array.isArray(value)) return [];
-  return value.map((field, index) => {
-    const type = SUPPORTED_CUSTOM_FIELD_TYPES.has(field?.type) ? field.type : 'text';
-    return {
-      id:
-        typeof field?.id === 'string' && field.id.trim()
-          ? field.id.trim()
-          : `custom_field_${index + 1}`,
-      label:
-        typeof field?.label === 'string' && field.label.trim()
-          ? field.label.trim()
-          : `Question ${index + 1}`,
-      type,
-      required: field?.required === true,
-      placeholder: typeof field?.placeholder === 'string' ? field.placeholder : '',
-      options: customFieldNeedsOptions(type)
-        ? Array.isArray(field?.options)
-            ? field.options.map((option: any) => String(option || '').trim()).filter(Boolean)
-            : []
-        : [],
-    };
-  });
-};
+// Google Forms purple, used for every event (custom colours no longer apply).
+const G_PURPLE = '#673ab7';
+const REQUIRED_MESSAGE = 'This is a required question';
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
 const createInitialResponses = (fields: RsvpCustomField[]) =>
   fields.reduce<Record<string, CustomResponseValue>>((acc, field) => {
     acc[field.id] = field.type === 'checkbox' ? [] : '';
     return acc;
   }, {});
+
+const INPUT_TYPE: Record<string, string> = {
+  text: 'text',
+  number: 'number',
+  email: 'email',
+  phone: 'tel',
+  date: 'date',
+  time: 'time',
+};
 
 const RSVP_FORM_DEVICE_KEY_PREFIX = 'softinvite:rsvp-form-device:';
 const RSVP_FORM_SUBMISSION_PREFIX = 'softinvite:rsvp-form-submission:';
@@ -215,69 +146,37 @@ function formatDate(value?: string) {
     : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
 }
 
-function normalizeCssColor(value: string | undefined, fallback: string) {
-  if (!value) return fallback;
-  const cleaned = value.trim();
-  if (!cleaned) return fallback;
-  if (
-    cleaned.startsWith('#') ||
-    cleaned.startsWith('rgb') ||
-    cleaned.startsWith('hsl') ||
-    cleaned.startsWith('var(')
-  ) {
-    return cleaned;
-  }
-  return `rgb(${cleaned})`;
-}
-
-function parseColorChannels(value: string): [number, number, number] | null {
-  const cleaned = value.trim();
-
-  if (cleaned.startsWith('#')) {
-    const hex = cleaned.slice(1);
-    const normalized = hex.length === 3 ? hex.split('').map((char) => char + char).join('') : hex;
-    if (!/^[\da-fA-F]{6}$/.test(normalized)) {
-      return null;
-    }
-    return [
-      Number.parseInt(normalized.slice(0, 2), 16),
-      Number.parseInt(normalized.slice(2, 4), 16),
-      Number.parseInt(normalized.slice(4, 6), 16),
-    ];
-  }
-
-  const matches = cleaned.match(/\d+(\.\d+)?/g);
-  if (!matches || matches.length < 3) {
-    return null;
-  }
-
-  const channels = matches.slice(0, 3).map((channel) => Number(channel));
-  if (channels.some((channel) => Number.isNaN(channel))) {
-    return null;
-  }
-
-  return [channels[0], channels[1], channels[2]];
-}
-
-function getReadableTextColor(
-  background: string,
-  darkText: string = '#0f172a',
-  lightText: string = '#f8fafc'
-) {
-  const channels = parseColorChannels(background);
-  if (!channels) {
-    return lightText;
-  }
-
-  const [r, g, b] = channels.map((channel) => {
-    const normalized = channel / 255;
-    return normalized <= 0.03928
-      ? normalized / 12.92
-      : ((normalized + 0.055) / 1.055) ** 2.4;
-  });
-  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
-
-  return luminance > 0.55 ? darkText : lightText;
+function Question({
+  title,
+  description,
+  required,
+  error,
+  htmlFor,
+  children,
+}: {
+  title: string;
+  description?: string;
+  required?: boolean;
+  error?: string;
+  htmlFor?: string;
+  children: React.ReactNode;
+}) {
+  const Title = htmlFor ? 'label' : 'div';
+  return (
+    <div className={`gf-card gf-question${error ? ' gf-has-error' : ''}`} data-error={error ? 'true' : undefined}>
+      <Title className="gf-q-title" {...(htmlFor ? { htmlFor } : {})}>
+        {title}
+        {required && <span className="gf-required"> *</span>}
+      </Title>
+      {description && <div className="gf-q-desc">{description}</div>}
+      <div className="gf-q-body">{children}</div>
+      {error && (
+        <div className="gf-error" role="alert">
+          <span aria-hidden="true">ⓘ</span> {error}
+        </div>
+      )}
+    </div>
+  );
 }
 
 export default function RsvpPage() {
@@ -296,6 +195,8 @@ export default function RsvpPage() {
   const [status, setStatus] = useState<AttendanceStatus | ''>('');
   const [comments, setComments] = useState('');
   const [responses, setResponses] = useState<Record<string, CustomResponseValue>>({});
+  const [plusOnes, setPlusOnes] = useState<PlusOne[]>([]);
+  const [errors, setErrors] = useState<Record<string, string>>({});
 
   useEffect(() => {
     let ignore = false;
@@ -324,20 +225,19 @@ export default function RsvpPage() {
     };
   }, [token]);
 
-  const formSettings = useMemo(() => {
-    const savedSettings = payload?.event?.rsvpFormSettings || {};
-    return {
-      ...defaultFormSettings,
-      ...savedSettings,
-      isInvalidated: savedSettings?.isInvalidated === true,
-      submitLabel: 'Submit',
-      customFields: normalizeCustomFields(savedSettings.customFields),
-    };
-  }, [payload]);
+  const formSettings = useMemo(
+    () => normalizeRsvpFormSettings(payload?.event?.rsvpFormSettings),
+    [payload]
+  );
   const attendanceEnabled = formSettings.attendanceEnabled !== false;
   const formInvalidated =
     formSettings.isInvalidated === true ||
     payload?.event?.rsvpFormSettings?.acceptingSubmissions === false;
+  const plusOnesVisible =
+    formSettings.plusOnesEnabled && (!attendanceEnabled || status === 'yes');
+  const visibleFields = formSettings.customFields.filter((field) =>
+    fieldIsVisible(field, attendanceEnabled, status)
+  );
 
   useEffect(() => {
     setResponses(createInitialResponses(formSettings.customFields));
@@ -359,6 +259,58 @@ export default function RsvpPage() {
     setDeviceNameLocked(hasStoredSubmission(token, guestName));
   }, [token, guestName]);
 
+  const clearError = (key: string) =>
+    setErrors((prev) => {
+      if (!prev[key]) return prev;
+      const next = { ...prev };
+      delete next[key];
+      return next;
+    });
+
+  const setResponse = (id: string, value: CustomResponseValue) => {
+    setResponses((prev) => ({ ...prev, [id]: value }));
+    clearError(id);
+  };
+
+  const updatePlusOne = (index: number, patch: Partial<PlusOne>) => {
+    setPlusOnes((prev) => prev.map((p, i) => (i === index ? { ...p, ...patch } : p)));
+    clearError(`plusOne_${index}`);
+  };
+
+  const validate = () => {
+    const next: Record<string, string> = {};
+    if (!guestName.trim()) next.guestName = REQUIRED_MESSAGE;
+    if (formSettings.emailMode === 'required' && !email.trim()) next.email = REQUIRED_MESSAGE;
+    else if (formSettings.emailMode !== 'hidden' && email.trim() && !EMAIL_RE.test(email.trim()))
+      next.email = 'Enter a valid email address';
+    if (formSettings.phoneMode === 'required' && !phone.trim()) next.phone = REQUIRED_MESSAGE;
+    if (attendanceEnabled && !status) next.attendance = REQUIRED_MESSAGE;
+    visibleFields.forEach((field) => {
+      if (field.type === 'section') return;
+      const value = responses[field.id];
+      const empty =
+        field.type === 'checkbox'
+          ? !Array.isArray(value) || value.length === 0
+          : typeof value !== 'string' || !value.trim();
+      if (field.required && empty) next[field.id] = REQUIRED_MESSAGE;
+      else if (
+        field.type === 'email' &&
+        typeof value === 'string' &&
+        value.trim() &&
+        !EMAIL_RE.test(value.trim())
+      )
+        next[field.id] = 'Enter a valid email address';
+    });
+    if (plusOnesVisible) {
+      plusOnes.forEach((p, i) => {
+        if (!p.name.trim()) next[`plusOne_${i}`] = 'Enter a name or remove this guest';
+        else if (p.email.trim() && !EMAIL_RE.test(p.email.trim()))
+          next[`plusOne_${i}`] = 'Enter a valid email address';
+      });
+    }
+    return next;
+  };
+
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
     if (!payload || !token) return;
@@ -370,28 +322,15 @@ export default function RsvpPage() {
       toast.error('No internet connection. Please try again when you are online.');
       return;
     }
-    if (!guestName.trim()) {
-      toast.error('Please enter your name');
-      return;
-    }
-    if (!phone.trim()) {
-      toast.error('Please enter your phone number');
-      return;
-    }
-    if (attendanceEnabled && !status) {
-      toast.error('Please select an option');
-      return;
-    }
-    const missingRequiredField = formSettings.customFields.find((field) => {
-      if (!field.required) return false;
-      const value = responses[field.id];
-      if (field.type === 'checkbox') {
-        return !Array.isArray(value) || value.length === 0;
-      }
-      return typeof value !== 'string' || !value.trim();
-    });
-    if (missingRequiredField) {
-      toast.error(`Please complete "${missingRequiredField.label}"`);
+    const found = validate();
+    setErrors(found);
+    if (Object.keys(found).length) {
+      toast.error('Please complete the highlighted questions');
+      requestAnimationFrame(() => {
+        document
+          .querySelector('[data-error="true"]')
+          ?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
       return;
     }
     if (deviceNameLocked) {
@@ -401,25 +340,47 @@ export default function RsvpPage() {
 
     setSubmitting(true);
     try {
-      const responsePayload = formSettings.customFields.reduce<Record<string, CustomResponseValue>>(
+      // Only answers to questions the guest could see are sent.
+      const responsePayload = visibleFields.reduce<Record<string, CustomResponseValue>>(
         (acc, field) => {
+          if (field.type === 'section') return acc;
           const value = responses[field.id];
-          acc[field.id] = field.type === 'checkbox' ? (Array.isArray(value) ? value : []) : typeof value === 'string' ? value : '';
+          acc[field.id] =
+            field.type === 'checkbox'
+              ? Array.isArray(value)
+                ? value
+                : []
+              : typeof value === 'string'
+                ? value
+                : '';
           return acc;
         },
         {}
       );
       const { data } = await axios.post(`${API_BASE}/rsvp/form/${token}/submit`, {
         guestName,
-        email,
-        phone,
+        email: formSettings.emailMode === 'hidden' ? '' : email,
+        phone: formSettings.phoneMode === 'hidden' ? '' : phone,
         attendanceStatus: attendanceEnabled ? status : undefined,
-        comments,
+        comments: formSettings.commentsEnabled ? comments : '',
         submissionKey: deviceSubmissionKey || undefined,
         responses: responsePayload,
+        ...(plusOnesVisible && plusOnes.length
+          ? {
+              plusOnes: plusOnes.map((p) => ({
+                name: p.name.trim(),
+                phone: p.phone.trim(),
+                email: p.email.trim(),
+              })),
+            }
+          : {}),
       });
       storeSubmission(token, guestName, deviceSubmissionKey, data?.rsvp?.id);
-      setSubmitted({ status: (attendanceEnabled ? status : 'yes') as AttendanceStatus, rsvpId: data?.rsvp?.id || '' });
+      setSubmitted({
+        status: (attendanceEnabled ? status : 'yes') as AttendanceStatus,
+        rsvpId: data?.rsvp?.id || '',
+      });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
     } catch (err: any) {
       if (typeof navigator !== 'undefined' && !navigator.onLine) {
         toast.error('No internet connection. Please try again when you are online.');
@@ -437,298 +398,415 @@ export default function RsvpPage() {
     }
   };
 
-  const leftContent = useMemo(() => {
+  const invitation = useMemo(() => {
     if (!payload) return null;
     if (payload.event.iv) {
-      return <img src={payload.event.iv} alt="Invitation" className="rsvp-iv" />;
+      return <img src={payload.event.iv} alt="Invitation" className="gf-iv" />;
     }
-    return (
-      <div className="rsvp-fallback">
-        <div className="rsvp-fallback-pill">Invitation</div>
-        <h2>{payload.event.name}</h2>
-        <p className="rsvp-meta">{formatDate(payload.event.date)}</p>
-        {payload.event.location && <p className="rsvp-meta">{payload.event.location}</p>}
-        {payload.event.description && <p className="rsvp-desc">{payload.event.description}</p>}
-      </div>
-    );
+    return null;
   }, [payload]);
 
-  const rsvpBg = normalizeCssColor(payload?.event?.rsvpBgColor, '#111827');
-  const rsvpAccent = normalizeCssColor(
-    payload?.event?.rsvpAccentColor || payload?.event?.qrCodeCenterColor,
-    '#1f2937'
-  );
-  const rsvpBgText = getReadableTextColor(rsvpBg);
-  const rsvpAccentText = getReadableTextColor(rsvpAccent);
+  const renderField = (field: RsvpCustomField) => {
+    const value = responses[field.id];
+    const inputId = `rsvp-custom-${field.id}`;
+
+    if (field.type === 'section') {
+      return (
+        <div className="gf-card gf-section" key={field.id}>
+          {field.label && <h2>{field.label}</h2>}
+          {field.description && <p>{field.description}</p>}
+        </div>
+      );
+    }
+
+    const common = {
+      title: field.label,
+      description: field.description,
+      required: field.required,
+      error: errors[field.id],
+    };
+
+    if (field.type === 'textarea') {
+      return (
+        <Question key={field.id} {...common} htmlFor={inputId}>
+          <textarea
+            id={inputId}
+            className="gf-input"
+            value={typeof value === 'string' ? value : ''}
+            disabled={submitting}
+            placeholder={field.placeholder || 'Your answer'}
+            onChange={(e) => setResponse(field.id, e.target.value)}
+            rows={3}
+          />
+        </Question>
+      );
+    }
+
+    if (field.type === 'select') {
+      return (
+        <Question key={field.id} {...common} htmlFor={inputId}>
+          <select
+            id={inputId}
+            className="gf-select"
+            value={typeof value === 'string' ? value : ''}
+            disabled={submitting}
+            onChange={(e) => setResponse(field.id, e.target.value)}
+          >
+            <option value="">{field.placeholder || 'Choose'}</option>
+            {field.options.map((option) => (
+              <option key={option} value={option}>
+                {option}
+              </option>
+            ))}
+          </select>
+        </Question>
+      );
+    }
+
+    if (field.type === 'radio') {
+      return (
+        <Question key={field.id} {...common}>
+          <div className="gf-choices" role="radiogroup">
+            {field.options.map((option, i) => (
+              <label className="gf-choice" key={option} htmlFor={`${inputId}-${i}`}>
+                <input
+                  id={`${inputId}-${i}`}
+                  type="radio"
+                  name={field.id}
+                  value={option}
+                  checked={value === option}
+                  disabled={submitting}
+                  onChange={(e) => setResponse(field.id, e.target.value)}
+                />
+                <span>{option}</span>
+              </label>
+            ))}
+          </div>
+          {!field.required && typeof value === 'string' && value && (
+            <button type="button" className="gf-link" onClick={() => setResponse(field.id, '')}>
+              Clear selection
+            </button>
+          )}
+        </Question>
+      );
+    }
+
+    if (field.type === 'checkbox') {
+      const selected = Array.isArray(value) ? value : [];
+      return (
+        <Question key={field.id} {...common}>
+          <div className="gf-choices">
+            {field.options.map((option, i) => (
+              <label className="gf-choice" key={option} htmlFor={`${inputId}-${i}`}>
+                <input
+                  id={`${inputId}-${i}`}
+                  type="checkbox"
+                  value={option}
+                  checked={selected.includes(option)}
+                  disabled={submitting}
+                  onChange={(e) =>
+                    setResponse(
+                      field.id,
+                      e.target.checked
+                        ? [...selected, option]
+                        : selected.filter((entry) => entry !== option)
+                    )
+                  }
+                />
+                <span>{option}</span>
+              </label>
+            ))}
+          </div>
+        </Question>
+      );
+    }
+
+    return (
+      <Question key={field.id} {...common} htmlFor={inputId}>
+        <input
+          id={inputId}
+          className="gf-input"
+          type={INPUT_TYPE[field.type] || 'text'}
+          value={typeof value === 'string' ? value : ''}
+          disabled={submitting}
+          placeholder={
+            field.type === 'date' || field.type === 'time' ? undefined : field.placeholder || 'Your answer'
+          }
+          onChange={(e) => setResponse(field.id, e.target.value)}
+        />
+      </Question>
+    );
+  };
+
+  const title = formSettings.formTitle.trim() || payload?.event?.name || 'RSVP';
+  const showForm = !loading && !isRedirecting && !error && payload && !formInvalidated;
 
   return (
-    <div
-      className="rsvp-page"
-      style={
-        {
-          '--rsvp-bg': rsvpBg,
-          '--rsvp-accent': rsvpAccent,
-          '--rsvp-bg-contrast': rsvpBgText,
-          '--rsvp-accent-contrast': rsvpAccentText,
-        } as React.CSSProperties
-      }
-    >
+    <div className="gf-page">
       <Helmet>
         <title>RSVP | Softinvite</title>
       </Helmet>
 
-      <div className="rsvp-shell">
-        <div className="rsvp-left">{leftContent}</div>
+      <div className={`gf-shell${invitation ? ' gf-shell--with-iv' : ''}`}>
+        {invitation && <div className="gf-left">{invitation}</div>}
 
-        <div className="rsvp-right">
-          {(loading || isRedirecting) && <p className="rsvp-muted">{isRedirecting ? 'Redirecting...' : 'Loading RSVP...'}</p>}
-          {!loading && !isRedirecting && error && <p className="rsvp-error">{error}</p>}
-
+        <div className="gf-right">
+          {(loading || isRedirecting) && (
+            <div className="gf-card gf-header">
+              <p className="gf-muted">{isRedirecting ? 'Redirecting...' : 'Loading RSVP...'}</p>
+            </div>
+          )}
+          {!loading && !isRedirecting && error && (
+            <div className="gf-card gf-header">
+              <p className="gf-error-text">{error}</p>
+            </div>
+          )}
           {!loading && !isRedirecting && !error && payload && formInvalidated && (
-            <p className="rsvp-error">This form is no longer receiving submissions.</p>
+            <div className="gf-card gf-header">
+              <h1>{title}</h1>
+              <p className="gf-muted">This form is no longer receiving submissions.</p>
+            </div>
           )}
 
-          {!loading && !isRedirecting && !error && payload && !formInvalidated && submitted && (
-            <SuccessScreen
-              status={submitted.status}
-              rsvpId={submitted.rsvpId}
-              eventName={payload.event.name}
-              accentColor={rsvpAccent}
-              accentTextColor={rsvpAccentText}
-            />
+          {showForm && submitted && (
+            <div className="gf-card gf-header">
+              <SuccessScreen
+                status={submitted.status}
+                rsvpId={submitted.rsvpId}
+                eventName={payload.event.name}
+                accentColor={G_PURPLE}
+                accentTextColor="#ffffff"
+              />
+            </div>
           )}
 
-          {!loading && !isRedirecting && !error && payload && !formInvalidated && !submitted && (
-            <form className="rsvp-form" onSubmit={handleSubmit}>
-              <div className="rsvp-header">
-                <div className="rsvp-pill">RSVP</div>
-                <h1>{payload.event.name}</h1>
-                <p className="rsvp-muted">
-                  {attendanceEnabled
-                    ? 'Fill the form to confirm your attendance.'
-                    : 'Fill the form and submit your response.'}
-                </p>
+          {showForm && !submitted && (
+            <form className="gf-form" onSubmit={handleSubmit} noValidate>
+              <div className="gf-card gf-header">
+                <h1>{title}</h1>
+                {formSettings.formDescription ? (
+                  <p className="gf-desc">{formSettings.formDescription}</p>
+                ) : (
+                  <p className="gf-desc">
+                    {[formatDate(payload.event.date), payload.event.location]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </p>
+                )}
+                <p className="gf-required-note">* Indicates required question</p>
               </div>
 
-              <label className="rsvp-field" htmlFor="rsvp-guest-name">
-                <span>{formSettings.guestNameLabel}</span>
+              <Question
+                title={formSettings.guestNameLabel}
+                required
+                error={errors.guestName}
+                htmlFor="rsvp-guest-name"
+              >
                 <input
                   id="rsvp-guest-name"
+                  className="gf-input"
                   type="text"
-                  name="guestName"
+                  autoComplete="name"
                   value={guestName}
                   disabled={submitting}
-                  placeholder={formSettings.guestNamePlaceholder}
-                  onChange={(e) => setGuestName(e.target.value)}
-                  required
+                  placeholder={formSettings.guestNamePlaceholder || 'Your answer'}
+                  onChange={(e) => {
+                    setGuestName(e.target.value);
+                    clearError('guestName');
+                  }}
                 />
-              </label>
+              </Question>
 
-              <label className="rsvp-field" htmlFor="rsvp-email">
-                <span>{formSettings.emailLabel}</span>
-                <input
-                  id="rsvp-email"
-                  type="email"
-                  name="email"
-                  value={email}
-                  disabled={submitting}
-                  placeholder={formSettings.emailPlaceholder}
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </label>
+              {formSettings.emailMode !== 'hidden' && (
+                <Question
+                  title={formSettings.emailLabel}
+                  required={formSettings.emailMode === 'required'}
+                  error={errors.email}
+                  htmlFor="rsvp-email"
+                >
+                  <input
+                    id="rsvp-email"
+                    className="gf-input"
+                    type="email"
+                    autoComplete="email"
+                    value={email}
+                    disabled={submitting}
+                    placeholder={formSettings.emailPlaceholder || 'Your answer'}
+                    onChange={(e) => {
+                      setEmail(e.target.value);
+                      clearError('email');
+                    }}
+                  />
+                </Question>
+              )}
 
-              <label className="rsvp-field" htmlFor="rsvp-phone">
-                <span>{formSettings.phoneLabel}</span>
-                <input
-                  id="rsvp-phone"
-                  type="tel"
-                  name="phone"
-                  value={phone}
-                  disabled={submitting}
-                  placeholder={formSettings.phonePlaceholder}
-                  onChange={(e) => setPhone(e.target.value)}
-                  required
-                />
-              </label>
-
-              {formSettings.customFields.map((field) => {
-                const value = responses[field.id];
-                const inputId = `rsvp-custom-${field.id}`;
-
-                if (field.type === 'textarea') {
-                  return (
-                    <label className="rsvp-field" htmlFor={inputId} key={field.id}>
-                      <span>{field.label}</span>
-                      <textarea
-                        id={inputId}
-                        name={field.id}
-                        value={typeof value === 'string' ? value : ''}
-                        disabled={submitting}
-                        placeholder={field.placeholder}
-                        onChange={(e) =>
-                          setResponses((prev) => ({ ...prev, [field.id]: e.target.value }))
-                        }
-                        rows={4}
-                      />
-                    </label>
-                  );
-                }
-
-                if (field.type === 'select') {
-                  return (
-                    <label className="rsvp-field" htmlFor={inputId} key={field.id}>
-                      <span>{field.label}</span>
-                      <select
-                        id={inputId}
-                        name={field.id}
-                        value={typeof value === 'string' ? value : ''}
-                        disabled={submitting}
-                        onChange={(e) =>
-                          setResponses((prev) => ({ ...prev, [field.id]: e.target.value }))
-                        }
-                      >
-                        <option value="">{field.placeholder || `Select ${field.label}`}</option>
-                        {field.options.map((option) => (
-                          <option key={option} value={option}>
-                            {option}
-                          </option>
-                        ))}
-                      </select>
-                    </label>
-                  );
-                }
-
-                if (field.type === 'radio') {
-                  return (
-                    <div className="rsvp-field" key={field.id}>
-                      <span>{field.label}</span>
-                      <div className="rsvp-radio-group">
-                        {field.options.map((option) => (
-                          <label className="rsvp-radio" key={option} htmlFor={`${inputId}-${option}`}>
-                            <input
-                              id={`${inputId}-${option}`}
-                              type="radio"
-                              name={field.id}
-                              value={option}
-                              checked={value === option}
-                              disabled={submitting}
-                              onChange={(e) =>
-                                setResponses((prev) => ({ ...prev, [field.id]: e.target.value }))
-                              }
-                            />
-                            <span>{option}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                }
-
-                if (field.type === 'checkbox') {
-                  const selectedValues = Array.isArray(value) ? value : [];
-                  return (
-                    <div className="rsvp-field" key={field.id}>
-                      <span>{field.label}</span>
-                      <div className="rsvp-checkbox-group">
-                        {field.options.map((option) => (
-                          <label
-                            className="rsvp-checkbox"
-                            key={option}
-                            htmlFor={`${inputId}-${option}`}
-                          >
-                            <input
-                              id={`${inputId}-${option}`}
-                              type="checkbox"
-                              name={`${field.id}[]`}
-                              value={option}
-                              checked={selectedValues.includes(option)}
-                              disabled={submitting}
-                              onChange={(e) =>
-                                setResponses((prev) => {
-                                  const current = Array.isArray(prev[field.id])
-                                    ? (prev[field.id] as string[])
-                                    : [];
-                                  return {
-                                    ...prev,
-                                    [field.id]: e.target.checked
-                                      ? [...current, option]
-                                      : current.filter((entry: string) => entry !== option),
-                                  };
-                                })
-                              }
-                            />
-                            <span>{option}</span>
-                          </label>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                }
-
-                return (
-                  <label className="rsvp-field" htmlFor={inputId} key={field.id}>
-                    <span>{field.label}</span>
-                    <input
-                      id={inputId}
-                      type={field.type === 'number' ? 'number' : 'text'}
-                      name={field.id}
-                      value={typeof value === 'string' ? value : ''}
-                      disabled={submitting}
-                      placeholder={field.placeholder}
-                      onChange={(e) =>
-                        setResponses((prev) => ({ ...prev, [field.id]: e.target.value }))
-                      }
-                    />
-                  </label>
-                );
-              })}
+              {formSettings.phoneMode !== 'hidden' && (
+                <Question
+                  title={formSettings.phoneLabel}
+                  required={formSettings.phoneMode === 'required'}
+                  error={errors.phone}
+                  htmlFor="rsvp-phone"
+                >
+                  <input
+                    id="rsvp-phone"
+                    className="gf-input"
+                    type="tel"
+                    autoComplete="tel"
+                    value={phone}
+                    disabled={submitting}
+                    placeholder={formSettings.phonePlaceholder || 'Your answer'}
+                    onChange={(e) => {
+                      setPhone(e.target.value);
+                      clearError('phone');
+                    }}
+                  />
+                </Question>
+              )}
 
               {attendanceEnabled && (
-                <div className="rsvp-field">
-                  <span>{formSettings.attendanceLabel}</span>
-                  <div className="rsvp-statuses">
-                    {([
-                      ['yes', formSettings.attendanceYesLabel],
-                      ['no', formSettings.attendanceNoLabel],
-                    ] as const).map(([opt, label]) => (
-                      <button
-                        key={opt}
-                        type="button"
-                        className={`rsvp-chip ${status === opt ? 'active' : ''} ${opt}`}
-                        onClick={() => setStatus(opt)}
-                        disabled={submitting}
-                      >
-                        {label}
-                      </button>
+                <Question title={formSettings.attendanceLabel} required error={errors.attendance}>
+                  <div className="gf-choices" role="radiogroup">
+                    {(
+                      [
+                        ['yes', formSettings.attendanceYesLabel],
+                        ['no', formSettings.attendanceNoLabel],
+                      ] as const
+                    ).map(([opt, label]) => (
+                      <label className="gf-choice" key={opt} htmlFor={`rsvp-attendance-${opt}`}>
+                        <input
+                          id={`rsvp-attendance-${opt}`}
+                          type="radio"
+                          name="attendance"
+                          value={opt}
+                          checked={status === opt}
+                          disabled={submitting}
+                          onChange={() => {
+                            setStatus(opt);
+                            clearError('attendance');
+                          }}
+                        />
+                        <span>{label}</span>
+                      </label>
                     ))}
                   </div>
-                </div>
+                </Question>
               )}
 
-              <label className="rsvp-field" htmlFor="rsvp-comments">
-                <span>{formSettings.commentsLabel}</span>
-                <textarea
-                  id="rsvp-comments"
-                  name="comments"
-                  value={comments}
-                  disabled={submitting}
-                  placeholder={formSettings.commentsPlaceholder}
-                  onChange={(e) => setComments(e.target.value)}
-                  rows={4}
-                />
-              </label>
+              {plusOnesVisible && (
+                <Question
+                  title={formSettings.plusOnesLabel}
+                  description={`You can add up to ${formSettings.plusOnesMax} guest${
+                    formSettings.plusOnesMax === 1 ? '' : 's'
+                  }. Phone and email are optional.`}
+                >
+                  {plusOnes.map((p, i) => (
+                    <div
+                      className={`gf-plusone${errors[`plusOne_${i}`] ? ' gf-has-error' : ''}`}
+                      data-error={errors[`plusOne_${i}`] ? 'true' : undefined}
+                      key={i}
+                    >
+                      <div className="gf-plusone-head">
+                        <strong>Guest {i + 1}</strong>
+                        <button
+                          type="button"
+                          className="gf-link"
+                          disabled={submitting}
+                          onClick={() => {
+                            setPlusOnes((prev) => prev.filter((_, j) => j !== i));
+                            setErrors((prev) => {
+                              const next: Record<string, string> = {};
+                              Object.entries(prev).forEach(([k, v]) => {
+                                if (!k.startsWith('plusOne_')) next[k] = v;
+                              });
+                              return next;
+                            });
+                          }}
+                        >
+                          Remove
+                        </button>
+                      </div>
+                      <input
+                        className="gf-input"
+                        type="text"
+                        placeholder="Full name *"
+                        aria-label={`Guest ${i + 1} name`}
+                        value={p.name}
+                        disabled={submitting}
+                        onChange={(e) => updatePlusOne(i, { name: e.target.value })}
+                      />
+                      <div className="gf-plusone-row">
+                        <input
+                          className="gf-input"
+                          type="tel"
+                          placeholder="Phone (optional)"
+                          aria-label={`Guest ${i + 1} phone`}
+                          value={p.phone}
+                          disabled={submitting}
+                          onChange={(e) => updatePlusOne(i, { phone: e.target.value })}
+                        />
+                        <input
+                          className="gf-input"
+                          type="email"
+                          placeholder="Email (optional)"
+                          aria-label={`Guest ${i + 1} email`}
+                          value={p.email}
+                          disabled={submitting}
+                          onChange={(e) => updatePlusOne(i, { email: e.target.value })}
+                        />
+                      </div>
+                      {errors[`plusOne_${i}`] && (
+                        <div className="gf-error">
+                          <span aria-hidden="true">ⓘ</span> {errors[`plusOne_${i}`]}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                  {plusOnes.length < formSettings.plusOnesMax ? (
+                    <button
+                      type="button"
+                      className="gf-add"
+                      disabled={submitting}
+                      onClick={() => setPlusOnes((prev) => [...prev, { name: '', phone: '', email: '' }])}
+                    >
+                      + Add {plusOnes.length ? 'another guest' : 'a guest'}
+                    </button>
+                  ) : (
+                    <p className="gf-muted small">
+                      Maximum of {formSettings.plusOnesMax} extra guest
+                      {formSettings.plusOnesMax === 1 ? '' : 's'} reached.
+                    </p>
+                  )}
+                </Question>
+              )}
+
+              {visibleFields.map(renderField)}
+
+              {formSettings.commentsEnabled && (
+                <Question title={formSettings.commentsLabel} htmlFor="rsvp-comments">
+                  <textarea
+                    id="rsvp-comments"
+                    className="gf-input"
+                    value={comments}
+                    disabled={submitting}
+                    placeholder={formSettings.commentsPlaceholder || 'Your answer'}
+                    onChange={(e) => setComments(e.target.value)}
+                    rows={3}
+                  />
+                </Question>
+              )}
 
               {deviceNameLocked && normalizeGuestNameKey(guestName) && (
-                <p className="rsvp-warning">{DUPLICATE_SUBMISSION_MESSAGE}</p>
+                <div className="gf-card gf-warning">{DUPLICATE_SUBMISSION_MESSAGE}</div>
               )}
 
-              <button
-                type="submit"
-                className="rsvp-submit"
-                disabled={submitting || deviceNameLocked}
-              >
-                {submitting ? 'Submitting...' : 'Submit'}
-              </button>
+              <div className="gf-actions">
+                <button type="submit" className="gf-submit" disabled={submitting || deviceNameLocked}>
+                  {submitting ? 'Submitting...' : 'Submit'}
+                </button>
+              </div>
+              <p className="gf-footer">
+                Powered by <strong>SoftInvites</strong>
+              </p>
             </form>
           )}
         </div>

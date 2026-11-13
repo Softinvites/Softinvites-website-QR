@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
-import { SketchPicker } from 'react-color';
 import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
@@ -13,7 +12,6 @@ import Table from '@mui/material/Table';
 import Stack from '@mui/material/Stack';
 import Button from '@mui/material/Button';
 import Dialog from '@mui/material/Dialog';
-import Switch from '@mui/material/Switch';
 import Divider from '@mui/material/Divider';
 import TableRow from '@mui/material/TableRow';
 import MenuItem from '@mui/material/MenuItem';
@@ -31,9 +29,15 @@ import DialogActions from '@mui/material/DialogActions';
 import TableContainer from '@mui/material/TableContainer';
 import InputAdornment from '@mui/material/InputAdornment';
 import TablePagination from '@mui/material/TablePagination';
-import FormControlLabel from '@mui/material/FormControlLabel';
 
 import { API_BASE } from 'src/utils/apiBase';
+import {
+  type RsvpFormSettings,
+  fieldNeedsOptions as customFieldNeedsOptions,
+  normalizeCustomField,
+  defaultRsvpFormSettings,
+  normalizeRsvpFormSettings,
+} from 'src/utils/rsvp-form';
 import { uploadEventAsset } from 'src/utils/event-asset-upload';
 
 import { DashboardContent } from 'src/layouts/dashboard';
@@ -57,6 +61,9 @@ import {
   collectSequenceAttachmentFiles,
 } from 'src/sections/event/message-sequence-builder';
 
+import { RsvpFormBuilder } from './rsvp-form-builder';
+import { SubmissionAnswersDialog } from './submission-answers-dialog';
+
 type RsvpRecord = {
   _id: string;
   guestName: string;
@@ -70,6 +77,9 @@ type RsvpRecord = {
   invitationSent?: boolean;
   sentCount?: number;
   lastSentAt?: string;
+  comments?: string;
+  responses?: Record<string, any>;
+  plusOnes?: Array<{ name: string; phone?: string | null; email?: string | null }>;
 };
 
 type RsvpAttendanceStatus = 'pending' | 'yes' | 'no';
@@ -90,115 +100,6 @@ type AddGuestFormState = {
   guestCount: string;
   tag: string;
 };
-
-type RsvpFormSettings = {
-  guestNameLabel: string;
-  guestNamePlaceholder: string;
-  emailLabel: string;
-  emailPlaceholder: string;
-  phoneLabel: string;
-  phonePlaceholder: string;
-  attendanceEnabled: boolean;
-  isInvalidated: boolean;
-  attendanceLabel: string;
-  attendanceYesLabel: string;
-  attendanceNoLabel: string;
-  commentsLabel: string;
-  commentsPlaceholder: string;
-  submitLabel: string;
-  /** Event-level default. When set, every RSVP link for this event
-   *  forwards to this URL instead of the built-in form. */
-  externalFormUrl: string;
-  customFields: RsvpCustomField[];
-};
-
-type RsvpCustomFieldType = 'text' | 'textarea' | 'select' | 'radio' | 'checkbox' | 'number';
-
-type RsvpCustomField = {
-  id: string;
-  label: string;
-  type: RsvpCustomFieldType;
-  required: boolean;
-  placeholder: string;
-  options: string[];
-};
-
-const defaultRsvpFormSettings: RsvpFormSettings = {
-  guestNameLabel: 'Guest Name',
-  guestNamePlaceholder: '',
-  emailLabel: 'Email',
-  emailPlaceholder: '',
-  phoneLabel: 'Phone Number',
-  phonePlaceholder: '',
-  attendanceEnabled: true,
-  isInvalidated: false,
-  attendanceLabel: 'Will you attend?',
-  attendanceYesLabel: 'YES, I WILL ATTEND',
-  attendanceNoLabel: 'UNABLE TO ATTEND',
-  commentsLabel: 'Additional Comments',
-  commentsPlaceholder: '',
-  submitLabel: 'Submit',
-  externalFormUrl: '',
-  customFields: [],
-};
-
-const CUSTOM_FIELD_TYPES: RsvpCustomFieldType[] = [
-  'text',
-  'textarea',
-  'select',
-  'radio',
-  'checkbox',
-  'number',
-];
-
-const createCustomFieldId = () =>
-  globalThis.crypto && 'randomUUID' in globalThis.crypto
-    ? globalThis.crypto.randomUUID()
-    : `form_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`;
-
-const createEmptyCustomField = (): RsvpCustomField => ({
-  id: createCustomFieldId(),
-  label: '',
-  type: 'text',
-  required: false,
-  placeholder: '',
-  options: [],
-});
-
-const normalizeCustomField = (field: any, index: number): RsvpCustomField => ({
-  id:
-    typeof field?.id === 'string' && field.id.trim()
-      ? field.id.trim()
-      : `custom_field_${index + 1}`,
-  label:
-    typeof field?.label === 'string' && field.label.trim()
-      ? field.label.trim()
-      : `Question ${index + 1}`,
-  type: CUSTOM_FIELD_TYPES.includes(field?.type) ? field.type : 'text',
-  required: field?.required === true,
-  placeholder: typeof field?.placeholder === 'string' ? field.placeholder : '',
-  options: Array.isArray(field?.options)
-    ? field.options.map((option: any) => String(option || '').trim()).filter(Boolean)
-    : [],
-});
-
-const normalizeRsvpFormSettings = (settings: any): RsvpFormSettings => ({
-  ...defaultRsvpFormSettings,
-  ...(settings || {}),
-  isInvalidated: settings?.isInvalidated === true,
-  submitLabel: 'Submit',
-  externalFormUrl:
-    typeof settings?.externalFormUrl === 'string' ? settings.externalFormUrl.trim() : '',
-  customFields: Array.isArray(settings?.customFields)
-    ? settings.customFields.map((field: any, index: number) => normalizeCustomField(field, index))
-    : [],
-});
-
-const customFieldNeedsOptions = (type: RsvpCustomFieldType) =>
-  type === 'select' || type === 'radio' || type === 'checkbox';
-
-const formatCustomFieldType = (type: RsvpCustomFieldType) =>
-  type === 'textarea' ? 'Textarea' : type.charAt(0).toUpperCase() + type.slice(1);
 
 type RsvpEventStatusFilter = 'all' | 'active' | 'expired';
 type RsvpEventStatusLabel = 'Active' | 'Expired' | 'Inactive';
@@ -410,6 +311,7 @@ export function RsvpAdminView() {
   const [eventsLoading, setEventsLoading] = useState(false);
   const [eventFilter, setEventFilter] = useState<RsvpEventStatusFilter>('all');
   const [guests, setGuests] = useState<RsvpRecord[]>([]);
+  const [answersTarget, setAnswersTarget] = useState<RsvpRecord | null>(null);
   const [summary, setSummary] = useState(emptySummary);
   const [mode, setMode] = useState<'rsvp' | 'invitation-only'>('rsvp');
   const [loading, setLoading] = useState(false);
@@ -594,27 +496,6 @@ export function RsvpAdminView() {
     [event?.channelConfig?.bulkSms?.enabled]
   );
   const canEditSequence = mode !== 'invitation-only';
-  const updateCustomField = useCallback((fieldId: string, updates: Partial<RsvpCustomField>) => {
-    setRsvpFormSettings((prev) => ({
-      ...prev,
-      customFields: prev.customFields.map((field) =>
-        field.id === fieldId ? { ...field, ...updates } : field
-      ),
-    }));
-  }, []);
-  const addCustomField = useCallback(() => {
-    setRsvpFormSettings((prev) => ({
-      ...prev,
-      customFields: [...prev.customFields, createEmptyCustomField()],
-    }));
-  }, []);
-  const removeCustomField = useCallback((fieldId: string) => {
-    setRsvpFormSettings((prev) => ({
-      ...prev,
-      customFields: prev.customFields.filter((field) => field.id !== fieldId),
-    }));
-  }, []);
-
   const timelinePoints = analytics?.timeline || [];
   const timelineCategories = timelinePoints.map((point: any) => point.date);
   const timelineSeries = timelinePoints.map((point: any) => point.count);
@@ -2362,7 +2243,14 @@ export function RsvpAdminView() {
                           <TableCell>{guest.guestName}</TableCell>
                           <TableCell>{guest.email || '—'}</TableCell>
                           <TableCell>{guest.phone || '—'}</TableCell>
-                          <TableCell>{guest.guestCount || 1}</TableCell>
+                          <TableCell>
+                            {guest.guestCount || 1}
+                            {!!guest.plusOnes?.length && (
+                              <Typography variant="caption" display="block" color="text.secondary">
+                                +{guest.plusOnes.length}: {guest.plusOnes.map((p) => p.name).join(', ')}
+                              </Typography>
+                            )}
+                          </TableCell>
                           <TableCell>{guest.tag || '—'}</TableCell>
                           <TableCell>{guest.attendanceStatus || 'pending'}</TableCell>
                           <TableCell>
@@ -2371,9 +2259,14 @@ export function RsvpAdminView() {
                               : '—'}
                           </TableCell>
                           <TableCell align="right">
-                            <Button variant="outlined" onClick={() => openEditGuestDialog(guest)}>
-                              Edit
-                            </Button>
+                            <Stack direction="row" spacing={1} justifyContent="flex-end">
+                              <Button variant="text" onClick={() => setAnswersTarget(guest)}>
+                                Answers
+                              </Button>
+                              <Button variant="outlined" onClick={() => openEditGuestDialog(guest)}>
+                                Edit
+                              </Button>
+                            </Stack>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -2413,296 +2306,11 @@ export function RsvpAdminView() {
             RSVP Form Settings
           </Typography>
           <Stack spacing={3}>
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Guest Name Label"
-                  value={rsvpFormSettings.guestNameLabel}
-                  onChange={(e) =>
-                    setRsvpFormSettings((prev) => ({
-                      ...prev,
-                      guestNameLabel: e.target.value,
-                    }))
-                  }
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Guest Name Placeholder"
-                  value={rsvpFormSettings.guestNamePlaceholder}
-                  onChange={(e) =>
-                    setRsvpFormSettings((prev) => ({
-                      ...prev,
-                      guestNamePlaceholder: e.target.value,
-                    }))
-                  }
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Email Label"
-                  value={rsvpFormSettings.emailLabel}
-                  onChange={(e) =>
-                    setRsvpFormSettings((prev) => ({
-                      ...prev,
-                      emailLabel: e.target.value,
-                    }))
-                  }
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Email Placeholder"
-                  value={rsvpFormSettings.emailPlaceholder}
-                  onChange={(e) =>
-                    setRsvpFormSettings((prev) => ({
-                      ...prev,
-                      emailPlaceholder: e.target.value,
-                    }))
-                  }
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Phone Label"
-                  value={rsvpFormSettings.phoneLabel}
-                  onChange={(e) =>
-                    setRsvpFormSettings((prev) => ({
-                      ...prev,
-                      phoneLabel: e.target.value,
-                    }))
-                  }
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Phone Placeholder"
-                  value={rsvpFormSettings.phonePlaceholder}
-                  onChange={(e) =>
-                    setRsvpFormSettings((prev) => ({
-                      ...prev,
-                      phonePlaceholder: e.target.value,
-                    }))
-                  }
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      checked={rsvpFormSettings.attendanceEnabled}
-                      onChange={(toggleEvent) =>
-                        setRsvpFormSettings((prev) => ({
-                          ...prev,
-                          attendanceEnabled: toggleEvent.target.checked,
-                        }))
-                      }
-                    />
-                  }
-                  label="Enable attendance question on the form"
-                />
-              </Grid>
-              {rsvpFormSettings.attendanceEnabled && (
-                <>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      label="Attendance Label"
-                      value={rsvpFormSettings.attendanceLabel}
-                      onChange={(e) =>
-                        setRsvpFormSettings((prev) => ({
-                          ...prev,
-                          attendanceLabel: e.target.value,
-                        }))
-                      }
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      label="Attend Button Text"
-                      value={rsvpFormSettings.attendanceYesLabel}
-                      onChange={(e) =>
-                        setRsvpFormSettings((prev) => ({
-                          ...prev,
-                          attendanceYesLabel: e.target.value,
-                        }))
-                      }
-                      fullWidth
-                    />
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <TextField
-                      label="Unable To Attend Button Text"
-                      value={rsvpFormSettings.attendanceNoLabel}
-                      onChange={(e) =>
-                        setRsvpFormSettings((prev) => ({
-                          ...prev,
-                          attendanceNoLabel: e.target.value,
-                        }))
-                      }
-                      fullWidth
-                    />
-                  </Grid>
-                </>
-              )}
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Comments Label"
-                  value={rsvpFormSettings.commentsLabel}
-                  onChange={(e) =>
-                    setRsvpFormSettings((prev) => ({
-                      ...prev,
-                      commentsLabel: e.target.value,
-                    }))
-                  }
-                  fullWidth
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  label="Comments Placeholder"
-                  value={rsvpFormSettings.commentsPlaceholder}
-                  onChange={(e) =>
-                    setRsvpFormSettings((prev) => ({
-                      ...prev,
-                      commentsPlaceholder: e.target.value,
-                    }))
-                  }
-                  fullWidth
-                />
-              </Grid>
-            </Grid>
-            <Divider />
-            <Stack spacing={2}>
-              <Stack
-                direction={{ xs: 'column', sm: 'row' }}
-                spacing={2}
-                alignItems={{ xs: 'flex-start', sm: 'center' }}
-                justifyContent="space-between"
-              >
-                <Box>
-                  <Typography variant="subtitle1">Additional Questions</Typography>
-                  <Typography variant="body2" color="text.secondary">
-                    These questions appear on the RSVP form only.
-                  </Typography>
-                </Box>
-                <Button
-                  variant="outlined"
-                  startIcon={<Iconify icon="mingcute:add-line" />}
-                  onClick={addCustomField}
-                >
-                  Add Question
-                </Button>
-              </Stack>
-
-              {rsvpFormSettings.customFields.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">
-                  No additional questions yet.
-                </Typography>
-              ) : (
-                <Stack spacing={2}>
-                  {rsvpFormSettings.customFields.map((field, index) => (
-                    <Card key={field.id} variant="outlined" sx={{ p: 2 }}>
-                      <Stack spacing={2}>
-                        <Stack
-                          direction={{ xs: 'column', sm: 'row' }}
-                          spacing={2}
-                          alignItems={{ xs: 'flex-start', sm: 'center' }}
-                          justifyContent="space-between"
-                        >
-                          <Typography variant="subtitle2">Question {index + 1}</Typography>
-                          <Button color="error" onClick={() => removeCustomField(field.id)}>
-                            Remove
-                          </Button>
-                        </Stack>
-                        <Grid container spacing={2}>
-                          <Grid item xs={12} md={6}>
-                            <TextField
-                              label="Question Label"
-                              value={field.label}
-                              onChange={(e) =>
-                                updateCustomField(field.id, { label: e.target.value })
-                              }
-                              fullWidth
-                            />
-                          </Grid>
-                          <Grid item xs={12} md={6}>
-                            <TextField
-                              select
-                              label="Field Type"
-                              value={field.type}
-                              onChange={(e) => {
-                                const nextType = e.target.value as RsvpCustomFieldType;
-                                updateCustomField(field.id, {
-                                  type: nextType,
-                                  options: customFieldNeedsOptions(nextType) ? field.options : [],
-                                });
-                              }}
-                              fullWidth
-                            >
-                              {CUSTOM_FIELD_TYPES.map((type) => (
-                                <MenuItem key={type} value={type}>
-                                  {formatCustomFieldType(type)}
-                                </MenuItem>
-                              ))}
-                            </TextField>
-                          </Grid>
-                          <Grid item xs={12} md={6}>
-                            <TextField
-                              label="Placeholder"
-                              value={field.placeholder}
-                              onChange={(e) =>
-                                updateCustomField(field.id, { placeholder: e.target.value })
-                              }
-                              fullWidth
-                            />
-                          </Grid>
-                          <Grid item xs={12} md={6}>
-                            <FormControlLabel
-                              control={
-                                <Switch
-                                  checked={field.required}
-                                  onChange={(e) =>
-                                    updateCustomField(field.id, { required: e.target.checked })
-                                  }
-                                />
-                              }
-                              label="Required question"
-                            />
-                          </Grid>
-                          {customFieldNeedsOptions(field.type) && (
-                            <Grid item xs={12}>
-                              <TextField
-                                label="Options"
-                                value={field.options.join('\n')}
-                                onChange={(e) =>
-                                  updateCustomField(field.id, {
-                                    options: e.target.value
-                                      .split('\n')
-                                      .map((option) => option.trim())
-                                      .filter(Boolean),
-                                  })
-                                }
-                                fullWidth
-                                multiline
-                                minRows={4}
-                                helperText="Enter one option per line."
-                              />
-                            </Grid>
-                          )}
-                        </Grid>
-                      </Stack>
-                    </Card>
-                  ))}
-                </Stack>
-              )}
-            </Stack>
+            <RsvpFormBuilder
+              value={rsvpFormSettings}
+              onChange={setRsvpFormSettings}
+              eventName={event?.name}
+            />
             <Stack
               direction={{ xs: 'column', sm: 'row' }}
               spacing={1.5}
@@ -2739,31 +2347,11 @@ export function RsvpAdminView() {
             RSVP Settings
           </Typography>
           <Stack spacing={3}>
-            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
-              <Box>
-                <Typography variant="subtitle2" mb={1}>
-                  RSVP Background Color
-                </Typography>
-                <SketchPicker
-                  color={rsvpBgColor}
-                  onChangeComplete={(color) => setRsvpBgColor(color.hex)}
-                />
-              </Box>
-              <Box>
-                <Typography variant="subtitle2" mb={1}>
-                  RSVP Accent Color
-                </Typography>
-                <SketchPicker
-                  color={rsvpAccentColor}
-                  onChangeComplete={(color) => setRsvpAccentColor(color.hex)}
-                />
-              </Box>
-            </Stack>
-            <Box>
-              <Button variant="contained" onClick={handleSaveRsvpSettings}>
-                Save RSVP Settings
-              </Button>
-            </Box>
+            <Typography variant="body2" color="text.secondary">
+              The RSVP form now uses the Google Forms style (white question cards on a light
+              purple background), so the custom background and accent colours no longer apply.
+              Build the form itself in the Form Settings tab.
+            </Typography>
           </Stack>
         </Card>
       )}
@@ -3231,6 +2819,12 @@ export function RsvpAdminView() {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <SubmissionAnswersDialog
+        record={answersTarget}
+        settings={rsvpFormSettings}
+        onClose={() => setAnswersTarget(null)}
+      />
 
       <Dialog open={Boolean(editTarget)} onClose={closeEditGuestDialog} maxWidth="sm" fullWidth>
         <DialogTitle>
