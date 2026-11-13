@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import type {
+  RsvpTextStyle,
   RsvpFieldMode,
   RsvpShowWhen,
   RsvpCustomField,
@@ -7,7 +8,8 @@ import type {
   RsvpCustomFieldType,
 } from 'src/utils/rsvp-form';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
+import { Helmet } from 'react-helmet-async';
 
 import Box from '@mui/material/Box';
 import Card from '@mui/material/Card';
@@ -20,11 +22,18 @@ import MenuItem from '@mui/material/MenuItem';
 import TextField from '@mui/material/TextField';
 import IconButton from '@mui/material/IconButton';
 import Typography from '@mui/material/Typography';
+import ToggleButton from '@mui/material/ToggleButton';
+import CircularProgress from '@mui/material/CircularProgress';
 import FormControlLabel from '@mui/material/FormControlLabel';
 
 import {
+  tintColor,
+  FONT_SIZES,
   FIELD_TYPES,
+  FONT_FAMILIES,
   MAX_PLUS_ONES,
+  THEME_SWATCHES,
+  googleFontsHref,
   createFieldId,
   createEmptyField,
   fieldNeedsOptions,
@@ -32,16 +41,67 @@ import {
 
 import { Iconify } from 'src/components/iconify/iconify';
 
-// Google Forms palette.
-const G_PURPLE = '#673ab7';
 const G_BLUE = '#4285f4';
-const G_BG = '#f0ebf8';
 
 type Props = {
   value: RsvpFormSettings;
   onChange: (updater: (prev: RsvpFormSettings) => RsvpFormSettings) => void;
   eventName?: string;
+  /** The event's invitation image, used when no custom banner is set. */
+  eventImageUrl?: string;
+  /** Uploads a banner image and resolves to its public URL. */
+  onUploadBanner?: (file: File) => Promise<string>;
 };
+
+function StyleRow({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: RsvpTextStyle;
+  onChange: (next: RsvpTextStyle) => void;
+}) {
+  return (
+    <Stack direction="row" spacing={1} alignItems="center">
+      <Typography variant="body2" sx={{ width: 90 }}>
+        {label}
+      </Typography>
+      <TextField
+        select
+        size="small"
+        value={value.size}
+        onChange={(e) => onChange({ ...value, size: Number(e.target.value) })}
+        sx={{ width: 96 }}
+        aria-label={`${label} size`}
+      >
+        {FONT_SIZES.map((n) => (
+          <MenuItem key={n} value={n}>
+            {n}
+          </MenuItem>
+        ))}
+      </TextField>
+      <ToggleButton
+        size="small"
+        value="bold"
+        selected={value.bold}
+        onChange={() => onChange({ ...value, bold: !value.bold })}
+        aria-label={`${label} bold`}
+      >
+        <Iconify icon="mdi:format-bold" />
+      </ToggleButton>
+      <ToggleButton
+        size="small"
+        value="italic"
+        selected={value.italic}
+        onChange={() => onChange({ ...value, italic: !value.italic })}
+        aria-label={`${label} italic`}
+      >
+        <Iconify icon="mdi:format-italic" />
+      </ToggleButton>
+    </Stack>
+  );
+}
 
 const MODE_OPTIONS: Array<{ value: RsvpFieldMode; label: string }> = [
   { value: 'required', label: 'Required' },
@@ -63,7 +123,7 @@ function FormCard({
 }: {
   children: ReactNode;
   active?: boolean;
-  top?: boolean;
+  top?: string;
   onClick?: () => void;
 }) {
   return (
@@ -75,7 +135,7 @@ function FormCard({
         borderRadius: 2,
         bgcolor: '#fff',
         borderColor: '#dadce0',
-        ...(top && { borderTop: `10px solid ${G_PURPLE}` }),
+        ...(top && { borderTop: `10px solid ${top}` }),
         ...(active && { borderLeft: `6px solid ${G_BLUE}`, boxShadow: 2 }),
       }}
     >
@@ -91,9 +151,26 @@ const optionIcon = (type: RsvpCustomFieldType) =>
       ? 'mdi:checkbox-blank-outline'
       : 'mdi:numeric';
 
-export function RsvpFormBuilder({ value, onChange, eventName }: Props) {
+export function RsvpFormBuilder({
+  value,
+  onChange,
+  eventName,
+  eventImageUrl,
+  onUploadBanner,
+}: Props) {
   const [activeId, setActiveId] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
   const fields = value.customFields;
+  const theme = value.themeColor;
+  const pageBg = value.backgroundColor || tintColor(theme, 0.1);
+  const bannerUrl = value.headerImageUrl || eventImageUrl || '';
+  const backgroundChoices = [
+    { label: 'Light', value: '' },
+    { label: 'Medium', value: tintColor(theme, 0.25) },
+    { label: 'Dark', value: tintColor(theme, 0.4) },
+    { label: 'Grey', value: '#f6f6f6' },
+  ];
 
   const set = (patch: Partial<RsvpFormSettings>) => onChange((prev) => ({ ...prev, ...patch }));
 
@@ -160,10 +237,202 @@ export function RsvpFormBuilder({ value, onChange, eventName }: Props) {
     });
 
   return (
-    <Box sx={{ bgcolor: G_BG, borderRadius: 2, p: { xs: 1.5, sm: 3 } }}>
+    <Box sx={{ bgcolor: pageBg, borderRadius: 2, p: { xs: 1.5, sm: 3 } }}>
+      <Helmet>
+        <link rel="stylesheet" href={googleFontsHref(FONT_FAMILIES)} />
+      </Helmet>
       <Stack spacing={2} sx={{ maxWidth: 770, mx: 'auto' }}>
+        {/* Theme */}
+        <FormCard>
+          <Typography variant="subtitle1" gutterBottom>
+            Theme & header
+          </Typography>
+          <Stack spacing={2.5}>
+            <Box>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Colour
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                {THEME_SWATCHES.map((c) => (
+                  <Box
+                    key={c}
+                    component="button"
+                    type="button"
+                    aria-label={`Theme colour ${c}`}
+                    onClick={() => set({ themeColor: c })}
+                    sx={{
+                      width: 32,
+                      height: 32,
+                      borderRadius: '50%',
+                      bgcolor: c,
+                      cursor: 'pointer',
+                      border: theme.toLowerCase() === c ? '3px solid #202124' : '2px solid #fff',
+                      boxShadow: '0 0 0 1px #dadce0',
+                    }}
+                  />
+                ))}
+                <Tooltip title="Custom colour">
+                  <Box
+                    component="input"
+                    type="color"
+                    value={theme}
+                    onChange={(e: any) => set({ themeColor: e.target.value })}
+                    sx={{ width: 40, height: 34, border: 'none', bgcolor: 'transparent', cursor: 'pointer' }}
+                  />
+                </Tooltip>
+              </Stack>
+            </Box>
+            <Box>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Background
+              </Typography>
+              <Stack direction="row" spacing={1} flexWrap="wrap" useFlexGap alignItems="center">
+                {backgroundChoices.map((b) => {
+                  const swatch = b.value || tintColor(theme, 0.1);
+                  const selected = (value.backgroundColor || '') === b.value;
+                  return (
+                    <Tooltip key={b.label} title={b.label}>
+                      <Box
+                        component="button"
+                        type="button"
+                        aria-label={`${b.label} background`}
+                        onClick={() => set({ backgroundColor: b.value })}
+                        sx={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: '50%',
+                          bgcolor: swatch,
+                          cursor: 'pointer',
+                          border: selected ? '3px solid #202124' : '2px solid #fff',
+                          boxShadow: '0 0 0 1px #dadce0',
+                        }}
+                      />
+                    </Tooltip>
+                  );
+                })}
+              </Stack>
+            </Box>
+            <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2}>
+              <TextField
+                select
+                label="Invitation / banner"
+                value={value.headerLayout}
+                onChange={(e) => set({ headerLayout: e.target.value as RsvpFormSettings['headerLayout'] })}
+                sx={{ minWidth: 260 }}
+                helperText="Beside the form on computers, always above it on phones"
+              >
+                <MenuItem value="side">Beside the form</MenuItem>
+                <MenuItem value="top">Header banner above the form</MenuItem>
+                <MenuItem value="none">Don&apos;t show</MenuItem>
+              </TextField>
+              <TextField
+                select
+                label="Font"
+                value={value.fontFamily}
+                onChange={(e) => set({ fontFamily: e.target.value })}
+                sx={{ minWidth: 220 }}
+              >
+                {FONT_FAMILIES.map((f) => (
+                  <MenuItem key={f} value={f} sx={{ fontFamily: `'${f}', sans-serif` }}>
+                    {f}
+                  </MenuItem>
+                ))}
+              </TextField>
+            </Stack>
+            {value.headerLayout !== 'none' && (
+              <Stack direction={{ xs: 'column', sm: 'row' }} spacing={2} alignItems={{ sm: 'center' }}>
+                {bannerUrl ? (
+                  <Box
+                    component="img"
+                    src={bannerUrl}
+                    alt="Banner"
+                    sx={{
+                      width: 160,
+                      height: 90,
+                      objectFit: 'cover',
+                      borderRadius: 1,
+                      border: '1px solid #dadce0',
+                    }}
+                  />
+                ) : (
+                  <Typography variant="body2" color="text.secondary">
+                    No invitation image on this event yet.
+                  </Typography>
+                )}
+                <Stack spacing={1}>
+                  <Typography variant="caption" color="text.secondary">
+                    {value.headerImageUrl
+                      ? 'Using a custom banner.'
+                      : 'Using the event invitation (IV).'}
+                  </Typography>
+                  <Stack direction="row" spacing={1}>
+                    {onUploadBanner && (
+                      <Button
+                        size="small"
+                        variant="outlined"
+                        disabled={uploading}
+                        startIcon={
+                          uploading ? <CircularProgress size={14} /> : <Iconify icon="mdi:image-plus" />
+                        }
+                        onClick={() => fileRef.current?.click()}
+                      >
+                        Upload banner
+                      </Button>
+                    )}
+                    {value.headerImageUrl && (
+                      <Button size="small" onClick={() => set({ headerImageUrl: '' })}>
+                        Use invitation instead
+                      </Button>
+                    )}
+                  </Stack>
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    hidden
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0];
+                      e.target.value = '';
+                      if (!file || !onUploadBanner) return;
+                      setUploading(true);
+                      try {
+                        const url = await onUploadBanner(file);
+                        if (url) set({ headerImageUrl: url });
+                      } finally {
+                        setUploading(false);
+                      }
+                    }}
+                  />
+                </Stack>
+              </Stack>
+            )}
+            <Box>
+              <Typography variant="body2" color="text.secondary" gutterBottom>
+                Text style
+              </Typography>
+              <Stack spacing={1}>
+                <StyleRow
+                  label="Header"
+                  value={value.titleStyle}
+                  onChange={(next) => set({ titleStyle: next })}
+                />
+                <StyleRow
+                  label="Question"
+                  value={value.questionStyle}
+                  onChange={(next) => set({ questionStyle: next })}
+                />
+                <StyleRow
+                  label="Text"
+                  value={value.textStyle}
+                  onChange={(next) => set({ textStyle: next })}
+                />
+              </Stack>
+            </Box>
+          </Stack>
+        </FormCard>
+
         {/* Header */}
-        <FormCard top>
+        <FormCard top={theme}>
           <TextField
             variant="standard"
             fullWidth
@@ -171,7 +440,14 @@ export function RsvpFormBuilder({ value, onChange, eventName }: Props) {
             value={value.formTitle}
             onChange={(e) => set({ formTitle: e.target.value })}
             helperText="Form title (leave empty to use the event name)"
-            InputProps={{ sx: { fontSize: 28, fontWeight: 400 } }}
+            InputProps={{
+              sx: {
+                fontFamily: `'${value.fontFamily}', Roboto, sans-serif`,
+                fontSize: Math.min(value.titleStyle.size, 36),
+                fontWeight: value.titleStyle.bold ? 700 : 400,
+                fontStyle: value.titleStyle.italic ? 'italic' : 'normal',
+              },
+            }}
           />
           <TextField
             variant="standard"
@@ -506,7 +782,7 @@ export function RsvpFormBuilder({ value, onChange, eventName }: Props) {
         <Stack direction={{ xs: 'column', sm: 'row' }} spacing={1.5}>
           <Button
             variant="contained"
-            sx={{ bgcolor: G_PURPLE, '&:hover': { bgcolor: '#5e35b1' } }}
+            sx={{ bgcolor: theme, '&:hover': { bgcolor: theme, filter: 'brightness(0.9)' } }}
             startIcon={<Iconify icon="mingcute:add-line" />}
             onClick={() => addField('text')}
           >
@@ -514,7 +790,7 @@ export function RsvpFormBuilder({ value, onChange, eventName }: Props) {
           </Button>
           <Button
             variant="outlined"
-            sx={{ color: G_PURPLE, borderColor: G_PURPLE }}
+            sx={{ color: theme, borderColor: theme }}
             startIcon={<Iconify icon="mdi:format-title" />}
             onClick={() => addField('section')}
           >

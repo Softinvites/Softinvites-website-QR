@@ -10,7 +10,13 @@ import { useParams } from 'react-router-dom';
 import { useMemo, useState, useEffect } from 'react';
 
 import { API_BASE } from 'src/utils/apiBase';
-import { fieldIsVisible, normalizeRsvpFormSettings } from 'src/utils/rsvp-form';
+import {
+  tintColor,
+  shadeColor,
+  fieldIsVisible,
+  googleFontsHref,
+  normalizeRsvpFormSettings,
+} from 'src/utils/rsvp-form';
 
 type AttendanceStatus = 'yes' | 'no';
 type CustomResponseValue = string | string[];
@@ -36,8 +42,6 @@ type RsvpFormResponse = {
   };
 };
 
-// Google Forms purple, used for every event (custom colours no longer apply).
-const G_PURPLE = '#673ab7';
 const REQUIRED_MESSAGE = 'This is a required question';
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 
@@ -398,13 +402,30 @@ export default function RsvpPage() {
     }
   };
 
-  const invitation = useMemo(() => {
-    if (!payload) return null;
-    if (payload.event.iv) {
-      return <img src={payload.event.iv} alt="Invitation" className="gf-iv" />;
-    }
-    return null;
-  }, [payload]);
+  const headerImage =
+    formSettings.headerLayout === 'none'
+      ? ''
+      : formSettings.headerImageUrl || payload?.event?.iv || '';
+  const sideImage = formSettings.headerLayout === 'side' ? headerImage : '';
+  const topImage = formSettings.headerLayout === 'top' ? headerImage : '';
+  const invitation = sideImage ? <img src={sideImage} alt="Invitation" className="gf-iv" /> : null;
+
+  const theme = formSettings.themeColor;
+  const styleVar = (s: { size: number; bold: boolean; italic: boolean }, prefix: string) => ({
+    [`--gf-${prefix}-size`]: `${s.size}px`,
+    [`--gf-${prefix}-weight`]: s.bold ? '700' : '400',
+    [`--gf-${prefix}-style`]: s.italic ? 'italic' : 'normal',
+  });
+  const pageStyle = {
+    '--gf-purple': theme,
+    '--gf-purple-dark': shadeColor(theme, 0.85),
+    '--gf-purple-soft': tintColor(theme, 0.08),
+    '--gf-bg': formSettings.backgroundColor || tintColor(theme, 0.1),
+    '--gf-font': `'${formSettings.fontFamily}', Roboto, Arial, sans-serif`,
+    ...styleVar(formSettings.titleStyle, 'title'),
+    ...styleVar(formSettings.questionStyle, 'question'),
+    ...styleVar(formSettings.textStyle, 'text'),
+  } as React.CSSProperties;
 
   const renderField = (field: RsvpCustomField) => {
     const value = responses[field.id];
@@ -542,15 +563,19 @@ export default function RsvpPage() {
   const showForm = !loading && !isRedirecting && !error && payload && !formInvalidated;
 
   return (
-    <div className="gf-page">
+    <div className="gf-page" style={pageStyle}>
       <Helmet>
         <title>RSVP | Softinvite</title>
+        <link rel="stylesheet" href={googleFontsHref([formSettings.fontFamily])} />
       </Helmet>
 
       <div className={`gf-shell${invitation ? ' gf-shell--with-iv' : ''}`}>
         {invitation && <div className="gf-left">{invitation}</div>}
 
         <div className="gf-right">
+          {topImage && !loading && (
+            <img src={topImage} alt="Invitation" className="gf-banner" />
+          )}
           {(loading || isRedirecting) && (
             <div className="gf-card gf-header">
               <p className="gf-muted">{isRedirecting ? 'Redirecting...' : 'Loading RSVP...'}</p>
@@ -574,7 +599,7 @@ export default function RsvpPage() {
                 status={submitted.status}
                 rsvpId={submitted.rsvpId}
                 eventName={payload.event.name}
-                accentColor={G_PURPLE}
+                accentColor={theme}
                 accentTextColor="#ffffff"
               />
             </div>

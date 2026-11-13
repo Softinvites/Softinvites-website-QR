@@ -2310,6 +2310,22 @@ export function RsvpAdminView() {
               value={rsvpFormSettings}
               onChange={setRsvpFormSettings}
               eventName={event?.name}
+              eventImageUrl={event?.iv}
+              onUploadBanner={async (file) => {
+                try {
+                  const uploaded = await uploadEventAsset({
+                    token: token || '',
+                    file,
+                    assetType: 'iv',
+                    eventRef: eventId,
+                  });
+                  toast.success('Banner uploaded. Save RSVP form settings to apply it.');
+                  return uploaded.url;
+                } catch (err: any) {
+                  toast.error(err?.message || 'Failed to upload banner');
+                  return '';
+                }
+              }}
             />
             <Stack
               direction={{ xs: 'column', sm: 'row' }}
