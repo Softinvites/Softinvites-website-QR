@@ -141,6 +141,10 @@ export function UserView() {
           rsvpDeadline: event.rsvpDeadline,
           eventEndDate: event.eventEndDate,
           customMessageSequence: event.customMessageSequence,
+          // Needed so the Edit dialog shows (and re-saves) the saved settings.
+          emailSenderMode: event.emailSenderMode,
+          emailSenderName: event.emailSenderName,
+          smsFallbackEnabled: event.smsFallbackEnabled === true,
         }));
 
         // console.log('Formatted Data:', formattedData);

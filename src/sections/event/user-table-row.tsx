@@ -270,6 +270,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import axios from 'axios';
 import {
+  Box,
   Popover,
   TableRow,
   Checkbox,
@@ -313,6 +314,7 @@ export type UserProps = {
   customMessageSequence?: any;
   emailSenderMode?: 'softinvites' | 'event' | 'custom';
   emailSenderName?: string;
+  smsFallbackEnabled?: boolean;
 };
 
 type UserTableRowProps = {
@@ -350,6 +352,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     'softinvites' | 'event' | 'custom'
   >(row.emailSenderMode || 'softinvites');
   const [editEmailSenderName, setEditEmailSenderName] = useState(row.emailSenderName || '');
+  const [editSmsFallback, setEditSmsFallback] = useState(row.smsFallbackEnabled === true);
 
   useEffect(() => {
     const storedIds = JSON.parse(localStorage.getItem('allRowIds') || '[]');
@@ -391,6 +394,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
       formData.append('servicePackage', editEventMode);
       formData.append('emailSenderMode', editEmailSenderMode);
       formData.append('emailSenderName', editEmailSenderName.trim());
+      formData.append('smsFallbackEnabled', String(editSmsFallback));
 
       const channelConfig = {
         email: { enabled: true, required: true, trackingEnabled: true },
@@ -456,6 +460,7 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
     editEnableSms,
     editEmailSenderMode,
     editEmailSenderName,
+    editSmsFallback,
     handleCloseDialog,
   ]);
 
@@ -700,6 +705,25 @@ export function UserTableRow({ row, selected, onSelectRow }: UserTableRowProps) 
               placeholder="e.g. The Odunsi & Cole Family"
             />
           )}
+          <FormControlLabel
+            sx={{ mt: 1, alignItems: 'flex-start' }}
+            control={
+              <Checkbox
+                checked={editSmsFallback}
+                onChange={(e) => setEditSmsFallback(e.target.checked)}
+                sx={{ pt: 0.5 }}
+              />
+            }
+            label={
+              <Box>
+                <Typography variant="body2">SMS backup when WhatsApp fails</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  If a guest&apos;s WhatsApp message is not delivered, send them one SMS with their
+                  link. SMS is charged per message.
+                </Typography>
+              </Box>
+            }
+          />
           <Typography variant="subtitle1" sx={{ mt: 2 }}>
             Replace Invitation Image (JPEG/PNG/WEBP):
           </Typography>

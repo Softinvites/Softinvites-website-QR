@@ -31,6 +31,7 @@ import EventModal from './GuestModal';
 import BatchDownloadModal from './BatchDownloadModal';
 import DeleteConfirmModal from './DeleteConfirmModal';
 import BatchDeleteModal from './BatchDeleteModal';
+import EmailStatusDialog from './EmailStatusDialog';
 import WhatsAppStatusDialog from './WhatsAppStatusDialog';
 import WhatsAppSendDialog from './WhatsAppSendDialog';
 import EmailSendDialog from './EmailSendDialog';
@@ -140,6 +141,7 @@ export function GuestView() {
   const [batchModalOpen, setBatchModalOpen] = useState(false);
   const [whatsappStatusOpen, setWhatsappStatusOpen] = useState(false);
   const [whatsappSendOpen, setWhatsappSendOpen] = useState(false);
+  const [emailStatusOpen, setEmailStatusOpen] = useState(false);
   const [emailSendOpen, setEmailSendOpen] = useState(false);
   const [whatsappTemplateSamples, setWhatsappTemplateSamples] = useState<WhatsAppTemplateSample[]>(
     []
@@ -985,6 +987,26 @@ export function GuestView() {
 
                 <Grid item xs={6} md={2.4}>
                   <Button
+                    variant="outlined"
+                    startIcon={<Iconify icon="material-symbols:mark-email-read-outline" />}
+                    onClick={() => setEmailStatusOpen(true)}
+                    disabled={!eventId}
+                    sx={{
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                      letterSpacing: '0.2px',
+                      textTransform: 'none',
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      height: { xs: '52px', sm: '40px', md: '48px' },
+                      width: '100%',
+                    }}
+                  >
+                    Email Status
+                  </Button>
+                </Grid>
+
+                <Grid item xs={6} md={2.4}>
+                  <Button
                     variant="contained"
                     startIcon={<Iconify icon="logos:whatsapp-icon" />}
                     onClick={handleSendBulkWhatsApp}
@@ -1302,6 +1324,14 @@ export function GuestView() {
         selectedCount={table.selected.length}
         loading={guestLoading}
       />
+
+      {eventId && (
+        <EmailStatusDialog
+          open={emailStatusOpen}
+          onClose={() => setEmailStatusOpen(false)}
+          eventId={eventId}
+        />
+      )}
 
       {/* WhatsApp Status Dialog */}
       {eventId && (
