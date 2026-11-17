@@ -722,7 +722,7 @@ export default function RsvpPage() {
                   title={formSettings.plusOnesLabel}
                   description={`You can add up to ${formSettings.plusOnesMax} guest${
                     formSettings.plusOnesMax === 1 ? '' : 's'
-                  }. Phone and email are optional.`}
+                  }. Add each guest's full name, phone number and email.`}
                 >
                   {plusOnes.map((p, i) => (
                     <div
@@ -763,7 +763,7 @@ export default function RsvpPage() {
                         <input
                           className="gf-input"
                           type="tel"
-                          placeholder="Phone (optional)"
+                          placeholder="Phone number"
                           aria-label={`Guest ${i + 1} phone`}
                           value={p.phone}
                           disabled={submitting}
@@ -772,7 +772,7 @@ export default function RsvpPage() {
                         <input
                           className="gf-input"
                           type="email"
-                          placeholder="Email (optional)"
+                          placeholder="Email"
                           aria-label={`Guest ${i + 1} email`}
                           value={p.email}
                           disabled={submitting}

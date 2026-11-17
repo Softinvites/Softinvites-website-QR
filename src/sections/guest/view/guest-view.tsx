@@ -35,6 +35,7 @@ import EmailStatusDialog from './EmailStatusDialog';
 import WhatsAppStatusDialog from './WhatsAppStatusDialog';
 import WhatsAppSendDialog from './WhatsAppSendDialog';
 import EmailSendDialog from './EmailSendDialog';
+import SmsSendDialog from './SmsSendDialog';
 import { AnalyticsWidgetSummary } from '../../overview/analytics-widget-summary';
 
 type EventCatalogRecord = {
@@ -143,6 +144,7 @@ export function GuestView() {
   const [whatsappSendOpen, setWhatsappSendOpen] = useState(false);
   const [emailStatusOpen, setEmailStatusOpen] = useState(false);
   const [emailSendOpen, setEmailSendOpen] = useState(false);
+  const [smsSendOpen, setSmsSendOpen] = useState(false);
   const [whatsappTemplateSamples, setWhatsappTemplateSamples] = useState<WhatsAppTemplateSample[]>(
     []
   );
@@ -460,6 +462,38 @@ export function GuestView() {
     }
   };
 
+
+  // Texts each guest a link to their QR code.
+  const handleSendSms = async (guestIds: string[] | null) => {
+    setGuestLoading(true);
+    try {
+      const token = localStorage.getItem('token');
+      const eventIdArray = localStorage.getItem('allRowIds');
+      if (!token || !eventIdArray) {
+        toast.error('Authentication required or no event IDs found');
+        return;
+      }
+      const parsedIds = JSON.parse(eventIdArray);
+      const derivedEventId = Array.isArray(parsedIds) && parsedIds.length > 0 ? parsedIds[0] : null;
+      if (!derivedEventId) {
+        toast.error('No valid event ID found');
+        return;
+      }
+      const response = await axios.post(
+        `${API_BASE}/guest/send-sms/${derivedEventId}`,
+        guestIds ? { guestIds } : {},
+        { headers: { Authorization: `Bearer ${token}` }, timeout: 60000 }
+      );
+      if (response.data?.failed) toast.warning(response.data?.message);
+      else toast.success(response.data?.message || 'SMS sent');
+      setSmsSendOpen(false);
+    } catch (err: any) {
+      console.error('Error sending SMS:', err);
+      toast.error(err.response?.data?.message || 'Failed to send SMS');
+    } finally {
+      setGuestLoading(false);
+    }
+  };
 
   const handleSendBulkWhatsApp = async () => {
     const token = localStorage.getItem('token');
@@ -1032,6 +1066,30 @@ export function GuestView() {
                 <Grid item xs={6} md={2.4}>
                   <Button
                     variant="contained"
+                    startIcon={<Iconify icon="material-symbols:sms" />}
+                    onClick={() => setSmsSendOpen(true)}
+                    disabled={guestLoading}
+                    sx={{
+                      backgroundColor: '#6a1b9a',
+                      '&:hover': {
+                        backgroundColor: '#4a148c',
+                      },
+                      color: '#fff',
+                      fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                      padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                      letterSpacing: '0.2px',
+                      textTransform: 'none',
+                      minWidth: { xs: 'auto', sm: 'auto' },
+                      height: { xs: '52px', sm: '40px', md: '48px' },
+                    }}
+                  >
+                    Send SMS
+                  </Button>
+                </Grid>
+
+                <Grid item xs={6} md={2.4}>
+                  <Button
+                    variant="contained"
                     startIcon={<Iconify icon="solar:clipboard-list-bold" />}
                     onClick={() => {
                       if (eventId) {
@@ -1347,6 +1405,14 @@ export function GuestView() {
         open={emailSendOpen}
         onClose={() => setEmailSendOpen(false)}
         onConfirm={handleSendEmails}
+        loading={guestLoading}
+        guests={users}
+        selectedGuestIds={table.selected}
+      />
+      <SmsSendDialog
+        open={smsSendOpen}
+        onClose={() => setSmsSendOpen(false)}
+        onConfirm={handleSendSms}
         loading={guestLoading}
         guests={users}
         selectedGuestIds={table.selected}
