@@ -463,6 +463,46 @@ export function GuestView() {
   };
 
 
+  // Opens the self check-in kiosk with a check-in token limited to this
+  // event (never the dashboard login, since the tablet is left with guests).
+  const [kioskOpening, setKioskOpening] = useState(false);
+  const handleOpenKiosk = async () => {
+    const urlToken = new URLSearchParams(window.location.search).get('token');
+    if (urlToken) {
+      // Check-in staff already hold an event-scoped token.
+      window.location.href = `https://softinvite-scan.vercel.app/kiosk?token=${urlToken}`;
+      return;
+    }
+    const token = localStorage.getItem('token');
+    let kioskEventId = eventId;
+    try {
+      if (!kioskEventId) {
+        const parsed = JSON.parse(localStorage.getItem('allRowIds') || '[]');
+        kioskEventId = Array.isArray(parsed) && parsed.length ? parsed[0] : '';
+      }
+    } catch {
+      kioskEventId = '';
+    }
+    if (!token || !kioskEventId) {
+      toast.error('Open an event first, then start the kiosk.');
+      return;
+    }
+    setKioskOpening(true);
+    try {
+      const { data } = await axios.post<{ tempLink: string }>(
+        `${API_BASE}/guest/generate-temp-link/${kioskEventId}`,
+        {},
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      const checkinToken = new URL(data.tempLink).searchParams.get('token');
+      if (!checkinToken) throw new Error('No token');
+      window.location.href = `https://softinvite-scan.vercel.app/kiosk?token=${checkinToken}`;
+    } catch {
+      toast.error('Could not open the kiosk. Please try again.');
+      setKioskOpening(false);
+    }
+  };
+
   // Texts each guest a link to their QR code.
   const handleSendSms = async (guestIds: string[] | null) => {
     setGuestLoading(true);
@@ -1117,7 +1157,7 @@ export function GuestView() {
               </>
             )}
 
-            <Grid item xs={isAdmin ? 12 : 6} md={isAdmin ? 12 : 3}>
+            <Grid item xs={isAdmin ? 12 : 6} md={isAdmin ? 6 : 3}>
               <Button
                 variant="contained"
                 color="secondary"
@@ -1150,6 +1190,27 @@ export function GuestView() {
                 }}
               >
                 Scan Guest
+              </Button>
+            </Grid>
+
+            <Grid item xs={isAdmin ? 12 : 6} md={isAdmin ? 6 : 3}>
+              <Button
+                variant="outlined"
+                color="secondary"
+                startIcon={<Iconify icon="mdi:tablet-dashboard" />}
+                onClick={handleOpenKiosk}
+                disabled={kioskOpening}
+                sx={{
+                  fontSize: { xs: '0.75rem', sm: '0.875rem', md: '1rem' },
+                  padding: { xs: '2px 6px', sm: '6px 8px', md: '8px 10px' },
+                  letterSpacing: '0.2px',
+                  textTransform: 'none',
+                  minWidth: { xs: 'auto', sm: 'auto' },
+                  height: { xs: '52px', sm: '40px', md: '48px' },
+                  width: '100%',
+                }}
+              >
+                {kioskOpening ? 'Opening kiosk…' : 'Self Check-in Kiosk'}
               </Button>
             </Grid>
           </Grid>

@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
+import { SketchPicker } from 'react-color';
 import { useRef, useMemo, useState, useEffect, useCallback } from 'react';
 
 import Box from '@mui/material/Box';
@@ -80,6 +81,7 @@ type RsvpRecord = {
   comments?: string;
   responses?: Record<string, any>;
   plusOnes?: Array<{ name: string; phone?: string | null; email?: string | null }>;
+  plusOneHistory?: Array<{ at: string; action: string; from?: string | null; to?: string | null }>;
 };
 
 type RsvpAttendanceStatus = 'pending' | 'yes' | 'no';
@@ -91,7 +93,12 @@ type EditGuestFormState = {
   attendanceStatus: RsvpAttendanceStatus;
   guestCount: string;
   tag: string;
+  plusOnes: Array<{ name: string; phone: string; email: string }>;
+  /** True once the admin changes plus-ones; only then are they sent. */
+  plusOnesTouched: boolean;
 };
+
+const MAX_PLUS_ONES_EDIT = 10;
 
 type AddGuestFormState = {
   guestName: string;
@@ -158,6 +165,8 @@ const defaultEditGuestFormState: EditGuestFormState = {
   attendanceStatus: 'pending',
   guestCount: '1',
   tag: '',
+  plusOnes: [],
+  plusOnesTouched: false,
 };
 
 const parseGuestCountInput = (value: string) => {
@@ -333,7 +342,7 @@ export function RsvpAdminView() {
   const [formLinkTitle, setFormLinkTitle] = useState('');
   const [formLinkRedirectUrl, setFormLinkRedirectUrl] = useState('');
   const [rsvpBgColor, setRsvpBgColor] = useState('#111827');
-  const [rsvpAccentColor, setRsvpAccentColor] = useState('#1f2937');
+  const [rsvpAccentColor, setRsvpAccentColor] = useState('#6b7280');
   const [rsvpFormSettings, setRsvpFormSettings] =
     useState<RsvpFormSettings>(defaultRsvpFormSettings);
   const [formResponsesDialog, setFormResponsesDialog] = useState<null | 'stop' | 'resume'>(null);
@@ -577,7 +586,7 @@ export function RsvpAdminView() {
     setFormLink('');
     setFormLinkTitle('');
     setRsvpBgColor('#111827');
-    setRsvpAccentColor('#1f2937');
+    setRsvpAccentColor('#6b7280');
     setRsvpFormSettings(defaultRsvpFormSettings);
     setSchedules([]);
     setReports([]);
@@ -680,7 +689,7 @@ export function RsvpAdminView() {
         if (nextEvent?.rsvpAccentColor) {
           setRsvpAccentColor(rgbToHex(nextEvent.rsvpAccentColor));
         } else {
-          setRsvpAccentColor('#1f2937');
+          setRsvpAccentColor('#6b7280');
         }
         if (nextEvent?.rsvpFormSettings) {
           setRsvpFormSettings(normalizeRsvpFormSettings(nextEvent.rsvpFormSettings));
@@ -1003,8 +1012,19 @@ export function RsvpAdminView() {
       attendanceStatus: guest.attendanceStatus || 'pending',
       guestCount: String(guest.guestCount || 1),
       tag: guest.tag || '',
+      plusOnes: (guest.plusOnes || []).map((p) => ({
+        name: p.name || '',
+        phone: p.phone || '',
+        email: p.email || '',
+      })),
+      plusOnesTouched: false,
     });
   }, []);
+
+  const changeEditPlusOnes = (
+    update: (list: EditGuestFormState['plusOnes']) => EditGuestFormState['plusOnes']
+  ) =>
+    setEditGuest((prev) => ({ ...prev, plusOnes: update(prev.plusOnes), plusOnesTouched: true }));
 
   const closeEditGuestDialog = useCallback(() => {
     if (editLoading) return;
@@ -1018,7 +1038,11 @@ export function RsvpAdminView() {
       toast.error('Guest name is required');
       return;
     }
-    if (mode !== 'invitation-only') {
+    if (editGuest.plusOnesTouched && editGuest.plusOnes.some((p) => !p.name.trim())) {
+      toast.error('Enter a name for each plus-one, or remove the empty row');
+      return;
+    }
+    if (mode !== 'invitation-only' && !editGuest.plusOnesTouched) {
       const parsedGuestCount = parseGuestCountInput(editGuest.guestCount);
       if (Number.isNaN(parsedGuestCount) || parsedGuestCount < 1) {
         toast.error('Guest count must be at least 1');
@@ -1038,8 +1062,19 @@ export function RsvpAdminView() {
             ? {}
             : {
                 attendanceStatus: editGuest.attendanceStatus,
-                guestCount: parseGuestCountInput(editGuest.guestCount),
+                guestCount: editGuest.plusOnesTouched
+                  ? 1 + editGuest.plusOnes.length
+                  : parseGuestCountInput(editGuest.guestCount),
                 tag: normalizeTagValue(editGuest.tag),
+                ...(editGuest.plusOnesTouched
+                  ? {
+                      plusOnes: editGuest.plusOnes.map((p) => ({
+                        name: p.name.trim(),
+                        phone: p.phone.trim(),
+                        email: p.email.trim(),
+                      })),
+                    }
+                  : {}),
               }),
         },
         { headers: { Authorization: `Bearer ${token}` } }
@@ -2364,10 +2399,34 @@ export function RsvpAdminView() {
           </Typography>
           <Stack spacing={3}>
             <Typography variant="body2" color="text.secondary">
-              The RSVP form now uses the Google Forms style (white question cards on a light
-              purple background), so the custom background and accent colours no longer apply.
-              Build the form itself in the Form Settings tab.
+              These colours are used for the attendance buttons in RSVP emails. The RSVP form page
+              has its own theme colour in the Form Settings tab.
             </Typography>
+            <Stack direction={{ xs: 'column', md: 'row' }} spacing={3}>
+              <Box>
+                <Typography variant="subtitle2" mb={1}>
+                  &quot;Yes, I will attend&quot; button colour
+                </Typography>
+                <SketchPicker
+                  color={rsvpBgColor}
+                  onChangeComplete={(color) => setRsvpBgColor(color.hex)}
+                />
+              </Box>
+              <Box>
+                <Typography variant="subtitle2" mb={1}>
+                  &quot;Unable to attend&quot; button colour
+                </Typography>
+                <SketchPicker
+                  color={rsvpAccentColor}
+                  onChangeComplete={(color) => setRsvpAccentColor(color.hex)}
+                />
+              </Box>
+            </Stack>
+            <Box>
+              <Button variant="contained" onClick={handleSaveRsvpSettings}>
+                Save button colours
+              </Button>
+            </Box>
           </Stack>
         </Card>
       )}
@@ -2872,13 +2931,117 @@ export function RsvpAdminView() {
                 <TextField
                   label="Guest Count"
                   type="number"
-                  value={editGuest.guestCount}
+                  value={
+                    editGuest.plusOnesTouched || editGuest.plusOnes.length
+                      ? String(1 + editGuest.plusOnes.length)
+                      : editGuest.guestCount
+                  }
                   onChange={(e) =>
                     setEditGuest((prev) => ({ ...prev, guestCount: e.target.value }))
+                  }
+                  disabled={editGuest.plusOnesTouched || editGuest.plusOnes.length > 0}
+                  helperText={
+                    editGuest.plusOnesTouched || editGuest.plusOnes.length
+                      ? 'Set automatically: the guest plus their plus-ones.'
+                      : undefined
                   }
                   inputProps={{ min: 1, step: 1 }}
                   fullWidth
                 />
+                <Box>
+                  <Typography variant="subtitle2">Plus-ones</Typography>
+                  <Typography variant="caption" color="text.secondary">
+                    To swap a guest, type the new person&apos;s details over the old ones. Changes
+                    are kept in the history below.
+                  </Typography>
+                  <Stack spacing={1.5} mt={1.5}>
+                    {editGuest.plusOnes.map((p, i) => (
+                      <Stack
+                        key={i}
+                        direction={{ xs: 'column', sm: 'row' }}
+                        spacing={1}
+                        alignItems={{ sm: 'center' }}
+                      >
+                        <TextField
+                          size="small"
+                          label={`Plus-one ${i + 1} name`}
+                          value={p.name}
+                          onChange={(e) =>
+                            changeEditPlusOnes((list) =>
+                              list.map((x, j) => (j === i ? { ...x, name: e.target.value } : x))
+                            )
+                          }
+                          fullWidth
+                          required
+                        />
+                        <TextField
+                          size="small"
+                          label="Phone"
+                          value={p.phone}
+                          onChange={(e) =>
+                            changeEditPlusOnes((list) =>
+                              list.map((x, j) => (j === i ? { ...x, phone: e.target.value } : x))
+                            )
+                          }
+                          fullWidth
+                        />
+                        <TextField
+                          size="small"
+                          label="Email"
+                          value={p.email}
+                          onChange={(e) =>
+                            changeEditPlusOnes((list) =>
+                              list.map((x, j) => (j === i ? { ...x, email: e.target.value } : x))
+                            )
+                          }
+                          fullWidth
+                        />
+                        <Button
+                          color="error"
+                          size="small"
+                          onClick={() => changeEditPlusOnes((list) => list.filter((_, j) => j !== i))}
+                        >
+                          Remove
+                        </Button>
+                      </Stack>
+                    ))}
+                    {editGuest.plusOnes.length < MAX_PLUS_ONES_EDIT && (
+                      <Box>
+                        <Button
+                          size="small"
+                          startIcon={<Iconify icon="mingcute:add-line" />}
+                          onClick={() =>
+                            changeEditPlusOnes((list) => [...list, { name: '', phone: '', email: '' }])
+                          }
+                        >
+                          Add plus-one
+                        </Button>
+                      </Box>
+                    )}
+                  </Stack>
+                  {!!editTarget?.plusOneHistory?.length && (
+                    <Box mt={1.5}>
+                      <Typography variant="caption" color="text.secondary" fontWeight={600}>
+                        Change history
+                      </Typography>
+                      {[...editTarget.plusOneHistory]
+                        .reverse()
+                        .slice(0, 8)
+                        .map((h, i) => (
+                          <Typography key={i} variant="caption" display="block" color="text.secondary">
+                            {new Date(h.at).toLocaleString()} —{' '}
+                            {h.action === 'replaced'
+                              ? `replaced ${h.from} with ${h.to}`
+                              : h.action === 'removed'
+                                ? `removed ${h.from}`
+                                : h.action === 'added'
+                                  ? `added ${h.to}`
+                                  : `updated details for ${h.to}`}
+                          </Typography>
+                        ))}
+                    </Box>
+                  )}
+                </Box>
                 <TextField
                   label="Tag"
                   value={editGuest.tag}
